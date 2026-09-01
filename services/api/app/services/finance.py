@@ -6,6 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Account, Transaction, Budget, SavingsGoal, Category
 
+# Postgres returns SUM(bigint) as NUMERIC, which SQLAlchemy hands back as a
+# decimal.Decimal; SQLite returns a plain int. Decimal and float do not mix
+# (Decimal * 100.0 raises TypeError), and this app's whole contract is integer
+# minor units - so every aggregate is coerced to int at the source.
+
 async def calculate_account_balance(db: AsyncSession, account_id: uuid.UUID) -> int:
     """
     Calculates the dynamic balance of an account in minor units (paise)
@@ -20,25 +25,25 @@ async def calculate_account_balance(db: AsyncSession, account_id: uuid.UUID) -> 
         and_(Transaction.account_id == account_id, Transaction.transaction_type == "income")
     )
     inc_res = await db.execute(inc_stmt)
-    income_sum = inc_res.scalar() or 0
+    income_sum = int(inc_res.scalar() or 0)
 
     exp_stmt = select(func.coalesce(func.sum(Transaction.amount_minor), 0)).where(
         and_(Transaction.account_id == account_id, Transaction.transaction_type == "expense")
     )
     exp_res = await db.execute(exp_stmt)
-    expense_sum = exp_res.scalar() or 0
+    expense_sum = int(exp_res.scalar() or 0)
 
     in_trf_stmt = select(func.coalesce(func.sum(Transaction.amount_minor), 0)).where(
         and_(Transaction.to_account_id == account_id, Transaction.transaction_type == "transfer")
     )
     in_trf_res = await db.execute(in_trf_stmt)
-    incoming_transfers = in_trf_res.scalar() or 0
+    incoming_transfers = int(in_trf_res.scalar() or 0)
 
     out_trf_stmt = select(func.coalesce(func.sum(Transaction.amount_minor), 0)).where(
         and_(Transaction.account_id == account_id, Transaction.transaction_type == "transfer")
     )
     out_trf_res = await db.execute(out_trf_stmt)
-    outgoing_transfers = out_trf_res.scalar() or 0
+    outgoing_transfers = int(out_trf_res.scalar() or 0)
 
     if account.account_type.lower() == "liability":
         balance = account.opening_balance_minor - income_sum + expense_sum - incoming_transfers + outgoing_transfers
@@ -85,7 +90,7 @@ async def calculate_income_totals(
 
     stmt = select(func.coalesce(func.sum(Transaction.amount_minor), 0)).where(and_(*filters))
     res = await db.execute(stmt)
-    return res.scalar() or 0
+    return int(res.scalar() or 0)
 
 
 async def calculate_expense_totals(
@@ -106,7 +111,7 @@ async def calculate_expense_totals(
 
     stmt = select(func.coalesce(func.sum(Transaction.amount_minor), 0)).where(and_(*filters))
     res = await db.execute(stmt)
-    return res.scalar() or 0
+    return int(res.scalar() or 0)
 
 
 async def calculate_cash_flow(
@@ -147,7 +152,7 @@ async def calculate_budget_spending(
         )
     )
     res = await db.execute(stmt)
-    return res.scalar() or 0
+    return int(res.scalar() or 0)
 
 
 async def calculate_budget_remaining(db: AsyncSession, budget_id: uuid.UUID) -> Dict[str, Any]:
@@ -188,7 +193,7 @@ async def calculate_savings_goal_progress(db: AsyncSession, goal_id: uuid.UUID) 
         )
     )
     res = await db.execute(stmt)
-    current_saved = res.scalar() or 0
+    current_saved = int(res.scalar() or 0)
 
     percentage = 0.0
     if goal.target_amount_minor > 0:
@@ -234,16 +239,17 @@ async def calculate_category_breakdown(
     res = await db.execute(stmt)
     rows = res.all()
 
-    total_expense = sum(r.total_minor for r in rows)
+    total_expense = sum(int(r.total_minor) for r in rows)
     result = []
     for r in rows:
-        pct = (r.total_minor / total_expense * 100.0) if total_expense > 0 else 0.0
+        total = int(r.total_minor)
+        pct = (total / total_expense * 100.0) if total_expense > 0 else 0.0
         result.append({
             "category_id": str(r.id),
             "name": r.name,
             "icon": r.icon or "Tag",
             "color": r.color or "#FF6B6B",
-            "total_minor": r.total_minor,
+            "total_minor": total,
             "percentage": round(pct, 2)
         })
     return result
@@ -279,7 +285,7 @@ async def calculate_spending_trends(
     return [
         {
             "date_label": str(r.tx_date),
-            "amount_minor": r.daily_total
+            "amount_minor": int(r.daily_total or 0)
         }
         for r in rows
     ]

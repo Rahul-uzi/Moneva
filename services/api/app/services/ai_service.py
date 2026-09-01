@@ -1,3 +1,4 @@
+import logging
 import re
 import uuid
 import os
@@ -19,6 +20,9 @@ from app.services.ai_tools import (
     get_goals_tool,
     get_bills_tool
 )
+
+logger = logging.getLogger(__name__)
+
 
 class ResponseType(str, Enum):
     ANSWER = "ANSWER"
@@ -164,7 +168,15 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
                     clarification_prompt=llm.get("clarification_prompt"),
                 )
         except Exception:
-            pass  # fall through to the rule engine
+            # Postgres aborts the whole transaction when a statement fails, and
+            # every later query on the same session then errors too. Without
+            # this rollback the fall-through below inherits a dead session and
+            # the rule engine fails for reasons that have nothing to do with it.
+            logger.exception("AI model path failed; falling back to the rule engine")
+            try:
+                await db.rollback()
+            except Exception:
+                logger.exception("Could not roll back the session after an AI failure")
 
     try:
         # 1. Prompt Injection Safeguard: Clean and isolate user prompt
@@ -481,6 +493,9 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
             message=f"I analyzed your request for '{clean_prompt}'. You can ask me about your net worth, expenses, account balances, or ask me to record transactions, pay bills, and transfer funds!"
         )
     except Exception:
+        # Logged with a traceback so a production failure is diagnosable; the
+        # user still gets a neutral message.
+        logger.exception("Assistant rule engine failed for user %s", user_id)
         return AIQueryResponse(
             response_type=ResponseType.ERROR,
             message="An error occurred while processing your financial query. Please try again."
