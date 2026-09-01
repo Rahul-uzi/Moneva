@@ -1,0 +1,16 @@
+{
+  "name": "moneva-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build:web": "npm run build --workspace=apps/web"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "vitest": "^4.1.11"
+  }
+}

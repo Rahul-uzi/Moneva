@@ -1,0 +1,45 @@
+.account-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.account-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-asset { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); }
+.icon-liability { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); }
+
+.account-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--moneva-text-muted);
+  background-color: var(--moneva-overlay-weak);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.account-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+}

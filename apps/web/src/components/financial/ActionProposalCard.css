@@ -1,0 +1,58 @@
+.action-proposal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
+  border: 1px solid var(--moneva-violet);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin: 8px 0;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.2);
+}
+
+.proposal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--moneva-violet);
+  border-bottom: 1px solid rgba(124, 58, 237, 0.3);
+  padding-bottom: 8px;
+}
+
+.proposal-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.proposal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proposal-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.proposal-error {
+  background-color: rgba(255, 107, 107, 0.15);
+  border: 1px solid var(--moneva-coral);
+  color: var(--moneva-text-on-danger);
+  padding: 8px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  text-align: center;
+}
+
+.proposal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}

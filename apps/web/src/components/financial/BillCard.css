@@ -1,0 +1,93 @@
+.bill-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bill-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bill-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--moneva-orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bill-title-box {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.bill-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+}
+
+.bill-due-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bill-due {
+  font-size: 12px;
+  color: var(--moneva-text-secondary);
+}
+
+.recurrence-pill {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  color: var(--moneva-text-muted);
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: 8px;
+  padding: 1px 5px;
+  text-transform: capitalize;
+}
+
+.bill-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+
+.status-upcoming { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); }
+.status-paid { background-color: rgba(16, 185, 129, 0.15); color: var(--moneva-teal); }
+.status-overdue { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); }
+.status-due-today { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); }
+.status-due-soon { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); }
+
+.bill-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--moneva-border);
+  padding-top: 10px;
+}
+
+.text-paid {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-teal);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

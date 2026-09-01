@@ -1,0 +1,82 @@
+.salary-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.salary-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
+  border: 1px solid var(--moneva-blue);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.preview-tag {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.salary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.salary-confirmed-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.confirmed-icon-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--moneva-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmed-amount-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 16px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  gap: 4px;
+}
+
+.confirmed-plan-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-top: 4px;
+}
+
+.cta-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}

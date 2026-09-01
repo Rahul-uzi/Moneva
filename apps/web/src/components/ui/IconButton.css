@@ -1,0 +1,34 @@
+.moneva-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  color: var(--moneva-text-main);
+  outline: none;
+}
+
+.moneva-icon-btn:active {
+  transform: scale(0.92);
+}
+
+.icon-btn-primary {
+  background-color: var(--moneva-blue);
+  color: var(--moneva-white);
+}
+
+.icon-btn-secondary {
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+}
+
+.icon-btn-ghost {
+  background: transparent;
+  color: var(--moneva-text-secondary);
+}
+
+.icon-btn-sm { width: 36px; height: 36px; }
+.icon-btn-md { width: 44px; height: 44px; }
+.icon-btn-lg { width: 52px; height: 52px; }

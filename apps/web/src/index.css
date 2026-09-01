@@ -1,0 +1,449 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Locked MONEVA Brand Palette */
+  --moneva-navy: #0D1321;
+  --moneva-blue: #2563EB;
+  --moneva-teal: #10B981;
+  --moneva-violet: #7C3AED;
+  --moneva-coral: #FF6B6B;
+  --moneva-orange: #F59E0B;
+  --moneva-white: #FFFFFF;
+
+  /* UI Surface Colors */
+  --moneva-bg: #000000;
+  --moneva-surface: #0B0E14;
+  --moneva-card: #101520;
+  --moneva-card-hover: #161C2A;
+  --moneva-border: #1B2233;
+
+  /* Composite surfaces (theme-aware) */
+  --moneva-card-gradient: linear-gradient(135deg, #121A2A 0%, #06080D 100%);
+  --moneva-card-gradient-alt: linear-gradient(135deg, #150F1F 0%, #06080D 100%);
+
+  /* Subtle elevation overlays layered on the current surface */
+  --moneva-overlay-weak: rgba(255, 255, 255, 0.05);
+  --moneva-overlay: rgba(255, 255, 255, 0.08);
+  --moneva-overlay-strong: rgba(255, 255, 255, 0.1);
+
+  /* Status text sitting on a 15%-tinted status background */
+  --moneva-text-on-danger: #FECACA;
+  --moneva-text-on-success: #A7F3D0;
+  --moneva-text-on-warning: #FDE68A;
+  --moneva-text-on-info: #BFDBFE;
+  --moneva-text-on-accent: #DDD6FE;
+
+  /* Page backdrop behind the 480px mobile container */
+  --moneva-backdrop: #000000;
+  --moneva-viewport-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+
+  /* Base stop for accent-tinted panels: linear-gradient(accent 15% -> this) */
+  --moneva-accent-panel-base: rgba(6, 8, 13, 0.95);
+
+  /* Text Typography Colors */
+  --moneva-text-main: #FFFFFF;
+  --moneva-text-secondary: #94A3B8;
+  --moneva-text-muted: #7C8AA0;
+
+  /* Fonts */
+  --font-family: 'Be Vietnam Pro', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Spacing & Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+}
+
+/*
+  LIGHT THEME
+  Only surface + text tokens are redefined; the locked MONEVA brand palette
+  (navy/blue/teal/violet/coral/orange) is identical in both themes.
+  Applied by services/themeService.ts, which stamps <html data-theme="...">.
+*/
+:root[data-theme="light"] {
+  --moneva-bg: #F4F6FA;
+  --moneva-surface: #FFFFFF;
+  --moneva-card: #FFFFFF;
+  --moneva-card-hover: #F1F5F9;
+  --moneva-border: #E2E8F0;
+
+  --moneva-text-main: #0D1321;
+  --moneva-text-secondary: #475569;
+  --moneva-text-muted: #5C6B80;
+
+  --moneva-card-gradient: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
+  --moneva-card-gradient-alt: linear-gradient(135deg, #FBF9FF 0%, #F5F3FF 100%);
+
+  --moneva-overlay-weak: rgba(13, 19, 33, 0.04);
+  --moneva-overlay: rgba(13, 19, 33, 0.06);
+  --moneva-overlay-strong: rgba(13, 19, 33, 0.09);
+
+  /* Darkened so they stay legible on the pale tinted backgrounds */
+  --moneva-text-on-danger: #B91C1C;
+  --moneva-text-on-success: #047857;
+  --moneva-text-on-warning: #B45309;
+  --moneva-text-on-info: #1D4ED8;
+  --moneva-text-on-accent: #6D28D9;
+
+  --moneva-backdrop: #E8ECF3;
+  --moneva-viewport-shadow: 0 0 40px rgba(13, 19, 33, 0.12);
+
+  --moneva-accent-panel-base: rgba(255, 255, 255, 0.92);
+}
+
+
+/* Reset & Box Sizing */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background-color: var(--moneva-bg);
+  color: var(--moneva-text-main);
+  font-family: var(--font-family);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Responsive Mobile Container Layout */
+#root {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  background-color: var(--moneva-backdrop);
+}
+
+.app-viewport {
+  width: 100%;
+  max-width: 480px;
+  /* A definite height (not min-height) makes .app-content the scroll box, so
+     a tall page can no longer push the shell past the viewport. */
+  height: 100dvh;
+  background-color: var(--moneva-bg);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  box-shadow: var(--moneva-viewport-shadow);
+}
+
+/* Typography Utility Classes */
+.heading-xl { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+.heading-lg { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; }
+.heading-md { font-size: 18px; font-weight: 600; }
+.heading-sm { font-size: 15px; font-weight: 600; }
+
+.number-xl { font-size: 32px; font-weight: 700; font-feature-settings: "tnum"; }
+.number-lg { font-size: 24px; font-weight: 700; font-feature-settings: "tnum"; }
+.number-md { font-size: 18px; font-weight: 600; font-feature-settings: "tnum"; }
+
+.text-body { font-size: 14px; font-weight: 400; color: var(--moneva-text-secondary); }
+.text-label { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; color: var(--moneva-text-muted); }
+
+/* Utility Scrollbar */
+/* A classic scrollbar reserves layout width, which cost the app 4px of the
+   viewport on the phone. Only show it where there is a real pointer. */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--moneva-border);
+    border-radius: 4px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   TEXT OVERFLOW SAFETY NET
+   Grid and flex children default to `min-width: auto`, so a long label, a big
+   currency figure, or an email address pushes past its card instead of
+   wrapping - which is what clipped text in the settings and summary cards.
+   `:where()` carries zero specificity, so component CSS still wins outright.
+   --------------------------------------------------------------------------- */
+:where(.app-viewport, .auth-viewport) :where(div, section, article, li, label, form, p, span) {
+  min-width: 0;
+}
+
+/* Break only when a word genuinely cannot fit, never mid-word otherwise. */
+.heading-xl, .heading-lg, .heading-md, .heading-sm,
+.number-xl, .number-lg, .number-md,
+.text-body, .text-label,
+.sec-label, .sec-val {
+  overflow-wrap: break-word;
+}
+
+/* Two-column form rows: when one label wraps to a second line, align the
+   inputs on their bottom edge so the fields stay on a shared baseline. */
+.form-grid-2 {
+  align-items: end;
+}
+
+/* ===========================================================================
+   MOTION
+   Short, GPU-friendly transitions only (transform + opacity). Nothing here
+   animates layout properties, so it stays smooth on a mid-range phone.
+   Everything is disabled under prefers-reduced-motion.
+   =========================================================================== */
+
+@keyframes monevaFadeUp {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes monevaFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes monevaPop {
+  0%   { transform: scale(0.94); opacity: 0; }
+  60%  { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Each screen fades up as it mounts, so route changes read as movement
+   rather than a hard swap. */
+.page-enter,
+.accounts-page-container,
+.activity-container,
+.analytics-page-container,
+.assistant-container,
+.home-container,
+.plan-page-container,
+.profile-page-container {
+  animation: monevaFadeUp 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Cards stagger in behind the screen so a list assembles instead of blinking. */
+.moneva-card {
+  animation: monevaFadeUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.moneva-card:nth-child(2) { animation-delay: 0.04s; }
+.moneva-card:nth-child(3) { animation-delay: 0.08s; }
+.moneva-card:nth-child(4) { animation-delay: 0.12s; }
+.moneva-card:nth-child(5) { animation-delay: 0.16s; }
+.moneva-card:nth-child(n + 6) { animation-delay: 0.2s; }
+
+/* Modals and toasts arrive with a small pop. */
+.tfa-modal,
+.moneva-modal,
+.modal-content {
+  animation: monevaPop 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Universal press feedback: anything tappable dips slightly under the finger. */
+button:not(:disabled):active,
+.tab-btn:not(:disabled):active,
+.theme-option-btn:active {
+  transform: scale(0.97);
+}
+
+button,
+.theme-option-btn {
+  transition: transform 0.12s ease, background-color var(--transition-fast),
+    color var(--transition-fast), border-color var(--transition-fast);
+}
+
+/* Respect the OS accessibility setting - and save battery on low-power mode. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   UTILITY CLASSES
+   These names were already used throughout the components but had no rule
+   anywhere, so the intended weight/spacing silently never applied.
+   --------------------------------------------------------------------------- */
+.font-semibold { font-weight: 600; }
+.font-bold     { font-weight: 700; }
+.uppercase     { text-transform: uppercase; letter-spacing: 0.4px; }
+
+.mt-3 { margin-top: 12px; }
+.py-2 { padding-top: 8px;  padding-bottom: 8px; }
+.py-3 { padding-top: 12px; padding-bottom: 12px; }
+.py-4 { padding-top: 16px; padding-bottom: 16px; }
+
+/* ---------------------------------------------------------------------------
+   SHARED ACROSS LAZY ROUTE CHUNKS
+   Routes are code-split, so a class defined only in one page's stylesheet is
+   unstyled until that route has been visited. These are used by several pages
+   (and reachable cold via a notification deep link), so they live here.
+   --------------------------------------------------------------------------- */
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.metric-divider {
+  width: 1px;
+  height: 32px;
+  background-color: var(--moneva-border);
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--moneva-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filter-tab {
+  padding: 8px 0;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--moneva-text-secondary);
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+/* Selected filter pills - the tinted variants also fix contrast in both themes. */
+.tab-active-all       { background-color: var(--moneva-blue); color: var(--moneva-white); }
+.tab-active-asset     { background-color: rgba(37, 99, 235, 0.2);  color: var(--moneva-text-on-info); }
+.tab-active-liability { background-color: rgba(255, 107, 107, 0.2); color: var(--moneva-text-on-danger); }
+.tab-active-income    { background-color: rgba(16, 185, 129, 0.2);  color: var(--moneva-text-on-success); }
+.tab-active-expense   { background-color: rgba(255, 107, 107, 0.2); color: var(--moneva-text-on-danger); }
+.tab-active-transfer  { background-color: rgba(124, 58, 237, 0.2);  color: var(--moneva-text-on-accent); }
+
+/* Undefined utilities that were in use across the app. */
+.text-xs   { font-size: 12px; }
+.text-muted { color: var(--moneva-text-muted); }
+.number-sm { font-size: 13px; font-weight: 600; font-feature-settings: "tnum"; }
+.capitalize { text-transform: capitalize; }
+
+/* ---------------------------------------------------------------------------
+   LOGO IN DARK MODE
+   The mark's hand is deep navy (#0D1321). Against the true-black dark canvas
+   it disappears, leaving only the coloured line visible. A tight light rim
+   separates the silhouette without altering the brand colours.
+   --------------------------------------------------------------------------- */
+:root[data-theme="dark"] .topbar-logo,
+:root[data-theme="dark"] .auth-logo,
+:root[data-theme="dark"] .assistant-logo-mark,
+:root[data-theme="dark"] .msg-avatar-logo {
+  filter:
+    drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 0 1.6px rgba(148, 163, 184, 0.5));
+}
+
+/* Close control shared by modal headers. */
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: var(--transition-fast);
+}
+.modal-close-btn:hover {
+  color: var(--moneva-text-main);
+  background-color: var(--moneva-overlay-weak);
+}
+
+/* ---------------------------------------------------------------------------
+   TOUCH TARGETS
+   Measured on device, many controls were under the 44px minimum: the bell (36),
+   the avatar (34), every filter pill (34), the analytics range tabs (27).
+
+   These use real min-height/min-width rather than an expanded pseudo-element,
+   because a pseudo-element hit area does not reliably receive taps - probing
+   3px outside the bell hit the parent row, not the button.
+   --------------------------------------------------------------------------- */
+.moneva-btn {
+  min-height: 44px;
+}
+
+.filter-tab,
+.tab-btn,
+.range-tab,
+.action-chip,
+.card-action-btn,
+.contribute-chip-btn,
+.nav-item {
+  min-height: 44px;
+}
+
+.range-tab {
+  line-height: 1.2;
+}
+
+/* Keep the chips pills once they are taller. */
+.action-chip {
+  border-radius: 999px;
+}
+
+/* Hand-rolled avatar button: 44px hit box with the visible circle still 34px. */
+.topbar-user-btn {
+  width: 44px;
+  height: 44px;
+  padding: 5px;
+  background-clip: content-box;
+}
+
+/* Small icon controls grow their padding rather than their icon. */
+.modal-close-btn {
+  padding: 12px;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin: -12px -8px -12px 0;
+}
+
+.profile-avatar-remove {
+  padding: 12px 16px;
+  min-height: 44px;
+}
+
+.icon-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+}
+
+/* Keyboard focus was suppressed everywhere with no replacement. */
+.moneva-btn:focus-visible,
+.moneva-icon-btn:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 2px;
+}
+
+/* Currency values must stay legible - 9.9px measured on the analytics bars. */
+.bar-val-label,
+.trend-date-label,
+.msg-time {
+  font-size: 11px;
+}

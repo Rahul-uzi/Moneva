@@ -1,0 +1,36 @@
+.moneva-card {
+  border-radius: var(--radius-lg);
+  transition: var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-surface {
+  background-color: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+}
+
+.card-gradient {
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-overlay);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.card-outlined {
+  background-color: transparent;
+  border: 1px dashed var(--moneva-border);
+}
+
+.card-pad-none { padding: 0; }
+.card-pad-sm { padding: 12px; }
+.card-pad-md { padding: 18px; }
+.card-pad-lg { padding: 24px; }
+
+.card-interactive {
+  cursor: pointer;
+}
+.card-interactive:hover {
+  background-color: var(--moneva-card-hover);
+  border-color: rgba(37, 99, 235, 0.4);
+  transform: translateY(-2px);
+}

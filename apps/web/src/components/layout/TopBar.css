@@ -1,0 +1,81 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* viewport-fit=cover lets the WebView draw under the status bar, so keep the
+     header clear of it. env() resolves to 0 where there is no inset. */
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 20px 16px;
+  background-color: var(--moneva-surface);
+  border-bottom: 1px solid var(--moneva-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+}
+
+.topbar-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--moneva-text-main);
+  letter-spacing: -0.3px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notif-btn-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.topbar-unread-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background-color: var(--moneva-coral);
+  color: var(--moneva-white);
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 5px;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(255, 107, 107, 0.5);
+}
+
+.topbar-user-btn {
+  /* 44px hit box; the gradient is painted into the 34px content box so the
+     visible circle is unchanged. */
+  width: 44px;
+  height: 44px;
+  padding: 5px;
+  background-clip: content-box;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--moneva-blue), var(--moneva-violet));
+  border: none;
+  color: var(--moneva-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.user-avatar {
+  font-weight: 700;
+  font-size: 14px;
+}

@@ -1,0 +1,44 @@
+.bottom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  /* Keep the tab bar above the gesture bar on devices that have one. */
+  height: calc(64px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  background-color: var(--moneva-surface);
+  border-top: 1px solid var(--moneva-border);
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  /* Shorthand must carry the inset - a longhand above would be reset here. */
+  padding: 0 4px env(safe-area-inset-bottom, 0px);
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--moneva-text-muted);
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 500;
+  width: 56px;
+  transition: var(--transition-fast);
+}
+
+.nav-active {
+  color: var(--moneva-blue);
+}
+
+.nav-item:hover {
+  color: var(--moneva-text-secondary);
+}
+
+.nav-quick-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+}

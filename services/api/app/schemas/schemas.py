@@ -1,0 +1,383 @@
+import uuid
+from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel, Field, EmailStr, field_validator
+
+# ----------------- AUTH & TOKEN SCHEMAS -----------------
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+class UserLogin(BaseModel):
+    email: str = Field(pattern=r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+    password: str = Field(min_length=1, max_length=128)
+
+
+# ----------------- USER & PROFILE SCHEMAS -----------------
+class UserBase(BaseModel):
+    email: str = Field(pattern=r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+    display_name: str = Field(min_length=1, max_length=100)
+    currency: Optional[str] = "INR"
+    timezone: Optional[str] = "UTC"
+
+class UserCreate(UserBase):
+    password: str = Field(min_length=6, max_length=128)
+
+class UserProfileUpdate(BaseModel):
+    display_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    currency: Optional[str] = None
+    timezone: Optional[str] = None
+
+class UserResponse(UserBase):
+    id: uuid.UUID
+    is_active: bool
+    avatar_data_url: Optional[str] = None
+    totp_enabled: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# ----------------- AVATAR SCHEMAS -----------------
+# Avatars arrive as data URLs the client has already downscaled to 256x256 JPEG.
+MAX_AVATAR_CHARS = 700_000  # ~500 KB of base64, generous for a 256px JPEG
+
+class AvatarUpdate(BaseModel):
+    avatar_data_url: str = Field(min_length=32, max_length=MAX_AVATAR_CHARS)
+
+    @field_validator("avatar_data_url")
+    @classmethod
+    def must_be_image_data_url(cls, v: str) -> str:
+        if not v.startswith("data:image/"):
+            raise ValueError("avatar_data_url must be a data:image/* URL")
+        if ";base64," not in v:
+            raise ValueError("avatar_data_url must be base64 encoded")
+        return v
+
+
+# ----------------- TWO-FACTOR (TOTP) SCHEMAS -----------------
+class TotpSetupResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+    qr_svg: str
+
+class TotpCodeRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=10)
+
+class TotpEnableResponse(BaseModel):
+    totp_enabled: bool
+    recovery_codes: List[str]
+
+class TotpDisableRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=6, max_length=10)
+
+class TwoFactorChallengeResponse(BaseModel):
+    requires_2fa: bool = True
+    challenge_token: str
+
+class TotpVerifyRequest(BaseModel):
+    challenge_token: str
+    code: str = Field(min_length=6, max_length=10)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    # Length is enforced in the route (8 chars) so the user gets one clear message
+    # instead of a schema error that contradicts it.
+    new_password: str = Field(min_length=1, max_length=128)
+
+
+# ----------------- ACCOUNT SCHEMAS -----------------
+class AccountBase(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    account_type: str  # asset or liability
+    currency: Optional[str] = "INR"
+    opening_balance_minor: Optional[int] = Field(default=0, ge=-100_000_000_000, le=100_000_000_000)
+
+class AccountCreate(AccountBase):
+    pass
+
+class AccountUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    account_type: Optional[str] = None
+    currency: Optional[str] = None
+    is_active: Optional[bool] = None
+    expected_version: Optional[int] = None
+
+class AccountResponse(AccountBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    is_active: bool
+    balance_paise: Optional[int] = 0  # Dynamic/calculated balance
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------- CATEGORY SCHEMAS -----------------
+class CategoryBase(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    type: str  # income or expense
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    is_default: Optional[bool] = False
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    type: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+
+class CategoryResponse(CategoryBase):
+    id: uuid.UUID
+    user_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------- TRANSACTION SCHEMAS -----------------
+class TransactionBase(BaseModel):
+    account_id: uuid.UUID
+    to_account_id: Optional[uuid.UUID] = None  # for transfers
+    category_id: Optional[uuid.UUID] = None
+    savings_goal_id: Optional[uuid.UUID] = None
+    transaction_type: str  # income, expense, transfer
+    amount_minor: int = Field(ge=1, le=100_000_000_000)
+    currency: str = "INR"
+    description: Optional[str] = Field(default=None, max_length=500)
+    transaction_date: datetime
+    client_mutation_id: uuid.UUID
+    device_id: str
+    sync_status: Optional[str] = "synced"
+
+class TransactionCreate(TransactionBase):
+    pass
+
+class TransactionUpdate(BaseModel):
+    account_id: Optional[uuid.UUID] = None
+    to_account_id: Optional[uuid.UUID] = None
+    category_id: Optional[uuid.UUID] = None
+    savings_goal_id: Optional[uuid.UUID] = None
+    amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
+    description: Optional[str] = Field(default=None, max_length=500)
+    transaction_date: Optional[datetime] = None
+    expected_version: Optional[int] = None
+
+class TransactionResponse(TransactionBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    version: int
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------- RECURRING INCOME SCHEMAS -----------------
+class RecurringIncomeBase(BaseModel):
+    source: str = Field(min_length=1, max_length=100)
+    amount_minor: int = Field(ge=1, le=100_000_000_000)
+    frequency: str
+    next_occurrence: datetime
+    active: Optional[bool] = True
+
+class RecurringIncomeCreate(RecurringIncomeBase):
+    pass
+
+class RecurringIncomeUpdate(BaseModel):
+    source: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
+    frequency: Optional[str] = None
+    next_occurrence: Optional[datetime] = None
+    active: Optional[bool] = None
+
+class RecurringIncomeResponse(RecurringIncomeBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------- BILL SCHEMAS -----------------
+class BillBase(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    amount_minor: int = Field(ge=1, le=100_000_000_000)
+    currency: Optional[str] = "INR"
+    due_date: datetime
+    recurrence: Optional[str] = None
+    category_id: Optional[uuid.UUID] = None
+    status: Optional[str] = "upcoming"
+    reminder_enabled: Optional[bool] = True
+
+class BillCreate(BillBase):
+    pass
+
+class BillUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
+    due_date: Optional[datetime] = None
+    recurrence: Optional[str] = None
+    category_id: Optional[uuid.UUID] = None
+    status: Optional[str] = None
+    reminder_enabled: Optional[bool] = None
+    expected_version: Optional[int] = None
+
+class BillPayPayload(BaseModel):
+    account_id: uuid.UUID
+    client_mutation_id: uuid.UUID
+    device_id: str
+    payment_date: Optional[datetime] = None
+
+class BillResponse(BillBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------- BUDGET SCHEMAS -----------------
+class BudgetBase(BaseModel):
+    category_id: uuid.UUID
+    limit_amount_minor: int = Field(ge=1, le=100_000_000_000)
+    period: Optional[str] = "monthly"
+    start_date: datetime
+    end_date: datetime
+
+class BudgetCreate(BudgetBase):
+    pass
+
+class BudgetUpdate(BaseModel):
+    limit_amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
+    period: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    expected_version: Optional[int] = None
+
+class BudgetResponse(BudgetBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    spent_amount_minor: Optional[int] = 0
+    remaining_amount_minor: Optional[int] = 0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------- SAVINGS GOAL SCHEMAS -----------------
+class SavingsGoalBase(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    target_amount_minor: int = Field(ge=1, le=100_000_000_000)
+    target_date: Optional[datetime] = None
+    status: Optional[str] = "active"
+
+class SavingsGoalCreate(SavingsGoalBase):
+    pass
+
+class SavingsGoalUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    target_amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
+    target_date: Optional[datetime] = None
+    status: Optional[str] = None
+    expected_version: Optional[int] = None
+
+class SavingsGoalResponse(SavingsGoalBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    current_saved_minor: Optional[int] = 0
+    progress_percentage: Optional[float] = 0.0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ----------------- NOTIFICATION SCHEMAS -----------------
+class NotificationResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    title: str
+    message: str
+    notification_type: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class NotificationPreferencesUpdate(BaseModel):
+    notif_bills: Optional[bool] = None
+    notif_budgets: Optional[bool] = None
+    notif_goals: Optional[bool] = None
+    notif_salary: Optional[bool] = None
+
+class NotificationPreferencesResponse(BaseModel):
+    notif_bills: bool
+    notif_budgets: bool
+    notif_goals: bool
+    notif_salary: bool
+
+
+# ----------------- SUMMARY & READ SCHEMAS -----------------
+class FinancialSummaryResponse(BaseModel):
+    net_worth_minor: int
+    income_minor: int
+    expense_minor: int
+    net_cash_flow_minor: int
+    currency: str = "INR"
+
+class SalaryUsageResponse(BaseModel):
+    """This month's salary versus what has been spent against it."""
+    period_start: datetime
+    period_end: datetime
+    salary_received_minor: int      # salary/recurring income actually credited
+    other_income_minor: int         # any other income this month
+    total_income_minor: int
+    spent_minor: int                # every expense recorded this month
+    remaining_minor: int            # total income - spent (may go negative)
+    used_percent: float             # 0-100+, clamped at 0 lower bound
+    has_salary_configured: bool
+    currency: str = "INR"
+
+
+class CashFlowResponse(BaseModel):
+    income_minor: int
+    expense_minor: int
+    net_cash_flow_minor: int
+
+class AccountBalanceResponse(BaseModel):
+    account_id: uuid.UUID
+    account_name: str
+    account_type: str
+    balance_minor: int
+    currency: str
+
+# ----------------- AI ASSISTANT SCHEMAS -----------------
+class AIQueryRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=1000)
+    conversation_id: Optional[str] = None
+

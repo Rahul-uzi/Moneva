@@ -1,0 +1,19 @@
+.quick-action-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--moneva-blue), var(--moneva-violet));
+  color: var(--moneva-white);
+  border: 3px solid var(--moneva-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+  transition: var(--transition-fast);
+  transform: translateY(-16px);
+}
+
+.quick-action-btn:active {
+  transform: translateY(-16px) scale(0.92);
+}

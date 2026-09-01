@@ -1,0 +1,123 @@
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background-color: var(--moneva-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: monevaFadeIn 0.24s ease both;
+}
+
+.onboarding-card {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 26px 20px 20px;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+}
+
+.onboarding-skip {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: transparent;
+  border: none;
+  padding: 13px 18px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+}
+.onboarding-skip:hover {
+  color: var(--moneva-text-main);
+  background-color: var(--moneva-overlay-weak);
+}
+
+/* Fixed height keeps the dots and button still while slides change. */
+.onboarding-slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  min-height: 300px;
+}
+
+.slide-from-right { animation: slideInRight 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.slide-from-left  { animation: slideInLeft  0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translate3d(26px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translate3d(-26px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+.onboarding-title {
+  color: var(--moneva-text-main);
+  margin-top: 4px;
+}
+
+.onboarding-body {
+  max-width: 30ch;
+  line-height: 1.5;
+}
+
+.onboarding-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+}
+
+/* The button carries the 44px hit area; ::before is the visible dot. */
+.onboarding-dot {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.onboarding-dot::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background-color: var(--moneva-border);
+  transition: width var(--transition-normal), background-color var(--transition-normal);
+}
+
+.onboarding-dot.is-active::before {
+  width: 22px;
+  background-color: var(--moneva-blue);
+}
+
+.onboarding-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-overlay,
+  .onboarding-slide {
+    animation: none;
+  }
+}

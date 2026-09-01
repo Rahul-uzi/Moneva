@@ -1,0 +1,85 @@
+.budget-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.budget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.budget-title-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.budget-cat-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+}
+
+.budget-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge-healthy {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--moneva-teal);
+}
+
+.badge-normal {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: var(--moneva-blue);
+}
+
+.badge-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--moneva-orange);
+}
+
+.badge-over {
+  background-color: rgba(255, 107, 107, 0.15);
+  color: var(--moneva-coral);
+}
+
+.budget-percent {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.budget-progress-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background-color: var(--moneva-surface);
+  overflow: hidden;
+}
+
+.budget-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.fill-healthy { background-color: var(--moneva-teal); }
+.fill-normal { background-color: var(--moneva-blue); }
+.fill-warning { background-color: var(--moneva-orange); }
+.fill-over { background-color: var(--moneva-coral); }
+
+.budget-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}

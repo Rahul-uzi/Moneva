@@ -1,0 +1,105 @@
+.plan-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 24px;
+}
+
+.plan-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (min-width: 400px) {
+  .plan-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.plan-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.plan-metrics-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 10px;
+}
+
+.plan-metric-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.plan-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  background-color: var(--moneva-surface);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moneva-border);
+}
+
+.plan-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-card-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-quick-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.card-action-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: var(--transition-fast);
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+}
+
+.card-action-btn:hover {
+  color: var(--moneva-blue);
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+.card-action-btn.btn-danger:hover {
+  color: var(--moneva-coral);
+  background-color: rgba(255, 107, 107, 0.1);
+}

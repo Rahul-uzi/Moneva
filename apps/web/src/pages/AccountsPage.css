@@ -1,0 +1,51 @@
+.accounts-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+.accounts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.accounts-metrics-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  padding: 14px 12px;
+}
+
+.metric-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.accounts-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background-color: var(--moneva-surface);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moneva-border);
+}
+
+.accounts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 420px) {
+  .accounts-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

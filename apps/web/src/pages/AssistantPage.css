@@ -1,0 +1,404 @@
+.assistant-container {
+  display: flex;
+  flex-direction: column;
+  /* Was calc(100vh - 135px); the real chrome is 163px plus both safe-area
+     insets, which pushed the composer below the fold. Fill the scroll box
+     instead of guessing. */
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
+
+.assistant-header-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+}
+
+.assistant-brand-badge {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(124, 58, 237, 0.2);
+  border: 1px solid var(--moneva-violet);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assistant-logo-mark {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.assistant-header-text {
+  display: flex;
+  flex-direction: column;
+  /* Must be able to shrink, or the title wraps once the header buttons take
+     their share of the row. */
+  min-width: 0;
+  flex: 1;
+}
+
+/* The title always fits; only the decorative subtitle may truncate. */
+.assistant-header-text h1 {
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.assistant-header-text span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assistant-offline-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: rgba(245, 158, 11, 0.15);
+  border: 1px solid var(--moneva-orange);
+  color: var(--moneva-text-on-warning);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+}
+
+.suggested-actions-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x mandatory;
+}
+.suggested-actions-scroll::-webkit-scrollbar {
+  height: 2px;
+}
+
+.action-chip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  color: var(--moneva-text-main);
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+
+.action-chip:hover {
+  border-color: var(--moneva-violet);
+  color: var(--moneva-violet);
+}
+
+.chip-primary {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: var(--moneva-violet);
+  color: var(--moneva-text-on-accent);
+}
+
+.messages-stream {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 4px;
+}
+
+.assistant-empty-state {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  max-width: 280px;
+}
+
+.empty-icon-ring {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: rgba(124, 58, 237, 0.15);
+  color: var(--moneva-violet);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 85%;
+}
+
+.user-msg {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.assistant-msg {
+  align-self: flex-start;
+}
+
+.msg-avatar-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(124, 58, 237, 0.2);
+  padding: 4px;
+  border: 1px solid var(--moneva-violet);
+}
+
+.message-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.user-msg .message-bubble {
+  background-color: var(--moneva-blue);
+  color: var(--moneva-white);
+  border-bottom-right-radius: 4px;
+}
+
+.assistant-msg .message-bubble {
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  color: var(--moneva-text-main);
+  border-bottom-left-radius: 4px;
+}
+
+.msg-text {
+  margin: 0;
+  white-space: pre-wrap;
+  /* pre-wrap only breaks at whitespace; a long URL or UPI ref escaped the bubble. */
+  overflow-wrap: anywhere;
+}
+
+.msg-time {
+  font-size: 10px;
+  align-self: flex-end;
+}
+
+/* Timestamp on the filled blue user bubble — always light. */
+.user-msg .msg-time {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Timestamp on the themed surface bubble — follows the palette. */
+.assistant-msg .msg-time {
+  color: var(--moneva-text-muted);
+}
+
+.assistant-msg .message-bubble.thinking-bubble {
+  font-style: italic;
+  color: var(--moneva-text-secondary);
+}
+
+.thinking-pulse {
+  animation: pulseLogo 1.2s infinite ease-in-out;
+}
+
+@keyframes pulseLogo {
+  0% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.7; }
+}
+
+
+.assistant-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: 24px;
+  padding: 6px 8px 6px 12px;
+}
+.assistant-input-bar:focus-within {
+  border-color: var(--moneva-violet);
+}
+
+.chat-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--moneva-text-main);
+  font-family: var(--font-family);
+  font-size: 14px;
+  outline: none;
+}
+
+
+
+.send-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  background-color: var(--moneva-violet);
+  color: var(--moneva-white);
+  transition: var(--transition-fast);
+}
+.send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- header controls ---------- */
+.assistant-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.assistant-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.assistant-header-btn:hover {
+  color: var(--moneva-text-main);
+  background-color: var(--moneva-overlay-weak);
+}
+
+/* ---------- history panel ---------- */
+.chat-history-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  animation: monevaFadeUp 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.chat-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-history-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--moneva-blue);
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-history-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+}
+.chat-history-list li.is-current {
+  background-color: var(--moneva-overlay-weak);
+}
+
+.chat-history-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--moneva-text-main);
+  font-family: var(--font-family);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.chat-history-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-history-date {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--moneva-text-muted);
+}
+
+.chat-history-delete {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--moneva-text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.chat-history-delete:hover {
+  color: var(--moneva-coral);
+  background-color: var(--moneva-overlay-weak);
+}

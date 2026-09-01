@@ -1,0 +1,125 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* The dim used to appear instantly while the sheet slid up under it. */
+.modal-overlay:not(.modal-fullscreen) {
+  animation: monevaFadeIn 0.25s ease-out both;
+}
+
+@media (min-width: 480px) {
+  .modal-overlay {
+    align-items: center;
+  }
+}
+
+.modal-container {
+  width: 100%;
+  max-width: 480px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+  animation: slideUp 0.25s ease-out;
+}
+
+@media (min-width: 480px) {
+  .modal-container {
+    border-radius: var(--radius-lg);
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--moneva-border);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* ---------------------------------------------------------------------------
+   FULL-SCREEN MODAL VARIANT
+   For content-heavy panels (notifications, long lists) that should read as a
+   separate page rather than a bottom sheet peeking over the current screen.
+   The Android back button already closes these, so they behave like a route.
+   --------------------------------------------------------------------------- */
+.modal-overlay.modal-fullscreen {
+  align-items: stretch;
+  justify-content: stretch;
+  background-color: var(--moneva-bg);
+  backdrop-filter: none;
+  padding: 0;
+}
+
+@media (min-width: 480px) {
+  /* On a wider screen keep it centred in the app column instead of edge-to-edge. */
+  .modal-overlay.modal-fullscreen {
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+  }
+}
+
+.modal-fullscreen .modal-container {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  animation: pageIn 0.24s cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Respect the notch and the gesture bar - the app uses viewport-fit=cover. */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (min-width: 480px) {
+  .modal-fullscreen .modal-container {
+    max-width: 480px;
+    height: auto;
+    max-height: 90vh;
+    border: 1px solid var(--moneva-border);
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* Slides in from the right like a pushed page, rather than up like a sheet. */
+@keyframes pageIn {
+  from { transform: translateX(14px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-fullscreen .modal-container { animation: none; }
+}

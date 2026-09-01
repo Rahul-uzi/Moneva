@@ -1,0 +1,11 @@
+.app-content {
+  flex: 1;
+  /* Without min-height:0 a flex child refuses to shrink below its content,
+     so overflow-y never engages. */
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

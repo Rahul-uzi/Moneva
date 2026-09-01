@@ -1,0 +1,80 @@
+.transaction-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  transition: transform 0.12s ease, background-color var(--transition-fast);
+  /* Rows are divs, so neither the card stagger nor the button press feedback
+     in index.css reaches them. */
+  animation: monevaFadeUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.transaction-row:nth-child(2) { animation-delay: 0.04s; }
+.transaction-row:nth-child(3) { animation-delay: 0.08s; }
+.transaction-row:nth-child(4) { animation-delay: 0.12s; }
+.transaction-row:nth-child(5) { animation-delay: 0.16s; }
+.transaction-row:nth-child(n + 6) { animation-delay: 0.2s; }
+
+/* Only rows that actually navigate get a tap affordance. */
+.transaction-row.is-tappable {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .transaction-row.is-tappable:hover {
+    background-color: var(--moneva-card-hover);
+  }
+}
+
+.transaction-row.is-tappable:active {
+  background-color: var(--moneva-card-hover);
+  transform: scale(0.98);
+}
+
+.tx-icon-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tx-income { background-color: rgba(16, 185, 129, 0.15); color: var(--moneva-teal); }
+.tx-expense { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); }
+.tx-transfer { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); }
+
+.tx-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.tx-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tx-date {
+  font-size: 12px;
+  color: var(--moneva-text-muted);
+}
+
+.tx-amount {
+  font-size: 15px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+}
+
+.amount-income { color: var(--moneva-teal); }
+.amount-expense { color: var(--moneva-text-main); }
+.amount-transfer { color: var(--moneva-text-secondary); }

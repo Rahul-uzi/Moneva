@@ -1,0 +1,40 @@
+.home-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 24px;
+}
+
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.accounts-scroll-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+}
+.accounts-scroll-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.account-scroll-item {
+  flex: 0 0 240px;
+  scroll-snap-align: start;
+}
+
+.vertical-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

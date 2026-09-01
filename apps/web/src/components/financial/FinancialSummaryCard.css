@@ -1,0 +1,53 @@
+.financial-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: var(--moneva-text-muted);
+}
+
+.summary-icon {
+  color: var(--moneva-blue);
+  background: rgba(37, 99, 235, 0.15);
+  padding: 6px;
+  border-radius: 50%;
+}
+
+.summary-net-worth {
+  color: var(--moneva-text-main);
+}
+
+.summary-divider {
+  height: 1px;
+  background: var(--moneva-overlay);
+  margin: 4px 0;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.summary-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.icon-teal { color: var(--moneva-teal); }
+.text-teal { color: var(--moneva-teal); }
+
+.icon-coral { color: var(--moneva-coral); }
+.text-coral { color: var(--moneva-coral); }

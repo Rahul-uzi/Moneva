@@ -1,0 +1,21 @@
+.plan-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.plan-modal-error {
+  background-color: rgba(255, 107, 107, 0.15);
+  border: 1px solid var(--moneva-coral);
+  color: var(--moneva-text-on-danger);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  text-align: center;
+}
+
+.dates-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}

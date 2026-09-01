@@ -1,0 +1,103 @@
+.bill-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bill-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--moneva-card-gradient-alt);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.bill-detail-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bill-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bill-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-upcoming-badge { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); border: 1px solid var(--moneva-blue); }
+.status-paid-badge { background-color: rgba(16, 185, 129, 0.15); color: var(--moneva-teal); border: 1px solid var(--moneva-teal); }
+.status-overdue-badge { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); border: 1px solid var(--moneva-coral); }
+.status-due-today-badge { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); border: 1px solid var(--moneva-orange); }
+.status-due-soon-badge { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); border: 1px solid var(--moneva-orange); }
+
+.bill-amount-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  gap: 4px;
+}
+
+.bill-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.meta-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+
+.meta-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--moneva-text-secondary);
+}
+
+.meta-val {
+  font-size: 13px;
+  color: var(--moneva-text-main);
+}
+
+.capitalize {
+  text-transform: capitalize;
+}
+
+.bill-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.left-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

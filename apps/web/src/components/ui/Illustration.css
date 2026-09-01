@@ -1,0 +1,69 @@
+.moneva-illustration {
+  display: block;
+  overflow: visible;
+}
+
+.illo-ground {
+  fill: var(--moneva-text-muted);
+  opacity: 0.14;
+}
+
+.illo-surface {
+  fill: var(--moneva-card);
+  stroke: var(--moneva-border);
+  stroke-width: 2;
+}
+
+.illo-lid {
+  fill: var(--moneva-surface);
+  stroke: var(--moneva-border);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.illo-line { fill: var(--moneva-blue); opacity: 0.55; }
+.illo-line-dim { opacity: 0.28; }
+
+.illo-accent { fill: var(--moneva-teal); opacity: 0.75; }
+.illo-accent-2 { fill: var(--moneva-violet); }
+
+.illo-stroke {
+  stroke: var(--moneva-text-secondary);
+  stroke-width: 3.5;
+  fill: none;
+}
+
+.illo-danger { fill: var(--moneva-coral); }
+.illo-danger-mark { stroke: var(--moneva-white); stroke-width: 2.4; }
+.illo-danger-mark-dot { fill: var(--moneva-white); }
+
+.illo-slash {
+  stroke: var(--moneva-coral);
+  stroke-width: 4;
+  fill: none;
+}
+
+.illo-success-ring {
+  fill: none;
+  stroke: var(--moneva-teal);
+  stroke-width: 3;
+  opacity: 0.55;
+}
+
+.illo-success-check {
+  fill: none;
+  stroke: var(--moneva-teal);
+  stroke-width: 5;
+  /* Draw the tick on mount so success feels earned rather than just appearing. */
+  stroke-dasharray: 52;
+  stroke-dashoffset: 52;
+  animation: illoDraw 0.45s ease-out 0.1s forwards;
+}
+
+@keyframes illoDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .illo-success-check { animation: none; stroke-dashoffset: 0; }
+}

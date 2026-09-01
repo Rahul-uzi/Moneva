@@ -1,0 +1,35 @@
+.biometric-gate {
+  position: fixed;
+  inset: 0;
+  background-color: var(--moneva-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 2000;
+}
+
+.biometric-gate-inner {
+  /* Only the inner panel animates: the gate itself must be opaque from frame
+     one, or it briefly reveals the account data it is protecting. */
+  animation: monevaFadeUp 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  max-width: 320px;
+  width: 100%;
+}
+
+.biometric-gate-icon {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--moneva-blue), var(--moneva-violet));
+  color: var(--moneva-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
