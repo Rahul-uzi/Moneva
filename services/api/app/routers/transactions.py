@@ -20,6 +20,10 @@ async def list_transactions(
     transaction_type: Optional[str] = Query(None),
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
+    # The dashboard needs the five most recent rows. Without a limit it had to
+    # download every transaction the user has ever recorded to show them.
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -36,7 +40,13 @@ async def list_transactions(
     if end_date:
         filters.append(Transaction.transaction_date <= end_date)
 
-    stmt = select(Transaction).where(and_(*filters)).order_by(desc(Transaction.transaction_date))
+    stmt = select(Transaction).where(and_(*filters)).order_by(
+        desc(Transaction.transaction_date), desc(Transaction.id)
+    )
+    if offset:
+        stmt = stmt.offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
     res = await db.execute(stmt)
     return res.scalars().all()
 

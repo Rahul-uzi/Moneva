@@ -18,14 +18,20 @@ async def list_budgets(
     db: AsyncSession = Depends(get_db)
 ):
     """Lists budgets for the current user with dynamically computed spending and remaining limits."""
-    stmt = select(Budget).where(Budget.user_id == current_user.id)
-    res = await db.execute(stmt)
-    budgets = res.scalars().all()
+    # Joined so each budget carries the category it caps; the UI had no name to
+    # show and rendered the placeholder "Category" on every card.
+    stmt = (
+        select(Budget, Category.name)
+        .join(Category, Category.id == Budget.category_id, isouter=True)
+        .where(Budget.user_id == current_user.id)
+    )
+    rows = (await db.execute(stmt)).all()
 
     result = []
-    for b in budgets:
+    for b, category_name in rows:
         spent = await calculate_budget_spending(db, current_user.id, b.category_id, b.start_date, b.end_date)
         resp = BudgetResponse.model_validate(b)
+        resp.category_name = category_name
         resp.spent_amount_minor = spent
         resp.remaining_amount_minor = b.limit_amount_minor - spent
         result.append(resp)

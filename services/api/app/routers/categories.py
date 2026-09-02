@@ -17,9 +17,16 @@ async def list_categories(
     db: AsyncSession = Depends(get_db)
 ):
     """Returns custom categories for the current user plus default global categories."""
+    # Global categories are ones with NO owner. Matching on is_default alone
+    # leaked every other account's starter categories once registration began
+    # seeding per-user rows with that flag set.
+    # Without an explicit ORDER BY the database is free to return rows in any
+    # order, and Postgres physically relocates a row on UPDATE — so renaming a
+    # category would silently reshuffle the list. Insertion order keeps the
+    # seeded defaults in their curated sequence and appends new ones at the end.
     stmt = select(Category).where(
-        or_(Category.user_id == current_user.id, Category.is_default == True)
-    )
+        or_(Category.user_id == current_user.id, Category.user_id.is_(None))
+    ).order_by(Category.created_at, Category.id)
     res = await db.execute(stmt)
     return res.scalars().all()
 

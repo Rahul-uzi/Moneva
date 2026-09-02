@@ -38,7 +38,9 @@ export const TopBar: React.FC<TopBarProps> = ({
           {unreadCount > 0 && <span className="topbar-unread-badge">{unreadCount}</span>}
         </div>
         <button type="button" className="topbar-user-btn" onClick={onProfileClick} aria-label="Profile">
-          {user?.display_name ? (
+          {user?.avatar_data_url ? (
+            <img src={user.avatar_data_url} alt="" className="topbar-avatar-img" />
+          ) : user?.display_name ? (
             <span className="user-avatar">{user.display_name.charAt(0).toUpperCase()}</span>
           ) : (
             <UserIcon size={16} />

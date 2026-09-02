@@ -5,6 +5,7 @@ import logoMark from '../assets/logo/MONEVA_Logo_Mark_FullColor.png';
 import { ActionProposalCard, type ProposedAction } from '../components/financial/ActionProposalCard';
 import { QuickAddModal } from '../components/financial/QuickAddModal';
 import { apiClient } from '../services/apiClient';
+import { withProposalCancelled } from '../utils/proposals';
 import { useUiStore } from '../stores/useUiStore';
 import {
   hydrateChatHistory,
@@ -52,16 +53,69 @@ interface AIResponseData {
 }
 
 /** Chips ask the assistant these questions instead of routing to another screen. */
-const SUGGESTED_PROMPTS: { label: string; prompt: string }[] = [
-  { label: 'My net worth', prompt: 'What is my total net worth right now?' },
-  { label: 'Salary left', prompt: 'How much of my income this month is left after expenses?' },
-  { label: 'View Budgets', prompt: 'How am I doing against my budgets this month?' },
-  { label: 'Savings Goals', prompt: 'What is the progress on my savings goals?' },
-  { label: 'Upcoming Bills', prompt: 'Which bills are due soon and how much are they?' },
-  { label: 'Check Accounts', prompt: 'What are my account balances?' },
-  { label: 'Where did it go', prompt: 'What did I spend the most on this month?' },
-];
+/** Chip-sized rupees: lakh/crore shorthand, since the full figure made the
+ *  net-worth chip wide enough to hide every other chip off-screen. */
+const compactRupees = (minor: number): string => {
+  const rupees = Math.abs(minor) / 100;
+  const sign = minor < 0 ? '-' : '';
+  if (rupees >= 10_000_000) return `${sign}₹${(rupees / 10_000_000).toFixed(2)}Cr`;
+  if (rupees >= 100_000) return `${sign}₹${(rupees / 100_000).toFixed(2)}L`;
+  if (rupees >= 1_000) return `${sign}₹${(rupees / 1_000).toFixed(1)}k`;
+  return `${sign}₹${rupees.toFixed(0)}`;
+};
 
+type Suggestion = { label: string; prompt: string };
+
+/**
+ * Chips are built from the user's own data rather than hard-coded, so the app
+ * never offers "View Budgets" to someone who has none - which used to answer
+ * with an apology - and the net-worth chip can show the figure up front.
+ */
+const buildSuggestions = (ctx: {
+  netWorthMinor: number | null;
+  billCount: number;
+  budgetCount: number;
+  goalCount: number;
+  hasSpending: boolean;
+}): Suggestion[] => {
+  const chips: Suggestion[] = [];
+
+  chips.push({
+    label: ctx.netWorthMinor === null
+      ? 'My net worth'
+      : `Net worth ${compactRupees(ctx.netWorthMinor)}`,
+    prompt: 'What is my total net worth right now?',
+  });
+
+  if (ctx.hasSpending) {
+    chips.push({ label: 'Where did it go', prompt: 'What did I spend the most on this month?' });
+    chips.push({ label: 'Spent this week', prompt: 'How much did I spend this week?' });
+  }
+  if (ctx.budgetCount > 0) {
+    chips.push({
+      label: `Budgets (${ctx.budgetCount})`,
+      prompt: 'How am I doing against my budgets this month?',
+    });
+  }
+  if (ctx.billCount > 0) {
+    chips.push({
+      label: `Bills due (${ctx.billCount})`,
+      prompt: 'Which bills are due soon and how much are they?',
+    });
+  }
+  if (ctx.goalCount > 0) {
+    chips.push({
+      label: `Goals (${ctx.goalCount})`,
+      prompt: 'What is the progress on my savings goals?',
+    });
+  }
+
+  chips.push({ label: 'Salary left', prompt: 'How much of my income this month is left after expenses?' });
+  chips.push({ label: 'Check accounts', prompt: 'What are my account balances?' });
+  chips.push({ label: 'Savings rate', prompt: 'What is my savings rate this month?' });
+
+  return chips;
+};
 export const AssistantPage: React.FC = () => {
   const { refreshTrigger } = useOutletContext<OutletContextType>() || {};
   const { isOnline, addToast } = useUiStore();
@@ -71,6 +125,16 @@ export const AssistantPage: React.FC = () => {
   const [isThinking, setIsThinking] = useState<boolean>(false);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
+  // Drives the suggestion chips. They used to be a fixed list, so the app
+  // offered "View Budgets" to someone with no budgets and the answer was an
+  // apology.
+  const [chipContext, setChipContext] = useState<{
+    netWorthMinor: number | null;
+    billCount: number;
+    budgetCount: number;
+    goalCount: number;
+    hasSpending: boolean;
+  }>({ netWorthMinor: null, billCount: 0, budgetCount: 0, goalCount: 0, hasSpending: false });
   const [isQuickAddOpen, setIsQuickAddOpen] = useState<boolean>(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -129,8 +193,22 @@ export const AssistantPage: React.FC = () => {
     let active = true;
     const loadContext = async () => {
       try {
-        const accRes = await apiClient.get<Account[]>('/accounts');
-        if (active) setAccounts(accRes.data);
+        const [accRes, summaryRes, billsRes, budgetsRes, goalsRes] = await Promise.all([
+          apiClient.get<Account[]>('/accounts'),
+          apiClient.get<{ net_worth_minor: number; expense_minor: number }>('/finance/summary'),
+          apiClient.get<unknown[]>('/bills'),
+          apiClient.get<unknown[]>('/budgets'),
+          apiClient.get<unknown[]>('/goals'),
+        ]);
+        if (!active) return;
+        setAccounts(accRes.data);
+        setChipContext({
+          netWorthMinor: summaryRes.data?.net_worth_minor ?? null,
+          billCount: Array.isArray(billsRes.data) ? billsRes.data.length : 0,
+          budgetCount: Array.isArray(budgetsRes.data) ? budgetsRes.data.length : 0,
+          goalCount: Array.isArray(goalsRes.data) ? goalsRes.data.length : 0,
+          hasSpending: (summaryRes.data?.expense_minor ?? 0) > 0,
+        });
       } catch {
         // Context is optional - the assistant still answers without it.
       }
@@ -222,6 +300,13 @@ export const AssistantPage: React.FC = () => {
       };
       setMessages((prev) => [...prev, errorMsg]);
     }
+  };
+
+  const handleCancelProposal = (messageId: string) => {
+    // Drop the proposal so the card unmounts. A toast alone left Confirm live,
+    // meaning a cancelled action could still be executed with one more tap.
+    setMessages((prev) => withProposalCancelled(prev, messageId));
+    addToast('Proposed action cancelled.', 'info');
   };
 
   const handleConfirmProposal = async (proposal: ProposedAction) => {
@@ -365,11 +450,12 @@ export const AssistantPage: React.FC = () => {
         >
           <Sparkles size={14} /> Add an expense
         </button>
-        {SUGGESTED_PROMPTS.map((sp) => (
+        {buildSuggestions(chipContext).map((sp, i) => (
           <button
             key={sp.label}
             type="button"
             className="action-chip"
+            style={{ animationDelay: `${0.04 * (i + 1)}s` }}
             disabled={isThinking}
             onClick={() => void handleSendMessage(sp.prompt)}
           >
@@ -394,7 +480,7 @@ export const AssistantPage: React.FC = () => {
           messages.map((msg) => (
             <div
               key={msg.id}
-              className={`message-wrapper ${msg.sender === 'user' ? 'user-msg' : 'assistant-msg'}`}
+              className={`message-wrapper ${msg.sender === 'user' ? 'user-msg' : 'assistant-msg'} ${msg.proposal ? 'has-proposal' : ''}`}
             >
               {msg.sender === 'assistant' && (
                 <img src={logoMark} alt="MONEVA" className="msg-avatar-logo" />
@@ -406,9 +492,7 @@ export const AssistantPage: React.FC = () => {
                   <ActionProposalCard
                     proposal={msg.proposal}
                     onConfirm={handleConfirmProposal}
-                    onCancel={() => {
-                      addToast('Proposed action cancelled.', 'info');
-                    }}
+                    onCancel={() => handleCancelProposal(msg.id)}
                   />
                 )}
 
@@ -423,7 +507,14 @@ export const AssistantPage: React.FC = () => {
           <div className="message-wrapper assistant-msg">
             <img src={logoMark} alt="MONEVA" className="msg-avatar-logo thinking-pulse" />
             <div className="message-bubble thinking-bubble">
-              <span className="thinking-text">MONEVA is analyzing your financial metrics...</span>
+              {/* Three bouncing dots read as "working" at a glance; the old
+                  static sentence looked like a message that had already
+                  arrived. */}
+              <span className="typing-dots" aria-label="MONEVA is thinking">
+                <span />
+                <span />
+                <span />
+              </span>
             </div>
           </div>
         )}

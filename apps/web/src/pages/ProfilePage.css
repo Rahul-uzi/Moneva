@@ -138,14 +138,65 @@
   color: var(--moneva-text-muted);
 }
 
+/*
+  Custom checkbox.
+
+  `accent-color` hands the checkmark's colour to the browser, which picks it
+  for contrast and cannot be overridden. Drawing the control ourselves is the
+  only way to theme the tick, so the box is reset and the mark is a rotated
+  border on ::after - crisp at any density, and no image to load.
+
+  The row is a <label>, so the 22px control is not the tap target.
+*/
 .toggle-checkbox {
-  /* Was 20x20. Keep the control visually small but give it a real hit box. */
-  width: 44px;
-  height: 44px;
-  padding: 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
-  accent-color: var(--moneva-teal);
+  margin: 0;
+  border: 2px solid var(--moneva-border);
+  border-radius: 6px;
+  background-color: transparent;
   cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.toggle-checkbox:checked {
+  background-color: var(--moneva-teal);
+  border-color: var(--moneva-teal);
+}
+
+.toggle-checkbox::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 5px;
+  height: 10px;
+  border: solid var(--moneva-tick);
+  border-width: 0 2.5px 2.5px 0;
+  transform: translate(-50%, -55%) rotate(45deg) scale(0);
+  transition: transform 0.18s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.toggle-checkbox:checked::after {
+  transform: translate(-50%, -55%) rotate(45deg) scale(1);
+}
+
+.toggle-checkbox:active {
+  transform: scale(0.88);
+}
+
+.toggle-checkbox:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle-checkbox::after { transition: none; }
 }
 
 .security-status-grid {
@@ -311,4 +362,374 @@
 .api-url-actions {
   display: flex;
   gap: 8px;
+}
+
+
+/* ---------- settings page motion ---------- */
+
+/* The whole row toggles, so it needs row-level affordance. */
+.toggle-row {
+  cursor: pointer;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  padding: 8px;
+  margin: -8px;
+  transition: background-color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.toggle-row:active {
+  background-color: var(--moneva-overlay-weak);
+}
+
+@media (hover: hover) {
+  .toggle-row:hover {
+    background-color: var(--moneva-overlay-weak);
+  }
+}
+
+/* Settings cards arrive in sequence rather than all at once. */
+.settings-section-card {
+  animation: monevaFadeUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.settings-section-card:nth-of-type(2) { animation-delay: 0.05s; }
+.settings-section-card:nth-of-type(3) { animation-delay: 0.10s; }
+.settings-section-card:nth-of-type(4) { animation-delay: 0.15s; }
+.settings-section-card:nth-of-type(n + 5) { animation-delay: 0.20s; }
+
+/* Expanding panels (disable-2FA, server address) slide rather than jump. */
+.tfa-disable-form,
+.api-url-controls {
+  animation: settingsExpand 0.24s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  overflow: hidden;
+}
+
+@keyframes settingsExpand {
+  from { opacity: 0; transform: translate3d(0, -6px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Inputs acknowledge focus instead of snapping. */
+.form-input,
+.form-select {
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.form-input:focus,
+.form-select:focus {
+  border-color: var(--moneva-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  outline: none;
+}
+
+/* Avatar swap should cross-fade, not pop. */
+.profile-avatar-img,
+.topbar-avatar-img {
+  animation: monevaFadeIn 0.25s ease-out both;
+}
+
+/* Theme buttons: the selected one lifts slightly. */
+.theme-option-btn {
+  transition: transform 0.12s ease, background-color var(--transition-fast),
+    color var(--transition-fast), border-color var(--transition-fast);
+}
+.theme-option-btn.active-theme {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-section-card,
+  .tfa-disable-form,
+  .api-url-controls,
+  .profile-avatar-img,
+  .topbar-avatar-img {
+    animation: none;
+  }
+}
+
+/* ---------- change password modal ---------- */
+.pwd-modal-overlay {
+  /* A short form should sit centred, not stretch as a full sheet. */
+  align-items: center;
+  padding: 20px;
+}
+
+.pwd-modal {
+  max-width: 380px;
+  border-radius: var(--radius-lg);
+  animation: monevaPop 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.pwd-modal-body {
+  padding: 16px 20px 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwd-modal { animation: none; }
+}
+
+/* ---------- currency change ---------- */
+.currency-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  border: 1px solid var(--moneva-orange);
+  color: var(--moneva-text-on-warning);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.currency-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--moneva-text-on-danger);
+}
+
+
+/* ---------- categories manager ---------- */
+.categories-modal {
+  max-height: 85vh;
+}
+
+.categories-body {
+  gap: 12px;
+}
+
+.category-add-row {
+  display: grid;
+  /* The name gets a row of its own: at 360px the old single-row grid squeezed
+     it to 165px and clipped the placeholder. */
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.category-add-row .form-input {
+  grid-column: 1 / -1;
+}
+
+.category-type-select {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---------- type filter ---------- */
+.category-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background-color: var(--moneva-bg);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moneva-border);
+}
+
+/* ---------- search + sort ---------- */
+.category-tools {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.category-sort-select {
+  width: auto;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.category-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.category-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--moneva-text-secondary);
+  pointer-events: none;
+}
+
+.category-search .form-input {
+  padding-left: 36px;
+}
+
+.category-search .form-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ---------- groups ---------- */
+.category-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.category-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--moneva-border);
+}
+
+/* The colour bar is what tells the two sets apart at a glance, now that the
+   per-row type badge is gone. */
+.category-group-head::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.group-expense::before {
+  background-color: var(--moneva-coral);
+}
+
+.group-income::before {
+  background-color: var(--moneva-teal);
+}
+
+.category-group-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--moneva-text-secondary);
+  margin: 0;
+}
+
+.category-group-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--moneva-text-secondary);
+  background-color: var(--moneva-bg);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+.category-group-empty {
+  font-size: 13px;
+  color: var(--moneva-text-secondary);
+  margin: 0;
+  padding: 6px 2px;
+}
+
+.category-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 12px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  animation: monevaFadeUp 0.24s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.category-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+  overflow-wrap: break-word;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .category-item {
+    animation: none;
+  }
+}
+
+
+/* =========================================================================
+   SETTINGS VISUAL PASS
+   ========================================================================= */
+
+/* ---------- section headers ---------- */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--moneva-border);
+}
+
+/* ---------- rows ---------- */
+/* Draw a rule only BETWEEN consecutive rows. Putting border-top on every row
+   doubled up with the section header's own bottom rule; :first-of-type could
+   not fix it because it counts element types and the header is also a div. */
+.security-feature-row {
+  border-top: none;
+}
+
+.security-feature-row + .security-feature-row {
+  border-top: 1px solid var(--moneva-border);
+}
+
+/* ---------- danger zone ---------- */
+.danger-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--moneva-coral);
+  border-radius: var(--radius-lg);
+  background-color: rgba(255, 107, 107, 0.06);
+  animation: monevaFadeUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.danger-zone::before {
+  content: 'Danger Zone';
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--moneva-text-on-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-stats,
+  .danger-zone {
+    animation: none;
+  }
+}
+
+
+/* Row actions keep a consistent width so the column of buttons down the right
+   edge of the settings rows lines up instead of each sizing to its own label. */
+.row-action-btn {
+  min-width: 104px;
+  justify-content: center;
+  white-space: nowrap;
 }

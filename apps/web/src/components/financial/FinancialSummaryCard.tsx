@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { formatMonetaryValue } from '../../utils/money';
 import './FinancialSummaryCard.css';
+import { useCountUp } from '../../hooks/useCountUp';
 
 interface FinancialSummaryCardProps {
   netWorthMinor: number;
@@ -19,6 +20,10 @@ export const FinancialSummaryCard: React.FC<FinancialSummaryCardProps> = ({
   currency = 'INR',
   isLoading = false,
 }) => {
+  // The headline figure counts up on first paint. Presentation only: it always
+  // settles on the exact value, and does nothing under prefers-reduced-motion.
+  const displayedNetWorth = useCountUp(netWorthMinor);
+
   if (isLoading) {
     return (
       <Card variant="gradient" className="summary-card-skeleton">
@@ -35,7 +40,7 @@ export const FinancialSummaryCard: React.FC<FinancialSummaryCardProps> = ({
         <div className="summary-icon"><Wallet size={18} /></div>
       </div>
       <div className="summary-net-worth">
-        <span className="number-xl">{formatMonetaryValue(netWorthMinor, currency)}</span>
+        <span className="number-xl">{formatMonetaryValue(displayedNetWorth, currency)}</span>
       </div>
       <div className="summary-divider" />
       <div className="summary-grid">

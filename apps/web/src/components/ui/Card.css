@@ -28,9 +28,36 @@
 
 .card-interactive {
   cursor: pointer;
+  transition: transform 0.16s ease, background-color 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
-.card-interactive:hover {
+
+/* Hover only where a pointer can actually hover. On a touchscreen :hover
+   latches after a tap and the card stayed lifted with nothing to un-hover it,
+   leaving a stuck transform that also acts as a containing block. */
+@media (hover: hover) and (pointer: fine) {
+  .card-interactive:hover {
+    background-color: var(--moneva-card-hover);
+    border-color: rgba(37, 99, 235, 0.4);
+    transform: translateY(-2px);
+  }
+}
+
+/* Touch gets a press instead: it ends when the finger lifts. */
+.card-interactive:active {
+  transform: scale(0.985);
   background-color: var(--moneva-card-hover);
-  border-color: rgba(37, 99, 235, 0.4);
-  transform: translateY(-2px);
+}
+
+.card-interactive:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-interactive,
+  .card-interactive:active {
+    transition: none;
+    transform: none;
+  }
 }

@@ -44,6 +44,21 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+class CurrencyChangeRequest(BaseModel):
+    currency: str = Field(min_length=3, max_length=3)
+    # Amounts are converted at the live rate unless `rate` is supplied, which is
+    # kept so a caller can pin a specific rate if it ever needs to.
+    convert: bool = True
+    rate: Optional[float] = Field(default=None, gt=0, le=100000)
+
+class CurrencyChangeResponse(BaseModel):
+    currency: str
+    converted: bool
+    rate: Optional[float] = None
+    rate_as_of: Optional[str] = None
+    rows_updated: int
+
+
 # ----------------- AVATAR SCHEMAS -----------------
 # Avatars arrive as data URLs the client has already downscaled to 256x256 JPEG.
 MAX_AVATAR_CHARS = 700_000  # ~500 KB of base64, generous for a 256px JPEG
@@ -88,7 +103,9 @@ class TotpVerifyRequest(BaseModel):
 
 
 class PasswordChangeRequest(BaseModel):
-    current_password: str
+    # Optional: the app sets a new password directly for an already-authenticated
+    # session. When supplied it is still verified.
+    current_password: Optional[str] = None
     # Length is enforced in the route (8 chars) so the user gets one clear message
     # instead of a schema error that contradicts it.
     new_password: str = Field(min_length=1, max_length=128)
@@ -278,6 +295,9 @@ class BudgetUpdate(BaseModel):
 class BudgetResponse(BudgetBase):
     id: uuid.UUID
     user_id: uuid.UUID
+    # Without this the UI had nothing to label a budget with and fell back to
+    # the literal word "Category", so every budget card looked identical.
+    category_name: Optional[str] = None
     spent_amount_minor: Optional[int] = 0
     remaining_amount_minor: Optional[int] = 0
     created_at: datetime

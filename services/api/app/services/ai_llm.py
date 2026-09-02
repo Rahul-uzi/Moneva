@@ -69,9 +69,17 @@ INTENT GUIDANCE
 """
 
 
+# Values people leave in a checked-in .env. Treating these as a real key meant
+# every message paid for a doomed network round-trip before falling back.
+_PLACEHOLDER_PREFIXES = ("your", "changeme", "change-me", "replace", "todo", "xxx", "<")
+
+
 def is_enabled() -> bool:
-    """True when an API key is configured. Absent key => rule engine only."""
-    return bool(os.getenv("GEMINI_API_KEY"))
+    """True when a usable API key is configured. Otherwise rule engine only."""
+    key = (os.getenv("GEMINI_API_KEY") or "").strip()
+    if len(key) < 20:
+        return False
+    return not key.lower().startswith(_PLACEHOLDER_PREFIXES)
 
 
 def _coerce_minor_units(value: Any) -> Optional[int]:

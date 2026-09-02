@@ -1,4 +1,5 @@
 import React from 'react';
+import logoMark from '../../assets/logo/MONEVA_Logo_Mark_FullColor.png';
 import './TutorialArt.css';
 
 export type TutorialArtName = 'welcome' | 'track' | 'plan' | 'bills' | 'secure';
@@ -23,16 +24,18 @@ export const TutorialArt: React.FC<{ name: TutorialArtName }> = ({ name }) => (
 
     {name === 'welcome' && (
       <>
-        <circle className="tut-halo" cx="110" cy="76" r="52" />
-        <circle className="tut-halo tut-halo-2" cx="110" cy="76" r="40" />
-        {/* The MONEVA mark: a rising line over a cupped hand. */}
-        <path className="tut-hand" d="M74 96 q36 30 72 0 q-8 34 -36 34 q-28 0 -36 -34 Z" />
-        <polyline className="tut-spark" points="76,88 94,74 110,82 128,58 144,48" />
-        <circle className="tut-dot tut-dot-a" cx="76" cy="88" r="5" />
-        <circle className="tut-dot tut-dot-b" cx="94" cy="74" r="5" />
-        <circle className="tut-dot tut-dot-c" cx="110" cy="82" r="5" />
-        <circle className="tut-dot tut-dot-d" cx="128" cy="58" r="5" />
-        <circle className="tut-dot tut-dot-e" cx="144" cy="48" r="6" />
+        {/* The real brand mark rather than a redrawn one: the hand-built path
+            read as a grinning face against the halo rings. */}
+        <circle className="tut-halo" cx="110" cy="80" r="58" />
+        <image
+          className="tut-logo"
+          href={logoMark}
+          x="46"
+          y="30"
+          width="128"
+          height="108"
+          preserveAspectRatio="xMidYMid meet"
+        />
       </>
     )}
 
@@ -81,13 +84,18 @@ export const TutorialArt: React.FC<{ name: TutorialArtName }> = ({ name }) => (
 
     {name === 'secure' && (
       <>
-        <path className="tut-shield" d="M110 26 L156 44 v34 q0 32 -46 48 q-46 -16 -46 -48 V44 Z" />
-        <path className="tut-shield-check" d="M92 76 l13 13 l25 -28" strokeLinecap="round" strokeLinejoin="round" />
-        {/* Fingerprint ridges sweeping in behind the shield. */}
-        <path className="tut-ridge tut-ridge-1" d="M40 96 q10 -22 26 -28" />
-        <path className="tut-ridge tut-ridge-2" d="M34 110 q14 -32 34 -40" />
-        <path className="tut-ridge tut-ridge-3" d="M180 96 q-10 -22 -26 -28" />
-        <path className="tut-ridge tut-ridge-4" d="M186 110 q-14 -32 -34 -40" />
+        {/* Slightly rounded shoulders, otherwise the straight edges read as a
+            hexagon rather than a shield. */}
+        <path
+          className="tut-shield"
+          d="M110 26 L154 43 q3 1 3 5 v30 q0 32 -47 50 q-47 -18 -47 -50 V48 q0 -4 3 -5 Z"
+        />
+        {/* A fingerprint inside the shield. The ridges used to sit outside it,
+            where they read as a pair of horns. */}
+        <path className="tut-ridge tut-ridge-1" d="M86 98 v-10 q0 -24 24 -24 q24 0 24 24 v10" />
+        <path className="tut-ridge tut-ridge-2" d="M95 98 v-8 q0 -16 15 -16 q15 0 15 16 v8" />
+        <path className="tut-ridge tut-ridge-3" d="M104 98 v-6 q0 -9 6 -9 q6 0 6 9 v6" />
+        <path className="tut-ridge tut-ridge-4" d="M110 76 v22" />
       </>
     )}
   </svg>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User as UserIcon,
@@ -17,9 +17,15 @@ import {
   Server,
   Camera,
   Fingerprint,
-  ShieldOff,
   GraduationCap,
+  X,
+  Tags,
+  Plus,
+  Pencil,
+  Search,
+  MonitorSmartphone,
 } from 'lucide-react';
+import { categoryIcon } from '../utils/categoryIcons';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
@@ -30,11 +36,9 @@ import {
 import type { ThemeMode } from '../services/themeService';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useUiStore } from '../stores/useUiStore';
-import { apiClient, getApiBaseUrl, getDefaultApiBaseUrl, setApiBaseUrl } from '../services/apiClient';
-import type { User } from '../types/api';
-import { TwoFactorSetupModal } from '../components/settings/TwoFactorSetupModal';
+import { apiClient, getApiBaseUrl, getDefaultApiBaseUrl, setApiBaseUrl, setStoredTokens } from '../services/apiClient';
+import type { User, Category } from '../types/api';
 import { fileToAvatarDataUrl, uploadAvatar, deleteAvatar } from '../services/avatarService';
-import { disableTotp } from '../services/twoFactorService';
 import {
   getBiometricStatus,
   isBiometricLockEnabled,
@@ -43,7 +47,7 @@ import {
 } from '../services/biometricService';
 import type { BiometricStatus } from '../services/biometricService';
 import { markOnboardingPending } from '../services/onboardingService';
-import { exportJsonFile } from '../services/exportService';
+import { exportBinaryFile } from '../services/exportService';
 import './ProfilePage.css';
 
 export const ProfilePage: React.FC = () => {
@@ -62,15 +66,40 @@ export const ProfilePage: React.FC = () => {
 
   // Notification Preferences State
   const [notifBills, setNotifBills] = useState<boolean>(true);
+  const [notifSalary, setNotifSalary] = useState<boolean>(true);
+  const [isSavingPrefs, setIsSavingPrefs] = useState<boolean>(false);
+
+  // Currency change is destructive to the meaning of every stored amount, so it
+  // gets its own confirmed flow rather than riding along with Save Profile.
+  const [pendingCurrency, setPendingCurrency] = useState<string | null>(null);
+  const [isChangingCurrency, setIsChangingCurrency] = useState<boolean>(false);
+
+  // Categories
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState<boolean>(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(false);
+  const [newCategoryName, setNewCategoryName] = useState<string>('');
+  const [categoryQuery, setCategoryQuery] = useState<string>('');
+  const [categorySort, setCategorySort] = useState<'custom' | 'az' | 'newest'>('custom');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'expense' | 'income'>('all');
+  const [pendingDeleteCategory, setPendingDeleteCategory] = useState<{ id: string; name: string } | null>(null);
+  const [newCategoryType, setNewCategoryType] = useState<'expense' | 'income'>('expense');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState<string>('');
+  const [isSavingCategory, setIsSavingCategory] = useState<boolean>(false);
+
+  // Sessions
+  const [isSigningOutAll, setIsSigningOutAll] = useState<boolean>(false);
+  const [confirmSignOutAll, setConfirmSignOutAll] = useState<boolean>(false);
   const [notifBudgets, setNotifBudgets] = useState<boolean>(true);
   const [notifGoals, setNotifGoals] = useState<boolean>(true);
 
   // Password Change State
-  const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [isChangingPassword, setIsChangingPassword] = useState<boolean>(false);
   const [pwdError, setPwdError] = useState<string | null>(null);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState<boolean>(false);
 
   // Data Export & Account Deletion State
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -82,11 +111,6 @@ export const ProfilePage: React.FC = () => {
   const [isAvatarBusy, setIsAvatarBusy] = useState<boolean>(false);
 
   // Two-factor
-  const [isTfaModalOpen, setIsTfaModalOpen] = useState<boolean>(false);
-  const [isDisablingTfa, setIsDisablingTfa] = useState<boolean>(false);
-  const [showDisableTfa, setShowDisableTfa] = useState<boolean>(false);
-  const [disableTfaPassword, setDisableTfaPassword] = useState<string>('');
-  const [disableTfaCode, setDisableTfaCode] = useState<string>('');
 
   // Biometric app-lock
   const [biometric, setBiometric] = useState<BiometricStatus>({ available: false, label: null, reason: null });
@@ -126,6 +150,195 @@ export const ProfilePage: React.FC = () => {
     };
   }, []);
 
+  // The toggles previously held local state only - nothing was ever loaded or
+  // saved, so flipping one did nothing at all.
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const res = await apiClient.get<{
+          notif_bills: boolean;
+          notif_budgets: boolean;
+          notif_goals: boolean;
+          notif_salary: boolean;
+        }>('/notifications/preferences');
+        if (!active) return;
+        setNotifBills(res.data.notif_bills);
+        setNotifBudgets(res.data.notif_budgets);
+        setNotifGoals(res.data.notif_goals);
+        setNotifSalary(res.data.notif_salary);
+      } catch {
+        // Keep the defaults; the next toggle will still write through.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const savePreference = async (
+    key: 'notif_bills' | 'notif_budgets' | 'notif_goals' | 'notif_salary',
+    value: boolean,
+    revert: (v: boolean) => void,
+  ) => {
+    setIsSavingPrefs(true);
+    try {
+      await apiClient.patch('/notifications/preferences', { [key]: value });
+    } catch {
+      // Put the switch back so it never claims a setting that did not save.
+      revert(!value);
+      addToast('Could not save that preference.', 'error');
+    } finally {
+      setIsSavingPrefs(false);
+    }
+  };
+
+  const handleConfirmCurrency = async () => {
+    if (!pendingCurrency) return;
+    setIsChangingCurrency(true);
+    try {
+      // No rate is sent: the API converts at the live rate and tells us which
+      // one it used, so the confirmation can state it rather than guess.
+      const res = await apiClient.post<{
+        rows_updated: number;
+        rate: number | null;
+        rate_as_of: string | null;
+      }>('/profile/currency', { currency: pendingCurrency, convert: true });
+
+      setCurrency(pendingCurrency);
+      await restoreSession();
+      addToast(
+        `Converted ${res.data.rows_updated} amounts at 1 ${currency} = ${res.data.rate} ${pendingCurrency}.`,
+        'success',
+      );
+      setPendingCurrency(null);
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      addToast(detail || 'Could not change the currency.', 'error');
+    } finally {
+      setIsChangingCurrency(false);
+    }
+  };
+
+  const loadCategories = async () => {
+    setIsLoadingCategories(true);
+    try {
+      const res = await apiClient.get<Category[]>('/categories');
+      setCategories(res.data);
+    } catch {
+      addToast('Could not load categories.', 'error');
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  };
+
+  // Expense and income categories are separate sets — the transaction form only
+  // ever offers the ones matching the type being added. Grouping them here makes
+  // that split visible instead of leaving one flat list of look-alike rows.
+  const categoryGroups = useMemo(() => {
+    const q = categoryQuery.trim().toLowerCase();
+    const match = (c: Category) => !q || c.name.toLowerCase().includes(q);
+
+    // 'custom' keeps whatever order the API returned — insertion order, which
+    // holds the seeded defaults in their curated sequence.
+    const sort = (items: Category[]) => {
+      if (categorySort === 'az') {
+        return [...items].sort((a, b) => a.name.localeCompare(b.name));
+      }
+      if (categorySort === 'newest') {
+        return [...items].sort((a, b) => b.created_at.localeCompare(a.created_at));
+      }
+      return items;
+    };
+
+    const of = (type: 'expense' | 'income') =>
+      sort(categories.filter((c) => c.type === type && match(c)));
+
+    const all = [
+      { type: 'expense' as const, label: 'Expense', items: of('expense') },
+      { type: 'income' as const, label: 'Income', items: of('income') },
+    ];
+    return categoryFilter === 'all' ? all : all.filter((g) => g.type === categoryFilter);
+  }, [categories, categoryQuery, categorySort, categoryFilter]);
+
+  const expenseCount = useMemo(() => categories.filter((c) => c.type === 'expense').length, [categories]);
+  const incomeCount = useMemo(() => categories.filter((c) => c.type === 'income').length, [categories]);
+
+  const handleOpenCategories = () => {
+    setCategoryFilter('all');
+    setCategoryQuery('');
+    setIsCategoriesOpen(true);
+    void loadCategories();
+  };
+
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name) return;
+    setIsSavingCategory(true);
+    try {
+      await apiClient.post('/categories', { name, type: newCategoryType });
+      setNewCategoryName('');
+      await loadCategories();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      addToast(detail || 'Could not add that category.', 'error');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const handleRenameCategory = async (id: string) => {
+    const name = editingCategoryName.trim();
+    if (!name) return;
+    setIsSavingCategory(true);
+    try {
+      await apiClient.patch(`/categories/${id}`, { name });
+      setEditingCategoryId(null);
+      setEditingCategoryName('');
+      await loadCategories();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      addToast(detail || 'Could not rename that category.', 'error');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    setIsSavingCategory(true);
+    try {
+      await apiClient.delete(`/categories/${id}`);
+      // Transactions keep their history; the API nulls their category link.
+      setPendingDeleteCategory(null);
+      addToast(`Deleted "${name}". Past transactions kept, now uncategorised.`, 'info');
+      await loadCategories();
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      addToast(detail || 'Could not delete that category.', 'error');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const handleSignOutAllDevices = async () => {
+    setIsSigningOutAll(true);
+    try {
+      const res = await apiClient.post<{ tokens: { access_token: string; refresh_token: string; token_type: string; expires_in: number } }>(
+        '/auth/logout-all',
+      );
+      // The server hands back a fresh pair so this device is not signed out too.
+      if (res.data?.tokens) setStoredTokens(res.data.tokens);
+      setConfirmSignOutAll(false);
+      addToast('Done. Every other device has been signed out.', 'success');
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      addToast(detail || 'Could not sign out other devices.', 'error');
+    } finally {
+      setIsSigningOutAll(false);
+    }
+  };
+
   // ---------- Profile picture ----------
   const handleAvatarPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,32 +375,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   // ---------- Two-factor ----------
-  const handleTfaEnabled = async () => {
-    try {
-      await restoreSession();
-      addToast('Two-factor authentication is now on.', 'success');
-    } catch {
-      addToast('2FA enabled, but the profile could not be refreshed.', 'warning');
-    }
-  };
 
-  const handleDisableTfa = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsDisablingTfa(true);
-    try {
-      await disableTotp(disableTfaPassword, disableTfaCode.trim());
-      await restoreSession();
-      setShowDisableTfa(false);
-      setDisableTfaPassword('');
-      setDisableTfaCode('');
-      addToast('Two-factor authentication disabled.', 'info');
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
-      addToast(detail || 'Could not disable two-factor authentication.', 'error');
-    } finally {
-      setIsDisablingTfa(false);
-    }
-  };
 
   const handleReplayTutorial = () => {
     markOnboardingPending();
@@ -239,9 +427,9 @@ export const ProfilePage: React.FC = () => {
 
   // Handle Theme Preference
   const handleThemeChange = (mode: ThemeMode) => {
+    // No toast: the screen repainting is the confirmation.
     setThemeMode(mode);
     persistThemeMode(mode);
-    addToast(`Appearance preference set to ${mode.toUpperCase()}`, 'info');
   };
 
   // Handle Profile Update
@@ -274,8 +462,8 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     setPwdError(null);
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPwdError('Please complete all password fields.');
+    if (!newPassword || !confirmPassword) {
+      setPwdError('Please fill in both fields.');
       return;
     }
 
@@ -291,14 +479,15 @@ export const ProfilePage: React.FC = () => {
 
     setIsChangingPassword(true);
     try {
+      // The access token already proves this session owns the account, so the
+      // current password is not required.
       await apiClient.post('/profile/change-password', {
-        current_password: currentPassword,
         new_password: newPassword,
       });
       addToast('Password changed successfully!', 'success');
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setIsPasswordModalOpen(false);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to change password.';
       setPwdError(msg);
@@ -311,10 +500,14 @@ export const ProfilePage: React.FC = () => {
   const handleExportData = async () => {
     setIsExporting(true);
     try {
-      const res = await apiClient.get('/profile/export');
-      const result = await exportJsonFile(
-        `moneva_financial_export_${new Date().toISOString().slice(0, 10)}.json`,
+      // The workbook is built server-side, so the app ships no spreadsheet code.
+      const res = await apiClient.get<ArrayBuffer>('/profile/export.xlsx', {
+        responseType: 'arraybuffer',
+      });
+      const result = await exportBinaryFile(
+        `moneva_export_${new Date().toISOString().slice(0, 10)}.xlsx`,
         res.data,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'MONEVA financial export',
       );
       addToast(result.message, 'success');
@@ -430,7 +623,15 @@ export const ProfilePage: React.FC = () => {
               <label className="form-label">
                 <DollarSign size={14} /> Currency
               </label>
-              <select className="form-select" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              <select
+                className="form-select"
+                value={currency}
+                onChange={(e) => {
+                  if (e.target.value !== currency) {
+                    setPendingCurrency(e.target.value);
+                  }
+                }}
+              >
                 <option value="INR">INR (₹)</option>
                 <option value="USD">USD ($)</option>
                 <option value="EUR">EUR (€)</option>
@@ -500,7 +701,7 @@ export const ProfilePage: React.FC = () => {
         </div>
 
         <div className="toggles-list">
-          <div className="toggle-row">
+          <label className="toggle-row">
             <div className="toggle-info">
               <span className="toggle-label">Upcoming Bill Reminders</span>
               <span className="toggle-sub">Receive alerts for bills due soon.</span>
@@ -509,11 +710,12 @@ export const ProfilePage: React.FC = () => {
               type="checkbox"
               className="toggle-checkbox"
               checked={notifBills}
-              onChange={(e) => setNotifBills(e.target.checked)}
+              disabled={isSavingPrefs}
+              onChange={(e) => { setNotifBills(e.target.checked); void savePreference('notif_bills', e.target.checked, setNotifBills); }}
             />
-          </div>
+          </label>
 
-          <div className="toggle-row">
+          <label className="toggle-row">
             <div className="toggle-info">
               <span className="toggle-label">Budget Limit Warnings</span>
               <span className="toggle-sub">Receive alerts when approaching category budget limits.</span>
@@ -522,11 +724,12 @@ export const ProfilePage: React.FC = () => {
               type="checkbox"
               className="toggle-checkbox"
               checked={notifBudgets}
-              onChange={(e) => setNotifBudgets(e.target.checked)}
+              disabled={isSavingPrefs}
+              onChange={(e) => { setNotifBudgets(e.target.checked); void savePreference('notif_budgets', e.target.checked, setNotifBudgets); }}
             />
-          </div>
+          </label>
 
-          <div className="toggle-row">
+          <label className="toggle-row">
             <div className="toggle-info">
               <span className="toggle-label">Savings Goal Milestones</span>
               <span className="toggle-sub">Receive updates when achieving savings goal targets.</span>
@@ -535,97 +738,144 @@ export const ProfilePage: React.FC = () => {
               type="checkbox"
               className="toggle-checkbox"
               checked={notifGoals}
-              onChange={(e) => setNotifGoals(e.target.checked)}
+              disabled={isSavingPrefs}
+              onChange={(e) => { setNotifGoals(e.target.checked); void savePreference('notif_goals', e.target.checked, setNotifGoals); }}
             />
-          </div>
+          </label>
+
+          <label className="toggle-row">
+            <div className="toggle-info">
+              <span className="toggle-label">Salary Reminders</span>
+              <span className="toggle-sub">Remind me when my recurring salary is due.</span>
+            </div>
+            <input
+              type="checkbox"
+              className="toggle-checkbox"
+              checked={notifSalary}
+              disabled={isSavingPrefs}
+              onChange={(e) => { setNotifSalary(e.target.checked); void savePreference('notif_salary', e.target.checked, setNotifSalary); }}
+            />
+          </label>
         </div>
       </Card>
 
-      {/* 5. Security & Change Password */}
+      {/* 5. Security */}
       <Card variant="surface" className="settings-section-card">
         <div className="section-header">
           <ShieldCheck size={18} className="text-coral" />
-          <h2 className="heading-md">Security & Password</h2>
+          <h2 className="heading-md">Security</h2>
         </div>
 
-        {/* Security Status */}
         <div className="security-status-grid">
           <div className="security-card">
             <span className="sec-label">Password Protection</span>
             <span className="sec-val text-teal">Active (JWT Session)</span>
           </div>
           <div className="security-card">
-            <span className="sec-label">Two-Factor (TOTP)</span>
-            <span className={user?.totp_enabled ? 'sec-val text-teal' : 'sec-val text-muted'}>
-              {user?.totp_enabled ? 'Enabled' : 'Not enabled'}
+            <span className="sec-label">App Lock</span>
+            <span className={biometricLock ? 'sec-val text-teal' : 'sec-val text-muted'}>
+              {biometricLock ? 'On' : 'Off'}
             </span>
           </div>
         </div>
 
-        {/* Two-Factor Authentication */}
-        <div className="security-feature-row">
-          <div className="security-feature-copy">
-            <span className="sec-label">Authenticator App</span>
-            <span className="text-body">
-              {user?.totp_enabled
-                ? 'A code from your authenticator app is required at every sign-in.'
-                : 'Require a rotating 6-digit code in addition to your password.'}
-            </span>
-          </div>
-          {user?.totp_enabled ? (
-            <Button variant="danger" size="sm" onClick={() => setShowDisableTfa((v) => !v)}>
-              <ShieldOff size={15} />
-              Disable
-            </Button>
-          ) : (
-            <Button variant="primary" size="sm" onClick={() => setIsTfaModalOpen(true)}>
-              <ShieldCheck size={15} />
-              Enable
-            </Button>
-          )}
-        </div>
-
-        {showDisableTfa && user?.totp_enabled && (
-          <form onSubmit={handleDisableTfa} className="settings-form tfa-disable-form">
-            <p className="text-body">Confirm with your password and a current code.</p>
-            <div className="form-group">
-              <label className="form-label">Account Password</label>
-              <input
-                type="password"
-                className="form-input"
-                value={disableTfaPassword}
-                onChange={(e) => setDisableTfaPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Authenticator or Recovery Code</label>
-              <input
-                type="text"
-                className="form-input"
-                value={disableTfaCode}
-                onChange={(e) => setDisableTfaCode(e.target.value)}
-                autoComplete="one-time-code"
-                maxLength={9}
-                placeholder="123456"
-              />
-            </div>
-            <Button type="submit" variant="danger" fullWidth isLoading={isDisablingTfa}>
-              Confirm &amp; Disable 2FA
-            </Button>
-          </form>
-        )}
-
-        {/* Replay the walkthrough */}
+        {/* Change password */}
         <div className="security-feature-row">
           <div className="security-feature-copy">
             <span className="sec-label">
-              <GraduationCap size={14} /> App Tutorial
+              <KeyRound size={14} /> Password
             </span>
-            <span className="text-body">Replay the five-step walkthrough of MONEVA.</span>
+            <span className="text-body">Set a new password for this account.</span>
           </div>
-          <Button variant="secondary" size="sm" onClick={handleReplayTutorial}>
-            Replay
+          <Button
+            variant="secondary"
+            size="sm"
+            className="row-action-btn"
+            onClick={() => { setPwdError(null); setIsPasswordModalOpen(true); }}
+          >
+            Change
+          </Button>
+        </div>
+
+        {/* Biometric App Lock */}
+        <div className="security-feature-row">
+          <div className="security-feature-copy">
+            <span className="sec-label">
+              <Fingerprint size={14} /> Biometric App Lock
+            </span>
+            <span className="text-body">
+              {biometric.available
+                ? `Require ${biometric.label} each time MONEVA opens.`
+                : biometric.reason || 'No biometric sensor available on this device.'}
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            className="toggle-checkbox"
+            checked={biometricLock}
+            disabled={!biometric.available}
+            onChange={(e) => void handleBiometricToggle(e.target.checked)}
+            aria-label="Biometric app lock"
+          />
+        </div>
+      </Card>
+
+      {/* 6. Your Data */}
+      <Card variant="surface" className="settings-section-card">
+        <div className="section-header">
+          <Download size={18} className="text-teal" />
+          <h2 className="heading-md">Your Data</h2>
+        </div>
+
+        {/* Manage categories */}
+        <div className="security-feature-row">
+          <div className="security-feature-copy">
+            <span className="sec-label">
+              <Tags size={14} /> Categories
+            </span>
+            <span className="text-body">Rename, add or remove your spending categories.</span>
+          </div>
+          <Button variant="secondary" size="sm" className="row-action-btn" onClick={handleOpenCategories}>
+            Manage
+          </Button>
+        </div>
+
+        <p className="text-body text-xs text-muted">
+          Download an Excel workbook of your financial records &mdash; a sheet each for
+          transactions, accounts, budgets, goals, bills and recurring income.
+        </p>
+
+        <Button variant="secondary" onClick={handleExportData} isLoading={isExporting}>
+          <Download size={14} /> Export to Excel
+        </Button>
+      </Card>
+
+      {/* 7. Devices & Advanced */}
+      <Card variant="surface" className="settings-section-card">
+        <div className="section-header">
+          <MonitorSmartphone size={18} className="text-violet" />
+          <h2 className="heading-md">Devices &amp; Advanced</h2>
+        </div>
+
+        {/* Revoke every other session */}
+        <div className="security-feature-row">
+          <div className="security-feature-copy">
+            <span className="sec-label">
+              <MonitorSmartphone size={14} /> Other Devices
+            </span>
+            <span className="text-body">
+              Sign out everywhere else. Use this if you lose a phone &mdash; sessions
+              otherwise stay valid for 60 days.
+            </span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="row-action-btn"
+            isLoading={isSigningOutAll}
+            onClick={() => setConfirmSignOutAll(true)}
+          >
+            <LogOut size={14} /> Sign out
           </Button>
         </div>
 
@@ -663,89 +913,23 @@ export const ProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Biometric App Lock */}
+        {/* Replay the walkthrough */}
         <div className="security-feature-row">
           <div className="security-feature-copy">
             <span className="sec-label">
-              <Fingerprint size={14} /> Biometric App Lock
+              <GraduationCap size={14} /> App Tutorial
             </span>
-            <span className="text-body">
-              {biometric.available
-                ? `Require ${biometric.label} each time MONEVA opens.`
-                : biometric.reason || 'No biometric sensor available on this device.'}
-            </span>
+            <span className="text-body">Replay the five-step walkthrough of MONEVA.</span>
           </div>
-          <input
-            type="checkbox"
-            className="toggle-checkbox"
-            checked={biometricLock}
-            disabled={!biometric.available}
-            onChange={(e) => void handleBiometricToggle(e.target.checked)}
-            aria-label="Biometric app lock"
-          />
-        </div>
-
-        <form onSubmit={handleChangePassword} className="settings-form mt-3">
-          <h3 className="heading-xs text-main">Change Password</h3>
-          {pwdError && <div className="form-error-banner">{pwdError}</div>}
-
-          <div className="form-group">
-            <label className="form-label">Current Password</label>
-            <input
-              type="password"
-              className="form-input"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="••••••••"
-            />
-          </div>
-
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label className="form-label">New Password</label>
-              <input
-                type="password"
-                className="form-input"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 8 characters"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Confirm New Password</label>
-              <input
-                type="password"
-                className="form-input"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter new password"
-              />
-            </div>
-          </div>
-
-          <Button type="submit" variant="secondary" isLoading={isChangingPassword}>
-            <KeyRound size={14} /> Update Password
+          <Button variant="secondary" size="sm" className="row-action-btn" onClick={handleReplayTutorial}>
+            Replay
           </Button>
-        </form>
-      </Card>
-
-      {/* 6. Data & Privacy */}
-      <Card variant="surface" className="settings-section-card">
-        <div className="section-header">
-          <Download size={18} className="text-teal" />
-          <h2 className="heading-md">Data & Privacy</h2>
         </div>
-        <p className="text-body text-xs text-muted">
-          Download a complete JSON export of your financial records including accounts, transactions, budgets, goals, and bills.
-        </p>
 
-        <Button variant="secondary" onClick={handleExportData} isLoading={isExporting}>
-          <Download size={14} /> Export Financial Data (JSON)
-        </Button>
       </Card>
 
-      {/* 7. Sign Out & Account Deletion */}
-      <div className="account-actions-group">
+      {/* 8. Danger Zone */}
+      <div className="account-actions-group danger-zone">
         <Button variant="secondary" fullWidth onClick={handleLogout}>
           <LogOut size={16} /> Sign Out Session
         </Button>
@@ -756,12 +940,326 @@ export const ProfilePage: React.FC = () => {
       </div>
 
       {/* Delete Account Confirmation Dialog */}
-      {isTfaModalOpen && (
-        <TwoFactorSetupModal
-          onClose={() => setIsTfaModalOpen(false)}
-          onEnabled={handleTfaEnabled}
-        />
+      {isCategoriesOpen && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Manage categories"
+          onClick={() => setIsCategoriesOpen(false)}
+        >
+          <div className="modal-container categories-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <Tags size={18} className="text-blue" />
+                <h2 className="heading-md">Categories</h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setIsCategoriesOpen(false)}
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body categories-body">
+              <form onSubmit={handleAddCategory} className="category-add-row">
+                <input
+                  type="text"
+                  className="form-input"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="New category name"
+                  aria-label="New category name"
+                />
+                <select
+                  className="form-select category-type-select"
+                  value={newCategoryType}
+                  onChange={(e) => setNewCategoryType(e.target.value as 'expense' | 'income')}
+                  aria-label="Category type"
+                >
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+                <Button type="submit" variant="primary" size="sm" isLoading={isSavingCategory}>
+                  <Plus size={16} /> Add
+                </Button>
+              </form>
+
+              <div className="category-filter-tabs">
+                <button
+                  type="button"
+                  className={`filter-tab ${categoryFilter === 'all' ? 'tab-active-all' : ''}`}
+                  onClick={() => setCategoryFilter('all')}
+                >
+                  All ({categories.length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-tab ${categoryFilter === 'expense' ? 'tab-active-expense' : ''}`}
+                  onClick={() => setCategoryFilter('expense')}
+                >
+                  Expense ({expenseCount})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-tab ${categoryFilter === 'income' ? 'tab-active-income' : ''}`}
+                  onClick={() => setCategoryFilter('income')}
+                >
+                  Income ({incomeCount})
+                </button>
+              </div>
+
+              {categories.length > 8 && (
+                <div className="category-tools">
+                  <div className="category-search">
+                    <Search size={15} className="category-search-icon" />
+                    <input
+                      type="search"
+                      className="form-input"
+                      value={categoryQuery}
+                      onChange={(e) => setCategoryQuery(e.target.value)}
+                      placeholder="Search"
+                      aria-label="Search categories"
+                    />
+                  </div>
+                  <select
+                    className="form-select category-sort-select"
+                    value={categorySort}
+                    onChange={(e) => setCategorySort(e.target.value as 'custom' | 'az' | 'newest')}
+                    aria-label="Sort categories"
+                  >
+                    <option value="custom">Default</option>
+                    <option value="az">A – Z</option>
+                    <option value="newest">Newest</option>
+                  </select>
+                </div>
+              )}
+
+              {isLoadingCategories ? (
+                <p className="text-body">Loading categories...</p>
+              ) : categories.length === 0 ? (
+                <p className="text-body">No categories yet. Add your first one above.</p>
+              ) : (
+                categoryGroups.map((group) => (
+                  <section key={group.type} className="category-group">
+                    <header className={`category-group-head group-${group.type}`}>
+                      <h3 className="category-group-title">{group.label}</h3>
+                      <span className="category-group-count">{group.items.length}</span>
+                    </header>
+
+                    {group.items.length === 0 ? (
+                      <p className="category-group-empty">
+                        {categoryQuery
+                          ? `No ${group.label.toLowerCase()} category matches "${categoryQuery}".`
+                          : `No ${group.label.toLowerCase()} categories yet.`}
+                      </p>
+                    ) : (
+                      <ul className="category-list">
+                        {group.items.map((c) => {
+                          const Icon = categoryIcon(c.icon);
+                          return (
+                            <li key={c.id} className="category-item">
+                              {editingCategoryId === c.id ? (
+                                <>
+                                  <input
+                                    type="text"
+                                    className="form-input"
+                                    value={editingCategoryName}
+                                    onChange={(e) => setEditingCategoryName(e.target.value)}
+                                    aria-label={`Rename ${c.name}`}
+                                    autoFocus
+                                  />
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    isLoading={isSavingCategory}
+                                    onClick={() => void handleRenameCategory(c.id)}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => setEditingCategoryId(null)}>
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <span
+                                    className="category-icon"
+                                    style={{
+                                      color: c.color || 'var(--moneva-text-secondary)',
+                                      backgroundColor: c.color ? `${c.color}22` : 'var(--moneva-bg)',
+                                    }}
+                                    aria-hidden="true"
+                                  >
+                                    <Icon size={15} />
+                                  </span>
+                                  <span className="category-name">{c.name}</span>
+                                  <button
+                                    type="button"
+                                    className="card-action-btn"
+                                    onClick={() => { setEditingCategoryId(c.id); setEditingCategoryName(c.name); }}
+                                    aria-label={`Rename ${c.name}`}
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="card-action-btn btn-danger"
+                                    onClick={() => setPendingDeleteCategory({ id: c.id, name: c.name })}
+                                    aria-label={`Delete ${c.name}`}
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </section>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       )}
+
+      {pendingCurrency && (
+        <div
+          className="modal-overlay pwd-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Change currency"
+          onClick={() => setPendingCurrency(null)}
+        >
+          <div className="modal-container pwd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <DollarSign size={18} className="text-orange" />
+                <h2 className="heading-md">Change to {pendingCurrency}?</h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setPendingCurrency(null)}
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="settings-form pwd-modal-body">
+              <div className="currency-warning">
+                Every amount you have saved will be converted from {currency} to
+                {' '}{pendingCurrency} at today&apos;s exchange rate. This rewrites your
+                transactions, budgets, goals and bills, and cannot be undone.
+              </div>
+
+              <Button
+                variant="danger"
+                fullWidth
+                isLoading={isChangingCurrency}
+                onClick={() => void handleConfirmCurrency()}
+              >
+                Yes, convert to {pendingCurrency}
+              </Button>
+              <Button variant="ghost" fullWidth onClick={() => setPendingCurrency(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPasswordModalOpen && (
+        <div
+          className="modal-overlay pwd-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Change password"
+          onClick={() => setIsPasswordModalOpen(false)}
+        >
+          <div className="modal-container pwd-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <KeyRound size={18} className="text-blue" />
+                <h2 className="heading-md">Change Password</h2>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setIsPasswordModalOpen(false)}
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="settings-form pwd-modal-body">
+              {pwdError && <div className="form-error-banner">{pwdError}</div>}
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="pwd-new">New Password</label>
+                <input
+                  id="pwd-new"
+                  type="password"
+                  className="form-input"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  autoFocus
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="pwd-confirm">Confirm New Password</label>
+                <input
+                  id="pwd-confirm"
+                  type="password"
+                  className="form-input"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <Button type="submit" variant="primary" fullWidth isLoading={isChangingPassword}>
+                <KeyRound size={16} /> Update Password
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <ConfirmationDialog
+        isOpen={!!pendingDeleteCategory}
+        title="Delete this category?"
+        message={`"${pendingDeleteCategory?.name ?? ''}" will be removed. Transactions already filed under it are kept, but they become uncategorised.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (pendingDeleteCategory) {
+            void handleDeleteCategory(pendingDeleteCategory.id, pendingDeleteCategory.name);
+          }
+        }}
+        onClose={() => setPendingDeleteCategory(null)}
+        isLoading={isSavingCategory}
+      />
+
+      <ConfirmationDialog
+        isOpen={confirmSignOutAll}
+        title="Sign out other devices?"
+        message="Every other phone or browser signed in to this account will be signed out immediately. This device stays signed in."
+        confirmLabel="Sign out others"
+        onConfirm={() => void handleSignOutAllDevices()}
+        onClose={() => setConfirmSignOutAll(false)}
+        isLoading={isSigningOutAll}
+      />
 
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}

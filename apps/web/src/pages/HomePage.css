@@ -15,15 +15,29 @@
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding-bottom: 6px;
   scroll-snap-type: x mandatory;
+  /* A scroll container clips to its content box, and the card shadow needs
+     22px (6px offset + 16px blur). With none, the shadow was cut off flush at
+     every edge and the card read as a hard rectangle beside the floating cards
+     above it. The negative margin cancels the padding so the cards stay lined
+     up with the rest of the page. */
+  padding: 20px 20px 22px;
+  margin: -20px -20px -16px;
+  /* Snapping ignores padding unless told otherwise: mandatory snap pulled the
+     first card flush to the container edge, eating the 20px of shadow room and
+     leaving it 20px out of line with every other card on the page. */
+  scroll-padding: 0 20px;
 }
 .accounts-scroll-row::-webkit-scrollbar {
   height: 4px;
 }
 
 .account-scroll-item {
-  flex: 0 0 240px;
+  /* Grows to share the row when there are only one or two accounts, instead
+     of sitting at a fixed 240px and leaving the rest of the row empty. */
+  flex: 1 1 240px;
+  min-width: 240px;
+  max-width: 100%;
   scroll-snap-align: start;
 }
 
@@ -37,4 +51,234 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   MOTION
+   Sections now paint as their own request lands, so each one arrives on its
+   own rather than the whole page appearing at once. backwards, not both: a
+   retained identity transform would make a section a containing block for any
+   fixed-position descendant.
+   --------------------------------------------------------------------------- */
+.home-section,
+.home-container > *:not(.home-section) {
+  animation: homeSectionIn 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.home-container > *:nth-child(1) { animation-delay: 0.02s; }
+.home-container > *:nth-child(2) { animation-delay: 0.07s; }
+.home-container > *:nth-child(3) { animation-delay: 0.12s; }
+.home-container > *:nth-child(4) { animation-delay: 0.17s; }
+.home-container > *:nth-child(5) { animation-delay: 0.22s; }
+.home-container > *:nth-child(6) { animation-delay: 0.27s; }
+.home-container > *:nth-child(n + 7) { animation-delay: 0.3s; }
+
+@keyframes homeSectionIn {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Cards inside a list cascade rather than snapping in together. */
+.vertical-cards-list > *,
+.transactions-list > *,
+.account-scroll-item {
+  animation: homeCardIn 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.vertical-cards-list > *:nth-child(2),
+.transactions-list > *:nth-child(2),
+.account-scroll-item:nth-child(2) { animation-delay: 0.06s; }
+.vertical-cards-list > *:nth-child(3),
+.transactions-list > *:nth-child(3),
+.account-scroll-item:nth-child(3) { animation-delay: 0.12s; }
+.transactions-list > *:nth-child(4),
+.account-scroll-item:nth-child(4) { animation-delay: 0.18s; }
+.transactions-list > *:nth-child(n + 5),
+.account-scroll-item:nth-child(n + 5) { animation-delay: 0.24s; }
+
+@keyframes homeCardIn {
+  from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Press feedback on the cards that are actually tappable. */
+.account-scroll-item > *:active,
+.vertical-cards-list > *:active {
+  transform: scale(0.985);
+}
+
+.account-scroll-item > *,
+.vertical-cards-list > * {
+  transition: transform 0.14s ease;
+}
+
+/* The scroll row keeps momentum on a touch device and does not drag the page
+   with it when it reaches the end. */
+.accounts-scroll-row {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-section,
+  .home-container > *,
+  .vertical-cards-list > *,
+  .transactions-list > *,
+  .account-scroll-item {
+    animation: none;
+  }
+  .account-scroll-item > *:active,
+  .vertical-cards-list > *:active {
+    transform: none;
+  }
+}
+
+
+/* ---------------------------------------------------------------------------
+   NEUMORPHISM (home screen only)
+
+   The effect is two opposing shadows - a light one where the notional light
+   falls and a darker one opposite - over a surface that shares the page's
+   colour. Scoped to .home-container so the rest of the app keeps its current
+   treatment.
+
+   Text colours are deliberately untouched: the surface barely shifts, so every
+   figure keeps the contrast it already passed.
+   --------------------------------------------------------------------------- */
+.home-container {
+  /* White cards on the tinted page. Classic neumorphism tints the card to
+     match its background; keeping the card white instead holds the figures
+     legible, and the paired shadows still do the lifting because the page
+     behind them is not white. */
+  --neu-surface: #FFFFFF;
+  --neu-light: #FFFFFF;
+  --neu-dark: rgba(148, 163, 184, 0.34);
+  --neu-distance: 6px;
+  --neu-blur: 16px;
+}
+
+/* Dark mode cannot use the same recipe. The canvas is true black, and no
+   shadow can be darker than #000 - the "dark" half of the pair would be
+   invisible. The surface is lifted off black instead and carries a soft top
+   highlight, so the card still reads as raised without abandoning the
+   true-black canvas. */
+:root[data-theme="dark"] .home-container {
+  --neu-surface: #0F131C;
+  --neu-light: rgba(255, 255, 255, 0.045);
+  --neu-dark: #000000;
+  --neu-distance: 5px;
+  --neu-blur: 14px;
+}
+
+.home-container .moneva-card,
+.home-container .account-card,
+.home-container .budget-card,
+.home-container .goal-card,
+.home-container .bill-card {
+  background: var(--neu-surface);
+  background-image: none;
+  border: 1px solid transparent;
+  box-shadow:
+    calc(var(--neu-distance) * -1) calc(var(--neu-distance) * -1) var(--neu-blur) var(--neu-light),
+    var(--neu-distance) var(--neu-distance) var(--neu-blur) var(--neu-dark);
+}
+
+:root[data-theme="dark"] .home-container .moneva-card,
+:root[data-theme="dark"] .home-container .account-card,
+:root[data-theme="dark"] .home-container .budget-card,
+:root[data-theme="dark"] .home-container .goal-card,
+:root[data-theme="dark"] .home-container .bill-card {
+  /* A hairline of light along the top edge does the lifting on black. */
+  border-top-color: rgba(255, 255, 255, 0.06);
+  border-left-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Pressing pushes the card in rather than lifting it, which is the whole point
+   of the style: the same two shadows, inset. */
+.home-container .card-interactive:active {
+  transform: none;
+  box-shadow:
+    inset calc(var(--neu-distance) * -1) calc(var(--neu-distance) * -1)
+      calc(var(--neu-blur) - 4px) var(--neu-light),
+    inset var(--neu-distance) var(--neu-distance) calc(var(--neu-blur) - 4px) var(--neu-dark);
+}
+
+/* Progress tracks are carved into the surface; their fills stay raised so the
+   value still reads as a solid bar. */
+.home-container .salary-bar-track,
+.home-container .budget-progress-bar,
+.home-container .goal-progress-bar {
+  /* Slightly tinted: an inset shadow is invisible on a pure white track. */
+  background: #EDF1F7;
+  box-shadow:
+    inset 2px 2px 4px var(--neu-dark),
+    inset -2px -2px 4px var(--neu-light);
+}
+
+/* The round icon tiles read as small raised buttons. */
+.home-container .account-icon,
+.home-container .goal-icon,
+.home-container .summary-icon-box {
+  box-shadow:
+    -3px -3px 6px var(--neu-light),
+    3px 3px 6px var(--neu-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-container .card-interactive:active {
+    box-shadow:
+      calc(var(--neu-distance) * -1) calc(var(--neu-distance) * -1) var(--neu-blur) var(--neu-light),
+      var(--neu-distance) var(--neu-distance) var(--neu-blur) var(--neu-dark);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   FIGURE CONTRAST ON THE NEUMORPHIC SURFACE
+
+   The raw brand teal and coral are decorative hues. As text they were already
+   short of WCAG AA on the old white card (2.54:1 and 2.78:1), and the softer
+   neumorphic surface pushed them lower still (2.24:1 and 2.45:1).
+
+   The palette already carries readable variants for exactly this purpose, so
+   the money figures use those on the home screen. Same hues, legible weight:
+   4.81:1 and 5.68:1 against the surface. Icons and other decorative uses keep
+   the brand colours.
+   --------------------------------------------------------------------------- */
+.home-container .number-md.text-teal,
+.home-container .number-lg.text-teal,
+.home-container .number-xl.text-teal {
+  color: var(--moneva-text-on-success);
+}
+
+.home-container .number-md.text-coral,
+.home-container .number-lg.text-coral,
+.home-container .number-xl.text-coral {
+  color: var(--moneva-text-on-danger);
+}
+
+/* "See all" in a section header. Sized as a real touch target rather than a
+   bare text link, since it sits beside a heading on a phone. */
+.section-see-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 2px 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--moneva-blue);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.14s ease;
+}
+
+.section-see-all:active {
+  transform: scale(0.96);
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-see-all:active { transform: none; }
 }

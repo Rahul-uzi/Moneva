@@ -22,7 +22,7 @@ from app.core.security import (
     get_current_user
 )
 from app.db.database import get_db
-from app.models.models import User
+from app.models.models import User, Category
 from app.schemas.schemas import (
     UserCreate,
     UserLogin,
@@ -36,6 +36,32 @@ from app.schemas.schemas import (
     TwoFactorChallengeResponse,
     TotpVerifyRequest,
 )
+
+# Starter categories every new account gets. The Category model already had
+# is_default/icon/colour fields for this, but nothing ever populated them, so
+# users landed on an empty Plan screen with nothing to file spending under.
+# Colours come from the locked MONEVA palette; icons are lucide names the app
+# already bundles.
+DEFAULT_CATEGORIES = [
+    # --- expenses ---
+    ("Food & Dining", "expense", "UtensilsCrossed", "#FF6B6B"),
+    ("Groceries", "expense", "ShoppingCart", "#F59E0B"),
+    ("Transport", "expense", "Bus", "#2563EB"),
+    ("Fuel", "expense", "Fuel", "#F59E0B"),
+    ("Rent & Housing", "expense", "Home", "#7C3AED"),
+    ("Utilities", "expense", "Zap", "#2563EB"),
+    ("Shopping", "expense", "ShoppingBag", "#FF6B6B"),
+    ("Health", "expense", "HeartPulse", "#10B981"),
+    ("Entertainment", "expense", "Clapperboard", "#7C3AED"),
+    ("Education", "expense", "GraduationCap", "#2563EB"),
+    ("Other", "expense", "Tag", "#64748B"),
+    # --- income ---
+    ("Salary", "income", "Wallet", "#10B981"),
+    ("Business", "income", "Briefcase", "#10B981"),
+    ("Investments", "income", "TrendingUp", "#10B981"),
+    ("Other Income", "income", "PiggyBank", "#64748B"),
+]
+
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -60,12 +86,25 @@ async def register_user(payload: UserCreate, db: AsyncSession = Depends(get_db))
         timezone=payload.timezone or "UTC"
     )
     db.add(new_user)
+    await db.flush()  # assigns new_user.id without a second round trip
+
+    # Give the account something to file spending under from the first screen.
+    for name, kind, icon, colour in DEFAULT_CATEGORIES:
+        db.add(Category(
+            user_id=new_user.id,
+            name=name,
+            type=kind,
+            icon=icon,
+            color=colour,
+            is_default=True,
+        ))
+
     await db.commit()
     await db.refresh(new_user)
 
     # Generate JWT Tokens
-    access_token = create_access_token(data={"sub": str(new_user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(new_user.id)})
+    access_token = create_access_token(data={"sub": str(new_user.id), "tv": new_user.token_version or 0})
+    refresh_token = create_refresh_token(data={"sub": str(new_user.id), "tv": new_user.token_version or 0})
 
     return TokenResponse(
         access_token=access_token,
@@ -98,11 +137,11 @@ async def login_user(payload: UserLogin, db: AsyncSession = Depends(get_db)):
     # Password was correct. If TOTP is on, stop here and demand the second factor.
     if user.totp_enabled:
         return TwoFactorChallengeResponse(
-            challenge_token=create_2fa_challenge_token({"sub": str(user.id)})
+            challenge_token=create_2fa_challenge_token({"sub": str(user.id), "tv": user.token_version or 0})
         )
 
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    access_token = create_access_token(data={"sub": str(user.id), "tv": user.token_version or 0})
+    refresh_token = create_refresh_token(data={"sub": str(user.id), "tv": user.token_version or 0})
 
     return TokenResponse(
         access_token=access_token,
@@ -146,8 +185,15 @@ async def refresh_tokens(payload: RefreshTokenRequest, db: AsyncSession = Depend
             detail="User account is inactive or no longer exists."
         )
 
-    access_token = create_access_token(data={"sub": str(user.id)})
-    new_refresh_token = create_refresh_token(data={"sub": str(user.id)})
+    # A refresh token from before a "sign out everywhere" must not mint new ones.
+    if int(decoded.get("tv", 0)) != int(user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This session has been signed out."
+        )
+
+    access_token = create_access_token(data={"sub": str(user.id), "tv": user.token_version or 0})
+    new_refresh_token = create_refresh_token(data={"sub": str(user.id), "tv": user.token_version or 0})
 
     return TokenResponse(
         access_token=access_token,
@@ -179,8 +225,8 @@ RECOVERY_CODE_COUNT = 10
 
 def _issue_token_pair(user: User) -> TokenResponse:
     return TokenResponse(
-        access_token=create_access_token(data={"sub": str(user.id)}),
-        refresh_token=create_refresh_token(data={"sub": str(user.id)}),
+        access_token=create_access_token(data={"sub": str(user.id), "tv": user.token_version or 0}),
+        refresh_token=create_refresh_token(data={"sub": str(user.id), "tv": user.token_version or 0}),
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
@@ -320,3 +366,26 @@ async def totp_verify(
 
     await db.commit()
     return _issue_token_pair(user)
+
+
+@router.post("/logout-all")
+async def logout_all_devices(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Invalidates every token issued for this account, on every device.
+
+    Bumping token_version makes the claim inside all outstanding access and
+    refresh tokens stale, so they are refused on their next use. This is the
+    only way to end a session on a lost phone - refresh tokens live 60 days.
+    """
+    current_user.token_version = int(current_user.token_version or 0) + 1
+    await db.commit()
+    await db.refresh(current_user)
+
+    # Issue a fresh pair so the device doing the revoking stays signed in.
+    return {
+        "message": "Signed out on all devices.",
+        "tokens": _issue_token_pair(current_user).model_dump(),
+    }

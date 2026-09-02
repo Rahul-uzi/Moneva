@@ -87,6 +87,7 @@ export interface Budget {
   id: string;
   user_id: string;
   category_id: string;
+  category_name?: string | null;
   limit_amount_minor: number;
   spent_amount_minor?: number;
   remaining_amount_minor?: number;

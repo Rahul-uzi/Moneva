@@ -35,7 +35,7 @@ const SLIDES: Slide[] = [
   {
     art: 'secure',
     title: 'Lock it down',
-    body: 'Turn on two-factor authentication and the biometric app lock in Profile → Security whenever you are ready.',
+    body: 'Turn on the biometric app lock in Profile → Security, and MONEVA will ask for your fingerprint or face every time it opens.',
   },
 ];
 

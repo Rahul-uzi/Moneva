@@ -226,9 +226,25 @@ async def test_profile_update(api_client: AsyncClient):
     headers = {"Authorization": f"Bearer {u_reg.json()['access_token']}"}
 
     patch_res = await api_client.patch("/api/profile", json={
-        "display_name": "Updated Name",
-        "currency": "EUR"
+        "display_name": "Updated Name"
     }, headers=headers)
     assert patch_res.status_code == 200
     assert patch_res.json()["display_name"] == "Updated Name"
-    assert patch_res.json()["currency"] == "EUR"
+
+    # Currency is deliberately NOT changeable here. Amounts are stored as plain
+    # integer minor units, so swapping the label alone would silently misreport
+    # every figure the user owns.
+    reject = await api_client.patch("/api/profile", json={
+        "currency": "EUR"
+    }, headers=headers)
+    assert reject.status_code == 400
+
+    # The dedicated endpoint makes the choice explicit. Relabel-only leaves the
+    # stored numbers untouched.
+    changed = await api_client.post("/api/profile/currency", json={
+        "currency": "EUR",
+        "convert": False
+    }, headers=headers)
+    assert changed.status_code == 200
+    assert changed.json()["currency"] == "EUR"
+    assert changed.json()["converted"] is False

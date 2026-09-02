@@ -34,9 +34,24 @@
 
 .proposal-detail-row {
   display: flex;
-  align-items: center;
+  /* Top-aligned with a real gap: a long description used to wrap under the
+     label and overlap it, because neither side was allowed to shrink. */
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
   font-size: 13px;
+}
+
+.proposal-detail-row .detail-label {
+  flex-shrink: 0;
+  color: var(--moneva-text-secondary);
+}
+
+.proposal-detail-row .detail-val {
+  min-width: 0;
+  flex: 1;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .proposal-error {
@@ -51,8 +66,17 @@
 
 .proposal-actions {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: stretch;
+  /* Wrap is the safety net: on a very narrow card the buttons stack rather
+     than overflow, since their labels are not allowed to break. */
+  flex-wrap: wrap;
   gap: 10px;
   padding-top: 4px;
+}
+
+/* Each button takes half the row and keeps its label on one line; "Confirm &
+   Execute" was wrapping onto three lines inside the narrow card. */
+.proposal-actions > button {
+  flex: 1 1 auto;
+  white-space: nowrap;
 }

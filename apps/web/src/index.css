@@ -40,6 +40,9 @@
   /* Base stop for accent-tinted panels: linear-gradient(accent 15% -> this) */
   --moneva-accent-panel-base: rgba(6, 8, 13, 0.95);
 
+  /* Checkmark drawn inside a filled control - white on the dark theme. */
+  --moneva-tick: #FFFFFF;
+
   /* Text Typography Colors */
   --moneva-text-main: #FFFFFF;
   --moneva-text-secondary: #94A3B8;
@@ -94,6 +97,9 @@
   --moneva-viewport-shadow: 0 0 40px rgba(13, 19, 33, 0.12);
 
   --moneva-accent-panel-base: rgba(255, 255, 255, 0.92);
+
+  /* ...and near-black on the light theme. */
+  --moneva-tick: #0D1321;
 }
 
 
@@ -218,6 +224,13 @@ html, body {
 
 /* Each screen fades up as it mounts, so route changes read as movement
    rather than a hard swap. */
+/*
+  `both` keeps the final keyframe applied forever, so `transform: none` computes
+  to an identity matrix - and ANY transform makes the element the containing
+  block for position:fixed descendants. That pushed every modal on the page far
+  off screen. `backwards` applies the start frame before the run and then lets
+  the property return to its normal value.
+*/
 .page-enter,
 .accounts-page-container,
 .activity-container,
@@ -226,12 +239,12 @@ html, body {
 .home-container,
 .plan-page-container,
 .profile-page-container {
-  animation: monevaFadeUp 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: monevaFadeUp 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 /* Cards stagger in behind the screen so a list assembles instead of blinking. */
 .moneva-card {
-  animation: monevaFadeUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: monevaFadeUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 .moneva-card:nth-child(2) { animation-delay: 0.04s; }
 .moneva-card:nth-child(3) { animation-delay: 0.08s; }
@@ -347,7 +360,8 @@ button,
 :root[data-theme="dark"] .topbar-logo,
 :root[data-theme="dark"] .auth-logo,
 :root[data-theme="dark"] .assistant-logo-mark,
-:root[data-theme="dark"] .msg-avatar-logo {
+:root[data-theme="dark"] .msg-avatar-logo,
+:root[data-theme="dark"] .tut-logo {
   filter:
     drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.85))
     drop-shadow(0 0 1.6px rgba(148, 163, 184, 0.5));
@@ -395,6 +409,45 @@ button,
 
 .range-tab {
   line-height: 1.2;
+}
+
+/* Icon-only row action (rename / delete). Defined globally because it is used
+   on several routes and must not depend on a route chunk being loaded. */
+.card-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.card-action-btn:hover,
+.card-action-btn:focus-visible {
+  color: var(--moneva-blue);
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+/* `.btn-danger` is the filled Button variant; on an icon-only row action we
+   want the coral tint, not the solid block it paints. Two classes outrank it. */
+.card-action-btn.btn-danger {
+  color: var(--moneva-coral);
+  background: transparent;
+  box-shadow: none;
+}
+
+.card-action-btn.btn-danger:hover,
+.card-action-btn.btn-danger:focus-visible {
+  color: var(--moneva-coral);
+  background-color: rgba(255, 107, 107, 0.12);
 }
 
 /* Keep the chips pills once they are taller. */
@@ -446,4 +499,38 @@ button,
 .trend-date-label,
 .msg-time {
   font-size: 11px;
+}
+
+
+/* ---------------------------------------------------------------------------
+   PROGRESS BARS FILLING ON FIRST PAINT
+   Each bar had a width transition, which only fires when the value CHANGES.
+   On load the width was set immediately, so bars appeared already full and the
+   reader never saw the proportion being drawn.
+
+   scaleX is animated rather than width: it runs on the compositor, and with
+   `backwards` the element holds scaleX(0) before the animation starts and
+   returns to its own (untransformed) style afterwards - so nothing is left
+   behind to act as a containing block for fixed-position descendants.
+   --------------------------------------------------------------------------- */
+.salary-bar-fill,
+.budget-progress-fill,
+.goal-progress-fill,
+.detail-progress-fill {
+  transform-origin: left center;
+  animation: monevaBarFill 0.72s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+@keyframes monevaBarFill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .salary-bar-fill,
+  .budget-progress-fill,
+  .goal-progress-fill,
+  .detail-progress-fill {
+    animation: none;
+  }
 }

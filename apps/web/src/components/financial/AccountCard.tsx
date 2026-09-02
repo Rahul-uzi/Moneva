@@ -20,12 +20,17 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onClick }) =>
         <div className={`account-icon ${isLiability ? 'icon-liability' : 'icon-asset'}`}>
           {isLiability ? <CreditCard size={20} /> : <Landmark size={20} />}
         </div>
-        <span className="account-type-badge">{account.account_type.toUpperCase()}</span>
+        {/* "OWED" rather than "LIABILITY": it says what the figure means. */}
+        <span className={`account-type-badge${isLiability ? ' badge-owed' : ''}`}>
+          {isLiability ? 'OWED' : 'ASSET'}
+        </span>
       </div>
       <div className="account-details">
         <span className="account-name">{account.name}</span>
+        {/* A debt carries its sign. Shown bare, a credit-card balance read as
+            money held, while net worth was subtracting the very same figure. */}
         <span className={`number-lg ${isLiability ? 'text-coral' : 'text-main'}`}>
-          {formatMonetaryValue(balance, account.currency)}
+          {isLiability ? `- ${formatMonetaryValue(balance, account.currency)}` : formatMonetaryValue(balance, account.currency)}
         </span>
       </div>
     </Card>

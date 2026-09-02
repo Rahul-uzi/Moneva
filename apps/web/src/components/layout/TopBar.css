@@ -79,3 +79,13 @@
   font-weight: 700;
   font-size: 14px;
 }
+
+/* Profile picture in the header. The button paints its gradient into the
+   34px content box, so the image fills exactly that circle. */
+.topbar-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}

@@ -1,6 +1,43 @@
 import os
 import sys
+from pathlib import Path
+
 from pydantic import BaseModel
+
+
+def _load_dotenv() -> None:
+    """
+    Reads services/api/.env into the environment.
+
+    Nothing was loading this file, so a GEMINI_API_KEY (or any other value)
+    written there had no effect at all and the assistant silently stayed on the
+    rule engine. Real environment variables always win, which keeps Render's
+    dashboard values authoritative in production.
+
+    Stdlib only - this is one small file read at import time, not worth a
+    dependency.
+    """
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    try:
+        raw = env_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return
+
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        os.environ[key] = value
+
+
+_load_dotenv()
 
 class Settings(BaseModel):
     PROJECT_NAME: str = "MONEVA API"

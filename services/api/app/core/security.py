@@ -107,4 +107,14 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Tokens minted before a "sign out everywhere" carry an older version and
+    # are refused. Tokens issued before this feature shipped have no claim at
+    # all, which is treated as version 0 so existing sessions keep working.
+    if int(payload.get("tv", 0)) != int(user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="This session has been signed out.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return user

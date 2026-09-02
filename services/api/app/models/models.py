@@ -30,6 +30,11 @@ class User(Base):
     totp_enabled = Column(Boolean, default=False, nullable=False)
     totp_recovery_codes = Column(Text, nullable=True)    # JSON list of bcrypt hashes, single-use
 
+    # Bumped to invalidate every token already issued for this account. Cheaper
+    # than a server-side session store: the version is a claim inside the token,
+    # so revocation is one integer write and needs no lookup table.
+    token_version = Column(Integer, default=0, nullable=False)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 

@@ -20,43 +20,25 @@
 }
 
 /* ---------- welcome ---------- */
+/* A single soft disc behind the mark. The old pair of hard rings read as the
+   outline of a head once the silhouette sat inside them. */
 .tut-halo {
-  fill: none;
-  stroke: var(--moneva-blue);
-  stroke-width: 1.5;
-  opacity: 0.2;
-  animation: tutPulse 3.4s ease-in-out infinite;
-  transform-origin: 110px 76px;
-}
-.tut-halo-2 {
-  stroke: var(--moneva-violet);
-  opacity: 0.26;
-  animation-delay: 0.5s;
+  fill: var(--moneva-blue);
+  stroke: none;
+  opacity: 0.07;
+  animation: tutHalo 3.4s ease-in-out infinite;
+  transform-origin: 110px 80px;
 }
 
-.tut-hand {
-  fill: var(--moneva-navy);
-  stroke: var(--moneva-border);
-  stroke-width: 1.5;
+.tut-logo {
+  animation: tutRise 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  transform-origin: 110px 84px;
 }
 
-.tut-spark {
-  fill: none;
-  stroke: var(--moneva-teal);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 130;
-  stroke-dashoffset: 130;
-  animation: tutDraw 0.9s ease-out 0.15s forwards;
+@keyframes tutRise {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to   { opacity: 1; transform: none; }
 }
-
-.tut-dot { animation: tutPop 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
-.tut-dot-a { fill: var(--moneva-teal); animation-delay: 0.25s; }
-.tut-dot-b { fill: var(--moneva-violet); animation-delay: 0.4s; }
-.tut-dot-c { fill: var(--moneva-blue); animation-delay: 0.55s; }
-.tut-dot-d { fill: var(--moneva-teal); animation-delay: 0.7s; }
-.tut-dot-e { fill: var(--moneva-teal); animation-delay: 0.85s; }
 
 /* ---------- track ---------- */
 .tut-row { fill: var(--moneva-blue); opacity: 0.4; transform-origin: 64px center; }
@@ -140,27 +122,22 @@
   stroke-width: 3;
   stroke-linejoin: round;
 }
-.tut-shield-check {
-  fill: none;
-  stroke: var(--moneva-teal);
-  stroke-width: 6;
-  stroke-dasharray: 60;
-  stroke-dashoffset: 60;
-  animation: tutDraw 0.5s ease-out 0.3s forwards;
-}
 
+/* Fingerprint ridges: blue against the teal shield, both from the brand
+   palette, and drawn on rather than faded in so the print builds up. */
 .tut-ridge {
   fill: none;
-  stroke: var(--moneva-violet);
+  stroke: var(--moneva-blue);
   stroke-width: 3;
   stroke-linecap: round;
-  opacity: 0;
-  animation: tutFade 0.5s ease-out both;
+  stroke-dasharray: 110;
+  stroke-dashoffset: 110;
+  animation: tutDraw 0.55s ease-out both;
 }
-.tut-ridge-1 { animation-delay: 0.5s; }
-.tut-ridge-2 { animation-delay: 0.62s; }
-.tut-ridge-3 { animation-delay: 0.74s; }
-.tut-ridge-4 { animation-delay: 0.86s; }
+.tut-ridge-1 { animation-delay: 0.3s; }
+.tut-ridge-2 { animation-delay: 0.44s; }
+.tut-ridge-3 { animation-delay: 0.58s; }
+.tut-ridge-4 { animation-delay: 0.72s; }
 
 /* ---------- keyframes ---------- */
 @keyframes tutDraw { to { stroke-dashoffset: 0; } }
@@ -183,6 +160,11 @@
 
 @keyframes tutGrow {
   from { transform: scaleY(0); opacity: 0; }
+}
+
+@keyframes tutHalo {
+  0%, 100% { transform: scale(1); opacity: 0.06; }
+  50%      { transform: scale(1.06); opacity: 0.11; }
 }
 
 @keyframes tutPulse {

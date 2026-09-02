@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.models import Account, Category, Bill, SavingsGoal
 from app.services import ai_llm
+from app.services.finance import calculate_cash_flow, calculate_account_balance
+from app.services import ai_query
 from app.services.ai_tools import (
     get_financial_summary_tool,
     get_account_balances_tool,
@@ -194,6 +196,26 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
         # --------------------------------------------------
         # INTENT A: FINANCIAL QUESTIONS & METRICS (ANSWER)
         # --------------------------------------------------
+        # A greeting is the first thing most people type; it used to land on
+        # the "I could not work that out" fallback.
+        stripped = lower.strip().strip("!.,?")
+        if stripped in {
+            "hi", "hey", "hello", "yo", "hola", "namaste", "good morning",
+            "good afternoon", "good evening", "hi there", "hey there",
+            "hello there", "hii", "helo", "hey!", "good day",
+        } or any(k in lower for k in ["what can you do", "how can you help", "what do you do"]):
+            return AIQueryResponse(
+                response_type=ResponseType.ANSWER,
+                message=(
+                    "Hello! Ask me about your net worth, what you have spent this month, "
+                    "your biggest expense category, account balances, upcoming bills "
+                    "or savings goals. You can also just tell me what you spent "
+                    + chr(8212)
+                    + " something like " + chr(8220) + "refuelled the bike for 711.83"
+                    + chr(8221) + " " + chr(8212) + " and I will draft the transaction."
+                ),
+            )
+
         # Income-vs-spending for the current month. Checked before the generic
         # amount parser so "how much is left" is not mistaken for a transaction.
         if any(k in lower for k in [
@@ -233,28 +255,154 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
                 message=f"Your current Net Worth is ₹{nw_rupees:,.2f}."
             )
 
-        if any(k in lower for k in ["spent this month", "total spend", "how much did i spend", "spend on", "spent on", "spending on"]):
-            if "food" in lower or "groceries" in lower or "dining" in lower:
-                breakdown = await get_category_breakdown_tool(user_id, db)
-                food_items = [b for b in breakdown if any(f in b["category_name"].lower() for f in ["food", "groceries", "dining"])]
-                if food_items:
-                    tot_food = sum(b["amount_minor"] for b in food_items)
-                    return AIQueryResponse(
-                        response_type=ResponseType.ANSWER,
-                        message=f"You have spent ₹{tot_food / 100:,.2f} on food/groceries this month."
-                    )
-                else:
-                    return AIQueryResponse(
-                        response_type=ResponseType.ANSWER,
-                        message="You have no recorded food/grocery expenses for this month."
-                    )
-
-            summary = await get_financial_summary_tool(user_id, db)
-            exp_rupees = summary["total_expense_minor"] / 100.0
+        # "What do I spend most on" - the breakdown is already available, and
+        # without this the word "expense" fell through to the create-expense
+        # intent below, which answered a question by asking for an amount.
+        if any(k in lower for k in [
+            "biggest expense", "largest expense", "top category", "biggest category",
+            "most on", "spend most", "highest spending", "biggest spend",
+        ]):
+            breakdown = await get_category_breakdown_tool(user_id, db)
+            if not breakdown:
+                return AIQueryResponse(
+                    response_type=ResponseType.ANSWER,
+                    message="You have no expenses recorded this month yet, so there is no category to rank.",
+                )
+            ranked = sorted(breakdown, key=lambda b: b["amount_minor"], reverse=True)
+            top = ranked[0]
+            lines = [
+                f"• {b['category_name']}: ₹{b['amount_minor'] / 100:,.2f}"
+                for b in ranked[:3]
+            ]
+            header = (
+                f"Your biggest expense this month is {top['category_name']} "
+                f"at ₹{top['amount_minor'] / 100:,.2f}."
+            )
             return AIQueryResponse(
                 response_type=ResponseType.ANSWER,
-                message=f"Your total expenses for this month are ₹{exp_rupees:,.2f}."
+                message="\n".join([header] + lines),
             )
+
+        # "Did I spend more than last month" - compares the two windows rather
+        # than falling through to the not-understood reply.
+        if ("last month" in lower or "previous month" in lower) and any(
+            k in lower for k in ["spend", "spent", "spending", "expense", "more", "less", "compare"]
+        ):
+            now = datetime.now(timezone.utc)
+            this_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_end = this_start - timedelta(microseconds=1)
+            last_start = last_end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            this_flow = await calculate_cash_flow(db, user_id, this_start, now)
+            last_flow = await calculate_cash_flow(db, user_id, last_start, last_end)
+            this_exp = int(this_flow["expense_minor"])
+            last_exp = int(last_flow["expense_minor"])
+
+            if last_exp == 0:
+                verdict = (
+                    "There is nothing recorded for last month, so there is no "
+                    "comparison to make yet."
+                )
+            else:
+                diff = this_exp - last_exp
+                pct = abs(diff) * 100.0 / last_exp
+                if diff > 0:
+                    verdict = f"That is ₹{abs(diff) / 100:,.2f} more ({pct:.0f}% up)."
+                elif diff < 0:
+                    verdict = f"That is ₹{abs(diff) / 100:,.2f} less ({pct:.0f}% down)."
+                else:
+                    verdict = "That is exactly the same."
+            return AIQueryResponse(
+                response_type=ResponseType.ANSWER,
+                message=(
+                    f"This month you have spent ₹{this_exp / 100:,.2f}; "
+                    f"last month it was ₹{last_exp / 100:,.2f}. {verdict}"
+                ),
+            )
+
+        # Spending questions, resolved against the user's own data. This used to
+        # special-case food/groceries/dining and answer everything else with the
+        # month TOTAL - so "how much on entertainment" reported the whole month.
+        if any(k in lower for k in [
+            "spent", "spend", "spending", "how much did i", "how much have i",
+            "how much on", "total spend",
+        ]):
+            start_at, end_at, period_label = ai_query.resolve_period(lower)
+
+            # 1. A category the user actually has.
+            category = ai_query.match_by_name(lower, categories)
+            if category is not None:
+                total, count = await ai_query.spend_in_category(
+                    db, user_id, category.id, start_at, end_at
+                )
+                if count == 0:
+                    return AIQueryResponse(
+                        response_type=ResponseType.ANSWER,
+                        message=f"Nothing recorded under {category.name} for {period_label}.",
+                    )
+                noun = "transaction" if count == 1 else "transactions"
+                return AIQueryResponse(
+                    response_type=ResponseType.ANSWER,
+                    message=(
+                        f"You spent ₹{total / 100:,.2f} on {category.name} {period_label} "
+                        f"across {count} {noun}."
+                    ),
+                )
+
+            # 2. A merchant or payee from the descriptions they typed.
+            merchant_terms = [
+                t for t in ai_query._tokens(lower)
+                if t not in {"income", "worth", "net", "budget", "budgets", "goal", "goals"}
+            ]
+            for term in sorted(merchant_terms, key=len, reverse=True):
+                total, rows = await ai_query.search_transactions(
+                    db, user_id, term, start_at, end_at
+                )
+                if rows:
+                    label = (rows[0].description or term).strip()
+                    noun = "transaction" if len(rows) == 1 else "transactions"
+                    return AIQueryResponse(
+                        response_type=ResponseType.ANSWER,
+                        message=(
+                            f"You spent ₹{total / 100:,.2f} on “{term}” {period_label} "
+                            f"across {len(rows)} {noun}. Most recent: {label}."
+                        ),
+                    )
+
+            # 3. No category or merchant named - the period total, and the label
+            #    says which window it covers so the number cannot be misread.
+            total = await ai_query.spend_in_period(db, user_id, start_at, end_at)
+            return AIQueryResponse(
+                response_type=ResponseType.ANSWER,
+                message=f"You spent ₹{total / 100:,.2f} in total {period_label}.",
+            )
+
+        # "Can I afford X" - measured against liquid asset balances, not net
+        # worth, since money tied up in assets cannot be spent today.
+        if "afford" in lower:
+            price = parse_amount_to_minor(clean_prompt)
+            if not price:
+                return AIQueryResponse(
+                    response_type=ResponseType.ANSWER,
+                    message="Tell me the amount and I will check it against your available balance.",
+                )
+            balances = await get_account_balances_tool(user_id, db)
+            liquid = sum(
+                int(a["balance_paise"]) for a in balances if a["account_type"] == "asset"
+            )
+            if price <= liquid:
+                left = liquid - price
+                message = (
+                    f"Yes. ₹{price / 100:,.2f} against ₹{liquid / 100:,.2f} available "
+                    f"leaves you ₹{left / 100:,.2f}."
+                )
+            else:
+                short = price - liquid
+                message = (
+                    f"Not right now. ₹{price / 100:,.2f} is ₹{short / 100:,.2f} more "
+                    f"than the ₹{liquid / 100:,.2f} you have available."
+                )
+            return AIQueryResponse(response_type=ResponseType.ANSWER, message=message)
 
         if any(k in lower for k in ["cash flow", "income vs expense", "total income"]):
             summary = await get_financial_summary_tool(user_id, db)
@@ -264,6 +412,113 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
             return AIQueryResponse(
                 response_type=ResponseType.ANSWER,
                 message=f"This month's Total Income is ₹{inc:,.2f}, Total Expenses are ₹{exp:,.2f}, resulting in a Net Cash Flow of ₹{net:,.2f}."
+            )
+
+        # A named account: "what is my HDFC balance". The generic branch below
+        # lists everything, which is not what was asked.
+        if any(k in lower for k in ["balance", "how much is in", "how much do i have in"]):
+            account = ai_query.match_by_name(lower, accounts)
+            if account is not None:
+                bal = await calculate_account_balance(db, account.id)
+                return AIQueryResponse(
+                    response_type=ResponseType.ANSWER,
+                    message=f"{account.name} holds ₹{int(bal) / 100:,.2f}.",
+                )
+
+        # Recent activity, straight from the ledger.
+        if any(k in lower for k in [
+            "recent transaction", "last transaction", "latest transaction",
+            "recent activity", "what did i buy", "my transactions",
+        ]):
+            rows = await ai_query.recent_transactions(db, user_id, limit=5)
+            if not rows:
+                return AIQueryResponse(
+                    response_type=ResponseType.ANSWER,
+                    message="You have not recorded any transactions yet.",
+                )
+            cat_names = {c.id: c.name for c in categories}
+            lines = []
+            for t in rows:
+                sign = "-" if t.transaction_type == "expense" else "+"
+                cat = cat_names.get(t.category_id, "Uncategorised")
+                when = t.transaction_date.strftime("%d %b")
+                lines.append(
+                    f"• {when} {sign}₹{int(t.amount_minor) / 100:,.2f} "
+                    f"{(t.description or cat)} ({cat})"
+                )
+            return AIQueryResponse(
+                response_type=ResponseType.ANSWER,
+                message="Your most recent transactions:\n" + "\n".join(lines),
+            )
+
+        # Budget status against real spending.
+        if "budget" in lower and any(k in lower for k in [
+            "over", "under", "left", "status", "how am i", "doing", "on track", "my budget",
+        ]):
+            budgets = await get_budgets_tool(user_id, db)
+            if not budgets:
+                return AIQueryResponse(
+                    response_type=ResponseType.ANSWER,
+                    message="You have no budgets set. Add one in Plan to track a category.",
+                )
+            lines, over = [], 0
+            for b in budgets:
+                # get_budgets_tool returns spent_amount_minor. Guessing at the
+                # key name reported every budget as 0 spent and therefore "within
+                # limits" - a wrong number stated with full confidence.
+                limit = int(b.get("limit_amount_minor") or 0)
+                spent = int(b.get("spent_amount_minor") or 0)
+                name = b.get("category_name") or "Budget"
+                if limit and spent > limit:
+                    over += 1
+                    lines.append(
+                        f"• {name}: ₹{spent / 100:,.2f} of ₹{limit / 100:,.2f} "
+                        f"- over by ₹{(spent - limit) / 100:,.2f}"
+                    )
+                else:
+                    lines.append(
+                        f"• {name}: ₹{spent / 100:,.2f} of ₹{limit / 100:,.2f} "
+                        f"- ₹{max(0, limit - spent) / 100:,.2f} left"
+                    )
+            head = (
+                f"You are over on {over} of {len(budgets)} budgets."
+                if over else f"All {len(budgets)} budgets are within their limits."
+            )
+            return AIQueryResponse(
+                response_type=ResponseType.ANSWER,
+                message=head + "\n" + "\n".join(lines),
+            )
+
+        # Savings rate for the window asked about.
+        if "savings rate" in lower or ("saving" in lower and "rate" in lower) or "how much am i saving" in lower:
+            start_at, end_at, period_label = ai_query.resolve_period(lower)
+            income = await ai_query.spend_in_period(db, user_id, start_at, end_at, "income")
+            expense = await ai_query.spend_in_period(db, user_id, start_at, end_at, "expense")
+            if income <= 0:
+                return AIQueryResponse(
+                    response_type=ResponseType.ANSWER,
+                    message=f"No income is recorded for {period_label}, so a savings rate cannot be worked out yet.",
+                )
+            saved = income - expense
+            rate = saved * 100.0 / income
+            return AIQueryResponse(
+                response_type=ResponseType.ANSWER,
+                message=(
+                    f"You kept ₹{saved / 100:,.2f} of ₹{income / 100:,.2f} earned "
+                    f"{period_label} - a savings rate of {rate:.0f}%."
+                ),
+            )
+
+        # The categories they actually have, grouped by type.
+        if any(k in lower for k in ["list my categories", "my categories", "what categories"]):
+            exp = [c.name for c in categories if c.type == "expense"]
+            inc = [c.name for c in categories if c.type == "income"]
+            return AIQueryResponse(
+                response_type=ResponseType.ANSWER,
+                message=(
+                    f"Expense ({len(exp)}): " + ", ".join(exp) + "\n"
+                    + f"Income ({len(inc)}): " + ", ".join(inc)
+                ),
             )
 
         if any(k in lower for k in ["account balance", "my accounts", "my balances", "check accounts"]):
@@ -279,17 +534,57 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
                 message="Here are your current account balances:\n" + "\n".join(lines)
             )
 
-        if any(k in lower for k in ["upcoming bills", "unpaid bills", "my bills"]):
+        # Natural phrasings, not just the three exact strings the chips happened
+        # to use. "Which bills are due soon" matched none of them and fell all
+        # the way through to the not-understood reply.
+        # Excludes payment commands: this answer branch runs before the pay-bill
+        # action, so "pay my electricity bill" would otherwise just list bills.
+        if not any(k in lower for k in ["pay ", "paid ", "mark "]) and (
+            "bill" in lower or any(k in lower for k in ["what do i owe", "due soon", "what is due"])
+        ):
             bills_list = await get_bills_tool(user_id, db)
             if not bills_list:
                 return AIQueryResponse(
                     response_type=ResponseType.ANSWER,
                     message="You have no unpaid upcoming bills."
                 )
-            lines = [f"• {b['name']}: ₹{b['amount_minor'] / 100:,.2f} (Due: {b['due_date'][:10]})" for b in bills_list]
+            # Soonest first, and an overdue bill is called overdue rather than
+            # listed last under a heading that says "upcoming".
+            today = datetime.now(timezone.utc)
+            ordered = sorted(bills_list, key=lambda b: b["due_date"][:10])
+            lines, overdue = [], 0
+            for b in ordered:
+                due_txt = b["due_date"][:10]
+                try:
+                    due_dt = datetime.strptime(due_txt, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                except ValueError:
+                    due_dt = None
+                amount = f"₹{b['amount_minor'] / 100:,.2f}"
+                if due_dt is not None and due_dt.date() < today.date():
+                    overdue += 1
+                    days = (today.date() - due_dt.date()).days
+                    plural = "s" if days != 1 else ""
+                    lines.append(f"• {b['name']}: {amount} — OVERDUE by {days} day{plural} ({due_txt})")
+                elif due_dt is not None:
+                    days = (due_dt.date() - today.date()).days
+                    plural = "s" if days != 1 else ""
+                    when = "due today" if days == 0 else f"due in {days} day{plural}"
+                    lines.append(f"• {b['name']}: {amount} — {when} ({due_txt})")
+                else:
+                    lines.append(f"• {b['name']}: {amount} (Due: {due_txt})")
+
+            total = sum(int(b["amount_minor"]) for b in ordered)
+            if overdue:
+                verb = "is" if overdue == 1 else "are"
+                head = (f"{overdue} of your {len(ordered)} unpaid bills {verb} overdue. "
+                        f"Total outstanding ₹{total / 100:,.2f}:")
+            else:
+                plural = "s" if len(ordered) != 1 else ""
+                head = (f"You have {len(ordered)} unpaid bill{plural} "
+                        f"totalling ₹{total / 100:,.2f}:")
             return AIQueryResponse(
                 response_type=ResponseType.ANSWER,
-                message="Here are your upcoming unpaid bills:\n" + "\n".join(lines)
+                message=head + "\n" + "\n".join(lines),
             )
 
         if any(k in lower for k in ["savings goals", "my goals", "goal progress"]):
@@ -308,9 +603,24 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
         # --------------------------------------------------
         # INTENT B: MUTATION ACTION PROPOSALS & CLARIFICATIONS
         # --------------------------------------------------
+        # A question is never a command. Without this guard the action keywords
+        # below fire on questions that merely mention them - "what is my biggest
+        # expense" matched the create-an-expense branch and replied by asking
+        # for an amount. Anything phrased as a question skips to the fallback,
+        # which offers what the assistant can actually answer.
+        # "Can you add 500 for lunch" opens like a question but is a request, so
+        # the polite prefixes are excluded before the question test.
+        polite_command = lower.startswith((
+            "can you ", "could you ", "would you ", "please ", "pls ",
+        ))
+        is_question = not polite_command and (clean_prompt.strip().endswith("?") or lower.split(" ")[0] in {
+            "what", "whats", "what's", "how", "why", "when", "where", "which",
+            "who", "show", "list", "tell", "give", "do", "does", "did", "is",
+            "are", "am", "can", "could", "should", "was", "were", "have", "has",
+        })
 
         # B1: BILL PAYMENT INTENT
-        if "pay" in lower and "bill" in lower:
+        if not is_question and "pay" in lower and "bill" in lower:
             amount_minor = parse_amount_to_minor(clean_prompt)
             bills_list = (await db.execute(select(Bill).where(and_(Bill.user_id == user_id, Bill.status != 'paid')))).scalars().all()
             if not bills_list:
@@ -357,7 +667,7 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
             )
 
         # B2: GOAL CONTRIBUTION INTENT
-        if "contribute" in lower or "goal" in lower and ("save" in lower or "add" in lower):
+        if not is_question and ("contribute" in lower or ("goal" in lower and ("save" in lower or "add" in lower))):
             amount_minor = parse_amount_to_minor(clean_prompt)
             if not amount_minor:
                 return AIQueryResponse(
@@ -401,7 +711,7 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
             )
 
         # B3: TRANSFER INTENT
-        if any(k in lower for k in ["transfer", "move money", "move funds", "send to savings", "move to savings"]):
+        if not is_question and any(k in lower for k in ["transfer", "move money", "move funds", "send to savings", "move to savings"]):
             amount_minor = parse_amount_to_minor(clean_prompt)
             if not amount_minor:
                 return AIQueryResponse(
@@ -432,7 +742,16 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
             )
 
         # B4: EXPENSE / INCOME INTENT
-        if any(k in lower for k in ["spent", "expense", "paid", "bought", "cost", "income", "received", "earned"]):
+        if not is_question and any(k in lower for k in [
+            "spent", "spend", "expense", "paid", "pay", "bought", "buy", "cost",
+            "income", "received", "earned", "got paid",
+            # Plain verbs for "add 500 for lunch" / "record 1200 petrol".
+            "add", "record", "log",
+            # Fuel and top-up phrasings people actually use.
+            "refuel", "refueled", "refuelled", "refuelling", "refueling",
+            "filled up", "fuelled", "fueled", "fuel", "petrol", "diesel", "recharge",
+            "topped up", "top up",
+        ]):
             amount_minor = parse_amount_to_minor(clean_prompt)
             if not amount_minor:
                 return AIQueryResponse(
@@ -460,15 +779,13 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
                     clarification_prompt=f"Account 'HDFC' was not found. Please choose from your accounts: {acc_names}."
                 )
 
-            # Resolve Category Name
-            target_cat = None
-            for cat in categories:
-                if cat.name.lower() in lower:
-                    target_cat = cat
-                    break
-            if not target_cat:
-                exp_cats = [c for c in categories if c.type == ('income' if is_income else 'expense')]
-                target_cat = exp_cats[0] if exp_cats else None
+            # Resolve the category from the user's own names first, then from
+            # everyday words ("petrol" -> Fuel). Falling back to the FIRST
+            # expense category filed petrol under Food & Dining; an explicit
+            # catch-all, or none at all, is honest where a guess is not.
+            target_cat = ai_query.guess_category(lower, categories, is_income)
+            if target_cat is None:
+                target_cat = ai_query.fallback_category(categories, is_income)
 
             desc = clean_prompt[:50]
             proposal = ProposedActionSchema(
@@ -487,10 +804,45 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
                 proposal=proposal
             )
 
-        # Default fallback answer
+        # Bare "<thing> <amount>" with no verb at all - "bike 711.8", "chai 40".
+        # This is how people actually jot an expense, and it reached the
+        # not-understood reply because every branch above wants a keyword.
+        if not is_question:
+            bare_amount = parse_amount_to_minor(clean_prompt)
+            words = [w for w in re.findall(r"[a-zA-Z]+", clean_prompt) if len(w) > 1]
+            # Short and concrete: a couple of words naming a thing, plus a number.
+            if bare_amount and 1 <= len(words) <= 4:
+                target_acc = accounts[0] if accounts else None
+                target_cat = (
+                    ai_query.guess_category(lower, categories)
+                    or ai_query.fallback_category(categories)
+                )
+                proposal = ProposedActionSchema(
+                    type="add_expense",
+                    amount_minor=bare_amount,
+                    description=clean_prompt[:50],
+                    account_id=str(target_acc.id) if target_acc else None,
+                    account_name=target_acc.name if target_acc else "Default Account",
+                    category_id=str(target_cat.id) if target_cat else None,
+                    category_name=target_cat.name if target_cat else "Uncategorised",
+                )
+                return AIQueryResponse(
+                    response_type=ResponseType.ACTION_PROPOSAL,
+                    message="I have prepared a proposed transaction based on your request. Please review and confirm before I execute it:",
+                    proposal=proposal,
+                )
+
+        # Default fallback. It used to open with "I analyzed your request for
+        # <prompt>", which was not true of anything that reached this point.
         return AIQueryResponse(
             response_type=ResponseType.ANSWER,
-            message=f"I analyzed your request for '{clean_prompt}'. You can ask me about your net worth, expenses, account balances, or ask me to record transactions, pay bills, and transfer funds!"
+            message=(
+                "I could not work that one out. Try asking about your net worth, "
+                "what you spent this month, your biggest expense category, your "
+                "account balances, upcoming bills or savings goals — or tell me "
+                "something like “refuelled the bike for 711.83” and I will draft "
+                "the transaction for you."
+            ),
         )
     except Exception:
         # Logged with a traceback so a production failure is diagnosable; the
