@@ -6,6 +6,7 @@ import { formatMonetaryValue } from '../../utils/money';
 import type { Bill, Category } from '../../types/api';
 import './BillDetailModal.css';
 
+import { parseApiDate } from '../../utils/datetime';
 interface BillDetailModalProps {
   bill: Bill | null;
   category?: Category;
@@ -26,7 +27,7 @@ export const BillDetailModal: React.FC<BillDetailModalProps> = ({
   if (!bill) return null;
 
   const isPaid = bill.status === 'paid';
-  const dueDate = new Date(bill.due_date);
+  const dueDate = parseApiDate(bill.due_date);
   const now = new Date();
   
   // Strip time for exact date comparison

@@ -1,0 +1,84 @@
+.due-salary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius-lg, 16px);
+  background-color: var(--moneva-card);
+  /* Tinted edge rather than a filled panel: this is a question, not an alert.
+     A red or amber block for a salary that is merely due reads as an error. */
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  box-shadow: var(--shadow-card, 0 2px 10px rgba(0, 0, 0, 0.06));
+}
+
+.due-salary-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.due-salary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Fixed square: a percentage radius on an auto-sized box gives an ellipse,
+     and an inline icon takes its height from the line box. */
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full, 999px);
+  color: var(--moneva-text-on-info);
+  background-color: rgba(37, 99, 235, 0.16);
+}
+
+.due-salary-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* Without this the flex item refuses to shrink and the text overflows. */
+  min-width: 0;
+}
+
+.due-salary-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.due-salary-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.due-salary-actions > button {
+  flex: 1;
+}
+
+.due-salary-skip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  background: none;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md, 12px);
+  cursor: pointer;
+}
+
+.due-salary-skip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Latches on touch devices, so it is kept to real pointers. */
+@media (hover: hover) and (pointer: fine) {
+  .due-salary-skip:hover {
+    background-color: var(--moneva-card-hover);
+  }
+}

@@ -8,40 +8,115 @@
 .plan-header {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-@media (min-width: 400px) {
-  .plan-header {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
+  gap: 10px;
 }
 
 .plan-action-btns {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.plan-metrics-card {
-  display: flex;
+/* Three peer actions, so one weight for all three. They were primary,
+   secondary and ghost, which implied a hierarchy that does not exist. */
+.plan-add-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-around;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  padding: 9px 8px;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-primary);
+  background-color: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.14s ease;
+}
+
+.plan-add-btn:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plan-add-btn:hover {
+    background-color: var(--moneva-card-hover);
+  }
+}
+
+/* Equal columns rather than space-around: the boxes used to size to their own
+   content, so a long "X / Y" wrapped and the three columns ended up different
+   heights with the dividers floating between them. */
+.plan-metrics-card {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
   background: var(--moneva-card-gradient);
   border: 1px solid var(--moneva-border);
   border-radius: var(--radius-lg);
-  padding: 14px 10px;
+  padding: 14px 12px;
 }
 
 .plan-metric-box {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
+  align-items: flex-start;
+  gap: 3px;
+  /* Without this a grid item refuses to shrink below its content and the
+     numbers push the columns out of alignment again. */
+  min-width: 0;
 }
+
+.plan-metric-box .metric-label {
+  /* The icon sat inline with the text and wrapped away from it on the
+     narrowest column, leaving the card icon stranded on its own line. */
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.plan-metric-box .number-md {
+  font-size: 17px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.metric-sub {
+  font-size: 11px;
+  color: var(--moneva-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.metric-bar {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 5px;
+  border-radius: var(--radius-full);
+  background-color: var(--moneva-border);
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  /* Grows into place on load, and animates when the figures change. */
+  transition: width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.metric-bar-fill.is-budget { background-color: var(--moneva-blue, #2563EB); }
+.metric-bar-fill.is-goal   { background-color: var(--moneva-teal, #10B981); }
+.metric-bar-fill.is-over   { background-color: var(--moneva-figure-expense, #CF2222); }
 
 .plan-filter-tabs {
   display: grid;
@@ -62,21 +137,433 @@
 .cards-grid {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
+/* The wrapper now carries the card surface and the actions sit inside it as a
+   footer. They used to float in the gap below the card as bare text on the
+   page background, belonging to nothing - proximity alone could not fix that,
+   because the problem was that they had no surface of their own. */
 .plan-card-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
+  background-color: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* The inner card gives up its own edges so the two read as one object rather
+   than a card inside a card. */
+.plan-card-wrapper > .moneva-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .card-quick-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--moneva-border);
+  background-color: var(--moneva-surface);
+}
+
+/* Filled pills rather than grey text. Edit and Delete were both near-invisible
+   on the footer bar, and the only thing separating them was Delete being a
+   slightly different shade of muted. */
+.card-quick-actions .card-action-btn {
+  min-height: 36px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  color: var(--moneva-text-on-info);
+  background-color: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.22);
+}
+
+/* Destructive, and it should look it - without shouting louder than the card
+   content it sits under. */
+.card-quick-actions .card-action-btn.btn-danger {
+  color: var(--moneva-text-on-danger);
+  background-color: rgba(207, 34, 34, 0.10);
+  border-color: rgba(207, 34, 34, 0.24);
+}
+
+.card-quick-actions .card-action-btn:active {
+  transform: scale(0.94);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card-quick-actions .card-action-btn:hover {
+    background-color: rgba(37, 99, 235, 0.2);
+  }
+  .card-quick-actions .card-action-btn.btn-danger:hover {
+    background-color: rgba(207, 34, 34, 0.18);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   REMINDERS
+   --------------------------------------------------------------------------- */
+.plan-status-list {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding-right: 4px;
+}
+
+.plan-status-list .plan-status {
+  animation: planIn 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.plan-status-list .plan-status:nth-child(2) { animation-delay: 0.05s; }
+.plan-status-list .plan-status:nth-child(3) { animation-delay: 0.1s; }
+.plan-status-list .plan-status:nth-child(n + 4) { animation-delay: 0.14s; }
+
+.plan-status-more {
+  align-self: flex-start;
+  padding: 6px 12px;
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--moneva-text-secondary);
+  background: none;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.14s ease;
+}
+
+.plan-status-more:active {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plan-status-more:hover {
+    background-color: var(--moneva-card-hover);
+  }
 }
 
 /* .card-action-btn now lives in index.css so it applies on every route. */
+
+/* ---------------------------------------------------------------------------
+   EMPTY PLAN
+
+   One invitation, not three refusals: an untouched account used to stack a
+   full empty state for budgets, goals and bills, each with the same
+   illustration, over about a screen and a half of scrolling.
+   --------------------------------------------------------------------------- */
+.plan-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 26px 18px;
+  background-color: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+}
+
+.plan-empty p {
+  max-width: 34ch;
+  margin: 0;
+}
+
+.plan-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Explicit square: a percentage radius on an auto-sized box is an ellipse. */
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+  border-radius: var(--radius-full);
+  color: var(--moneva-text-on-info);
+  background-color: rgba(37, 99, 235, 0.14);
+}
+
+.plan-empty-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.plan-empty-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 12px 6px;
+  font-family: var(--font-family);
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.14s ease;
+}
+
+.plan-empty-btn:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plan-empty-btn:hover {
+    background-color: var(--moneva-card-hover);
+  }
+}
+
+.plan-empty-btn-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--moneva-text-primary);
+}
+
+.plan-empty-btn-sub {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--moneva-text-secondary);
+}
+
+/* Long titles wrapped to two lines and pushed the count badge out of line. */
+.plan-section .section-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plan-section .section-title-row .text-label {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   MOTION
+
+   backwards, never both: `both` retains the final keyframe, and an identity
+   transform makes the element a containing block for anything fixed inside it.
+   --------------------------------------------------------------------------- */
+.plan-page-container > * {
+  animation: planIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.plan-page-container > *:nth-child(1) { animation-delay: 0.02s; }
+.plan-page-container > *:nth-child(2) { animation-delay: 0.07s; }
+.plan-page-container > *:nth-child(3) { animation-delay: 0.12s; }
+.plan-page-container > *:nth-child(4) { animation-delay: 0.17s; }
+.plan-page-container > *:nth-child(n + 5) { animation-delay: 0.2s; }
+
+@keyframes planIn {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Cards cascade within their section, so switching tabs reads as the list
+   being rebuilt rather than silently swapping in place. */
+.cards-grid > * {
+  animation: planCardIn 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.cards-grid > *:nth-child(2) { animation-delay: 0.05s; }
+.cards-grid > *:nth-child(3) { animation-delay: 0.1s; }
+.cards-grid > *:nth-child(4) { animation-delay: 0.15s; }
+.cards-grid > *:nth-child(n + 5) { animation-delay: 0.18s; }
+
+@keyframes planCardIn {
+  from { opacity: 0; transform: translate3d(-8px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+.plan-empty-actions > * {
+  animation: planCardIn 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.plan-empty-actions > *:nth-child(2) { animation-delay: 0.06s; }
+.plan-empty-actions > *:nth-child(3) { animation-delay: 0.12s; }
+
+/* Touch feedback: the phone has no hover to confirm a tap. */
+.plan-filter-tabs button {
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.14s ease;
+}
+.plan-filter-tabs button:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-page-container > *,
+  .cards-grid > *,
+  .plan-empty-actions > * {
+    animation: none;
+  }
+  .metric-bar-fill {
+    transition: none;
+  }
+  .plan-add-btn:active,
+  .plan-empty-btn:active,
+  .plan-filter-tabs button:active {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   STATUS LINE
+
+   The metrics say what the numbers are; this says what needs attention. Its
+   colour carries the same meaning as its words, so it is never colour alone.
+   --------------------------------------------------------------------------- */
+.plan-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  /* A real control: tall enough to hit, and it says where it goes. */
+  min-height: 48px;
+  padding: 10px 12px 10px 14px;
+  font-family: var(--font-family);
+  text-align: left;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moneva-border);
+  background-color: var(--moneva-card);
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.14s ease;
+}
+
+.plan-status:active {
+  transform: scale(0.985);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plan-status:hover {
+    background-color: var(--moneva-card-hover);
+  }
+}
+
+.plan-status-hint {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--moneva-text-secondary);
+}
+
+.plan-status-chevron {
+  flex-shrink: 0;
+  color: var(--moneva-text-secondary);
+}
+
+.plan-status-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+}
+
+.plan-status-text {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-status-danger { border-color: rgba(207, 34, 34, 0.35); }
+.plan-status-danger .plan-status-dot { background-color: var(--moneva-figure-expense, #CF2222); }
+.plan-status-danger .plan-status-text { color: var(--moneva-text-on-danger); }
+
+.plan-status-warn { border-color: rgba(245, 158, 11, 0.4); }
+.plan-status-warn .plan-status-dot { background-color: #F59E0B; }
+.plan-status-warn .plan-status-text { color: var(--moneva-text-primary); }
+
+.plan-status-good { border-color: rgba(16, 185, 129, 0.35); }
+.plan-status-good .plan-status-dot { background-color: var(--moneva-teal, #10B981); }
+.plan-status-good .plan-status-text { color: var(--moneva-text-primary); }
+
+/* A live dot for something already wrong, so it reads as current rather than
+   a label that has always been there. */
+.plan-status-danger .plan-status-dot,
+.plan-status-warn .plan-status-dot {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.82); }
+}
+
+/* ---------------------------------------------------------------------------
+   COLOUR IN THE METRICS
+
+   Three grey columns made the card read as one undifferentiated block. Each
+   metric now carries its own tint, matching the icon already beside its label.
+   --------------------------------------------------------------------------- */
+.plan-metric-box:nth-child(1) { --metric-tint: rgba(37, 99, 235, 0.07); }
+.plan-metric-box:nth-child(2) { --metric-tint: rgba(16, 185, 129, 0.08); }
+.plan-metric-box:nth-child(3) { --metric-tint: rgba(207, 34, 34, 0.06); }
+
+.plan-metric-box {
+  /* Tight horizontal padding: the tint needs breathing room but every pixel
+     here comes straight off the width the figure has to fit in. */
+  padding: 9px 7px;
+  border-radius: var(--radius-md);
+  background-color: var(--metric-tint);
+}
+
+.plan-metrics-card {
+  gap: 8px;
+  padding: 10px;
+}
+
+/* ---------------------------------------------------------------------------
+   TRANSITIONS
+   --------------------------------------------------------------------------- */
+.plan-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Sections re-mount when the tab changes (the wrapper is keyed on it), so this
+   replays and the filter visibly does something. */
+.plan-sections > * {
+  animation: planIn 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.plan-sections > *:nth-child(2) { animation-delay: 0.06s; }
+.plan-sections > *:nth-child(3) { animation-delay: 0.12s; }
+
+.plan-card-wrapper {
+  transition: transform 0.14s ease, box-shadow 0.18s ease;
+}
+.plan-card-wrapper:active {
+  transform: scale(0.988);
+}
+
+.card-quick-actions .card-action-btn {
+  transition: background-color 0.16s ease, color 0.16s ease, transform 0.14s ease;
+}
+.card-quick-actions .card-action-btn:active {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-sections > *,
+  .plan-status-dot {
+    animation: none;
+  }
+  .plan-status-list .plan-status {
+    animation: none;
+  }
+  .plan-card-wrapper:active,
+  .plan-status:active,
+  .plan-status-more:active,
+  .card-quick-actions .card-action-btn:active {
+    transform: none;
+  }
+}

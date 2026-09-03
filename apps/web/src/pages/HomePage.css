@@ -162,12 +162,20 @@
    invisible. The surface is lifted off black instead and carries a soft top
    highlight, so the card still reads as raised without abandoning the
    true-black canvas. */
+/* Dark mode uses the app's own black.
+
+   Neumorphism needs a mid-tone base to cast an opposing pair of shadows, and
+   nothing can be darker than #000 - so on this canvas the dark half of the
+   pair is invisible and the effect only half works. Rather than ship an
+   imitation, dark mode uses the surface every other page already uses, and
+   home stops being a different shade of black from Plan or Activity. The
+   neumorphic treatment stays in light mode, where it reads properly. */
 :root[data-theme="dark"] .home-container {
-  --neu-surface: #0F131C;
-  --neu-light: rgba(255, 255, 255, 0.045);
-  --neu-dark: #000000;
-  --neu-distance: 5px;
-  --neu-blur: 14px;
+  --neu-surface: var(--moneva-card);
+  --neu-light: transparent;
+  --neu-dark: transparent;
+  --neu-distance: 0px;
+  --neu-blur: 0px;
 }
 
 .home-container .moneva-card,
@@ -183,14 +191,35 @@
     var(--neu-distance) var(--neu-distance) var(--neu-blur) var(--neu-dark);
 }
 
+/* Exactly .card-surface, so a home card and a Plan card are the same object. */
 :root[data-theme="dark"] .home-container .moneva-card,
 :root[data-theme="dark"] .home-container .account-card,
 :root[data-theme="dark"] .home-container .budget-card,
 :root[data-theme="dark"] .home-container .goal-card,
 :root[data-theme="dark"] .home-container .bill-card {
-  /* A hairline of light along the top edge does the lifting on black. */
-  border-top-color: rgba(255, 255, 255, 0.06);
-  border-left-color: rgba(255, 255, 255, 0.03);
+  background: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+  box-shadow: none;
+}
+
+/* A track reads as recessed by sitting darker than its card, which is how the
+   rest of the app does it; an inset highlight would be invisible on black. */
+:root[data-theme="dark"] .home-container .salary-bar-track,
+:root[data-theme="dark"] .home-container .budget-progress-bar,
+:root[data-theme="dark"] .home-container .goal-progress-bar {
+  background: var(--moneva-bg);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .home-container .account-icon,
+:root[data-theme="dark"] .home-container .goal-icon,
+:root[data-theme="dark"] .home-container .summary-icon-box {
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .home-container .card-interactive:active {
+  box-shadow: none;
+  transform: scale(0.985);
 }
 
 /* Pressing pushes the card in rather than lifting it, which is the whole point
@@ -232,29 +261,6 @@
   }
 }
 
-/* ---------------------------------------------------------------------------
-   FIGURE CONTRAST ON THE NEUMORPHIC SURFACE
-
-   The raw brand teal and coral are decorative hues. As text they were already
-   short of WCAG AA on the old white card (2.54:1 and 2.78:1), and the softer
-   neumorphic surface pushed them lower still (2.24:1 and 2.45:1).
-
-   The palette already carries readable variants for exactly this purpose, so
-   the money figures use those on the home screen. Same hues, legible weight:
-   4.81:1 and 5.68:1 against the surface. Icons and other decorative uses keep
-   the brand colours.
-   --------------------------------------------------------------------------- */
-.home-container .number-md.text-teal,
-.home-container .number-lg.text-teal,
-.home-container .number-xl.text-teal {
-  color: var(--moneva-text-on-success);
-}
-
-.home-container .number-md.text-coral,
-.home-container .number-lg.text-coral,
-.home-container .number-xl.text-coral {
-  color: var(--moneva-text-on-danger);
-}
 
 /* "See all" in a section header. Sized as a real touch target rather than a
    bare text link, since it sits beside a heading on a phone. */
@@ -282,3 +288,16 @@
 @media (prefers-reduced-motion: reduce) {
   .section-see-all:active { transform: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   DARK MODE USES THE APP'S OWN BLACK
+
+   The charcoal experiment is gone: home now sits on the same pure black as
+   Plan, Activity and Profile, with the same card colour and border, so moving
+   between tabs no longer changes the shade of the page.
+
+   Neumorphism proper is a light-mode treatment here. It needs a mid-tone base
+   to cast an opposing pair of shadows, and on #000 the dark half is invisible
+   - so in dark mode the cards use the app's established surface instead of a
+   half-working imitation.
+   --------------------------------------------------------------------------- */

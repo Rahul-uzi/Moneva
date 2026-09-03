@@ -9,7 +9,16 @@ import { ExpenseSuccessModal } from './ExpenseSuccessModal';
 import { SalaryConfirmationModal } from './SalaryConfirmationModal';
 import { RecurringSalaryModal } from './RecurringSalaryModal';
 import { apiClient } from '../../services/apiClient';
+import { nowForDateTimeInput } from '../../utils/datetime';
 import { useUiStore } from '../../stores/useUiStore';
+import {
+  BANKS,
+  WALLETS,
+  MERCHANTS,
+  OTHER_DESTINATION_ID,
+  findDestination,
+  isExternalDestination,
+} from '../../data/transferDestinations';
 import type { Account, Category, Transaction, RecurringIncome } from '../../types/api';
 import './QuickAddModal.css';
 
@@ -25,6 +34,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
   const [categories, setCategories] = useState<Category[]>([]);
   const [accountId, setAccountId] = useState<string>('');
   const [toAccountId, setToAccountId] = useState<string>('');
+  // Free text for "Someone else / Other", so an unlisted payee still has a name.
+  const [customPayee, setCustomPayee] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [amountPaise, setAmountPaise] = useState<number>(0);
   const [merchant, setMerchant] = useState<string>('');
@@ -71,7 +82,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
     let isMounted = true;
     const timer = setTimeout(() => {
       if (isOpen && isMounted) {
-        const nowISO = new Date().toISOString().slice(0, 16);
+        const nowISO = nowForDateTimeInput();
         setTxDate(nowISO);
         setSavedTransaction(null);
         void loadOptions();
@@ -122,10 +133,16 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
 
     if (type === 'transfer') {
       if (!toAccountId) {
-        setFormError('Please select a destination account for transfer.');
+        setFormError('Please choose where the money is going.');
         return;
       }
-      if (accountId === toAccountId) {
+      if (toAccountId === OTHER_DESTINATION_ID && !customPayee.trim()) {
+        setFormError('Please type who the money is going to.');
+        return;
+      }
+      // Only meaningful between two of your own accounts; an external
+      // destination is never the account it came from.
+      if (!isExternal && accountId === toAccountId) {
         setFormError('Source and destination accounts must be different.');
         return;
       }
@@ -140,15 +157,37 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
           : merchant.trim()
         : notes.trim() || null;
 
+      // Money sent outside your own accounts is not a transfer: it has left,
+      // so recording it as one would keep it in your net worth forever. It is
+      // filed as an expense against the category the destination suggests,
+      // matched by name so a category the user deleted is never invented.
+      const hinted = destination?.categoryHint;
+      const hintedCategory = hinted
+        ? categories.find((c) => c.type === 'expense' && c.name === hinted)
+        : undefined;
+      const fallbackCategory = categories.find((c) => c.type === 'expense' && c.name === 'Other');
+      const outboundCategory = hintedCategory ?? fallbackCategory;
+
+      const effectiveType = isExternal ? 'expense' : type;
+      const transferDescription = destinationLabel
+        ? notes.trim()
+          ? `${destinationLabel} - ${notes.trim()}`
+          : destinationLabel
+        : combinedDescription;
+
       const payload = {
         client_mutation_id: clientMutationId,
         account_id: accountId,
-        to_account_id: type === 'transfer' ? toAccountId : null,
-        category_id: type !== 'transfer' && categoryId ? categoryId : null,
-        transaction_type: type,
+        to_account_id: type === 'transfer' && !isExternal ? toAccountId : null,
+        category_id: isExternal
+          ? (outboundCategory?.id ?? null)
+          : type !== 'transfer' && categoryId
+            ? categoryId
+            : null,
+        transaction_type: effectiveType,
         amount_minor: amountPaise,
         currency: 'INR',
-        description: combinedDescription,
+        description: type === 'transfer' ? transferDescription : combinedDescription,
         transaction_date: txDate ? new Date(txDate).toISOString() : new Date().toISOString(),
         device_id: 'web-client',
       };
@@ -159,6 +198,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
       setSavedTransaction(res.data);
       setAmountPaise(0);
       setMerchant('');
+      setCustomPayee('');
       setNotes('');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to create transaction.';
@@ -167,6 +207,14 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
       setIsSubmitting(false);
     }
   };
+
+  // What the chosen destination means. Sending money out of your accounts and
+  // shuffling it between them are different events, and only the second leaves
+  // net worth untouched - so the destination decides which one gets recorded.
+  const isExternal = type === 'transfer' && isExternalDestination(toAccountId);
+  const destination = findDestination(toAccountId);
+  const destinationLabel =
+    toAccountId === OTHER_DESTINATION_ID ? customPayee.trim() : (destination?.label ?? '');
 
   const filteredCategories = categories.filter((c) => c.type === type);
 
@@ -261,14 +309,59 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
 
           {type === 'transfer' ? (
             <div className="select-group">
-              <label className="form-label">To Account</label>
-              <select className="form-select" value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id} disabled={acc.id === accountId}>
-                    {acc.name} ({acc.account_type.toUpperCase()})
-                  </option>
-                ))}
+              <label className="form-label">Send to</label>
+              <select
+                className="form-select"
+                value={toAccountId}
+                onChange={(e) => setToAccountId(e.target.value)}
+              >
+                <option value="">Choose a destination</option>
+                {/* Own accounts first: this is the only group that leaves net
+                    worth unchanged, so it is the one most people want. */}
+                <optgroup label="My accounts">
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.id} disabled={acc.id === accountId}>
+                      {acc.name} ({acc.account_type.toUpperCase()})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Bank transfer">
+                  {BANKS.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Wallets & UPI">
+                  {WALLETS.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Apps & services">
+                  {MERCHANTS.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </optgroup>
+                <option value={OTHER_DESTINATION_ID}>Someone else / Other…</option>
               </select>
+
+              {toAccountId === OTHER_DESTINATION_ID && (
+                <FormField
+                  label="Who is it going to?"
+                  type="text"
+                  placeholder="e.g. Rahul, landlord, ICICI ...4821"
+                  value={customPayee}
+                  onChange={(e) => setCustomPayee(e.target.value)}
+                />
+              )}
+
+              {/* Says plainly what the choice does to the numbers, because the
+                  two cases are genuinely different kinds of movement. */}
+              {toAccountId && (
+                <span className="text-body text-xs text-muted transfer-effect-hint">
+                  {isExternal
+                    ? 'This money leaves you, so it comes off your total and counts as spending.'
+                    : 'Moving money between your own accounts - your total net worth does not change.'}
+                </span>
+              )}
             </div>
           ) : (
             <div className="select-group">
@@ -292,14 +385,18 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
             </div>
           )}
 
-          {/* Merchant / Payee / Source */}
-          <FormField
-            label={type === 'income' ? 'Income Source / Payee' : 'Merchant / Payee'}
-            type="text"
-            placeholder={type === 'income' ? 'e.g. Acme Corp, Freelance Client, Dividend' : 'e.g. Swiggy, Amazon, Uber'}
-            value={merchant}
-            onChange={(e) => setMerchant(e.target.value)}
-          />
+          {/* Merchant / Payee / Source. Hidden on a transfer: the destination
+              above already names who the money went to, so asking twice wasted
+              a whole field. */}
+          {type !== 'transfer' && (
+            <FormField
+              label={type === 'income' ? 'Income Source / Payee' : 'Merchant / Payee'}
+              type="text"
+              placeholder={type === 'income' ? 'e.g. Acme Corp, Freelance Client, Dividend' : 'e.g. Swiggy, Amazon, Uber'}
+              value={merchant}
+              onChange={(e) => setMerchant(e.target.value)}
+            />
+          )}
 
           {/* Date & Time */}
           <FormField
@@ -365,6 +462,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
         transaction={savedTransaction}
         categoryName={categories.find((c) => c.id === savedTransaction?.category_id)?.name}
         accountName={accounts.find((a) => a.id === savedTransaction?.account_id)?.name}
+        toAccountName={accounts.find((a) => a.id === savedTransaction?.to_account_id)?.name}
         onClose={() => {
           setSavedTransaction(null);
           onClose();

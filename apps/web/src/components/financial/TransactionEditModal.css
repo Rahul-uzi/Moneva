@@ -1,0 +1,15 @@
+.tx-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tx-edit-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.tx-edit-actions > button {
+  flex: 1;
+}

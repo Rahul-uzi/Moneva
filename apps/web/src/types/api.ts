@@ -63,9 +63,21 @@ export interface RecurringIncome {
   amount_minor: number;
   frequency: string;
   next_occurrence: string;
+  /** Day of the month the stream is anchored to, so month-end pay stops drifting. */
+  anchor_day?: number | null;
   active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** A salary stream whose date has passed without the money being recorded. */
+export interface DueIncome {
+  id: string;
+  source: string;
+  frequency: string;
+  due_on: string;
+  expected_amount_minor: number;
+  missed_count: number;
 }
 
 export interface Bill {

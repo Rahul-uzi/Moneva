@@ -80,3 +80,79 @@
   width: 100%;
   margin-top: 4px;
 }
+
+/* ---------- repeat toggle ---------- */
+.salary-repeat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  background-color: var(--moneva-surface);
+  cursor: pointer;
+}
+
+.salary-repeat-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ---------- saved streams ---------- */
+.salary-streams {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.salary-stream-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tapping a stream fills the form from it, so last month is one tap away. */
+.stream-use {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  background-color: var(--moneva-surface);
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.14s ease;
+}
+
+.stream-use:active {
+  transform: scale(0.99);
+  border-color: var(--moneva-blue);
+}
+
+.stream-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+}
+
+.stream-amount {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--moneva-figure-income);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-use:active { transform: none; }
+}

@@ -20,7 +20,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, completeTwoFactorLogin, isLoading } = useAuthStore();
+  const { login, completeTwoFactorLogin } = useAuthStore();
   const { addToast } = useUiStore();
 
   const [loginError, setLoginError] = React.useState<string | null>(null);
@@ -138,7 +138,7 @@ export const LoginPage: React.FC = () => {
             error={errors.password?.message}
             {...register('password')}
           />
-          <Button type="submit" variant="primary" fullWidth isLoading={isLoading || isSubmitting}>
+          <Button type="submit" variant="primary" fullWidth isLoading={isSubmitting}>
             Sign In
           </Button>
         </form>

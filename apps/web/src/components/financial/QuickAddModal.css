@@ -98,3 +98,12 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* Explains what the chosen destination does to the numbers. Sending money out
+   and shuffling it between your own accounts are different events, and the
+   difference is invisible until it has already been recorded. */
+.transfer-effect-hint {
+  display: block;
+  margin-top: 6px;
+  line-height: 1.45;
+}

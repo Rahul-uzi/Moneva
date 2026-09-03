@@ -19,6 +19,7 @@ import { nativeNotificationService } from '../../services/notificationService';
 import type { NotificationItem, UserPreferences } from '../../types/api';
 import './NotificationsModal.css';
 
+import { parseApiDate } from '../../utils/datetime';
 interface NotificationsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -183,7 +184,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                     <div className="notif-title-area">
                       <span className="notif-title">{n.title}</span>
                       <span className="notif-time">
-                        {new Date(n.created_at).toLocaleDateString(undefined, {
+                        {parseApiDate(n.created_at).toLocaleDateString(undefined, {
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',

@@ -29,6 +29,14 @@
   /* Status text sitting on a 15%-tinted status background */
   --moneva-text-on-danger: #FECACA;
   --moneva-text-on-success: #A7F3D0;
+
+  /* Money figures. The two tokens above are for text sitting on a TINTED pill
+     (a 20%-opacity badge), where a pale tone is right. Used on a card they
+     read as washed-out mint and pink rather than green and red. On the dark
+     card the brand colours themselves clear AA comfortably - 7.20:1 and
+     6.58:1 - so figures use them directly. */
+  --moneva-figure-income: #10B981;
+  --moneva-figure-expense: #FF6B6B;
   --moneva-text-on-warning: #FDE68A;
   --moneva-text-on-info: #BFDBFE;
   --moneva-text-on-accent: #DDD6FE;
@@ -89,6 +97,14 @@
   /* Darkened so they stay legible on the pale tinted backgrounds */
   --moneva-text-on-danger: #B91C1C;
   --moneva-text-on-success: #047857;
+
+  /* On white the brand colours fail badly (2.54:1 and 2.78:1), so figures take
+     a deeper tone - but not as deep as the brick red used for badge text.
+     Checked against BOTH light surfaces, since some figures sit on the tinted
+     page rather than a white card: red-600 (#DC2626) reads 4.83:1 on white but
+     only 4.46:1 on #F4F6FA, so this is a shade darker and clears both. */
+  --moneva-figure-income: #047857;   /* 5.48:1 on white, 5.07:1 on the page */
+  --moneva-figure-expense: #CF2222;  /* 5.38:1 on white, 4.97:1 on the page */
   --moneva-text-on-warning: #B45309;
   --moneva-text-on-info: #1D4ED8;
   --moneva-text-on-accent: #6D28D9;

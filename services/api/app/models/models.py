@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Text, Column, String, Integer, BigInteger, Boolean, DateTime, ForeignKey
+from sqlalchemy import Text, Column, String, Integer, SmallInteger, BigInteger, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -126,6 +126,10 @@ class RecurringIncome(Base):
     amount_minor = Column(BigInteger, nullable=False)
     frequency = Column(String, nullable=False)  # monthly, weekly, etc.
     next_occurrence = Column(DateTime(timezone=True), nullable=False)
+    # The day of the month the stream is anchored to. Advancing from
+    # next_occurrence alone drifts: a 31st salary clamps to 28 in February
+    # and stays there. Nullable for rows written before this existed.
+    anchor_day = Column(SmallInteger, nullable=True)
     active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)

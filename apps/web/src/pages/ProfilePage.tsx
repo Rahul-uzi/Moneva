@@ -386,7 +386,7 @@ export const ProfilePage: React.FC = () => {
   const handleSaveApiUrl = async () => {
     const next = apiUrlInput.trim();
     if (!/^https?:\/\/.+/i.test(next)) {
-      addToast('Enter a full URL, e.g. http://192.168.1.19:8000/api', 'error');
+      addToast('Enter a full URL, e.g. https://moneva.onrender.com/api', 'error');
       return;
     }
     setIsSavingApiUrl(true);
@@ -895,7 +895,7 @@ export const ProfilePage: React.FC = () => {
                 className="form-input"
                 value={apiUrlInput}
                 onChange={(e) => setApiUrlInput(e.target.value)}
-                placeholder="http://192.168.1.19:8000/api"
+                placeholder="https://moneva.onrender.com/api"
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}

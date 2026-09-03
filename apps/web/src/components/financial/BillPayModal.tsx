@@ -9,6 +9,7 @@ import { formatMonetaryValue } from '../../utils/money';
 import type { Bill, Account, Transaction } from '../../types/api';
 import './BillPayModal.css';
 
+import { parseApiDate } from '../../utils/datetime';
 interface BillPayModalProps {
   bill: Bill | null;
   accounts: Account[];
@@ -183,7 +184,7 @@ export const BillPayModal: React.FC<BillPayModalProps> = ({
               <div className="bill-pay-summary-banner">
                 <span className="text-label">Bill Due Amount</span>
                 <span className="number-xl text-coral">{formatMonetaryValue(bill.amount_minor, bill.currency)}</span>
-                <span className="text-body text-xs text-muted">Due Date: {new Date(bill.due_date).toLocaleDateString()}</span>
+                <span className="text-body text-xs text-muted">Due Date: {parseApiDate(bill.due_date).toLocaleDateString()}</span>
               </div>
 
               <div className="select-group">

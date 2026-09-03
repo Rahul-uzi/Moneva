@@ -28,7 +28,7 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { register: registerUser, isLoading } = useAuthStore();
+  const { register: registerUser } = useAuthStore();
   const { addToast } = useUiStore();
 
   const [registerError, setRegisterError] = React.useState<string | null>(null);
@@ -99,7 +99,7 @@ export const RegisterPage: React.FC = () => {
             error={errors.confirm_password?.message}
             {...register('confirm_password')}
           />
-          <Button type="submit" variant="primary" fullWidth isLoading={isLoading || isSubmitting}>
+          <Button type="submit" variant="primary" fullWidth isLoading={isSubmitting}>
             Create Account
           </Button>
         </form>

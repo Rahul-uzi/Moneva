@@ -1,7 +1,23 @@
 import uuid
-from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from datetime import datetime, timezone
+from typing import Optional, List, Annotated
+from pydantic import BaseModel, Field, EmailStr, field_validator, AfterValidator
+
+
+def _ensure_utc(value: datetime) -> datetime:
+    """Stamps a naive timestamp as UTC.
+
+    Everything here is stored in UTC, but SQLite has no timezone type, so it
+    hands back naive datetimes and the API serialised them without an offset.
+    A browser reads an offset-less timestamp as LOCAL time, so clients showed
+    every stored date shifted by their own UTC offset. Postgres already
+    returns aware values and is left untouched.
+    """
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+#: A timestamp that always crosses the wire with an explicit UTC offset.
+UtcDateTime = Annotated[datetime, AfterValidator(_ensure_utc)]
 
 # ----------------- AUTH & TOKEN SCHEMAS -----------------
 class TokenResponse(BaseModel):
@@ -38,8 +54,8 @@ class UserResponse(UserBase):
     is_active: bool
     avatar_data_url: Optional[str] = None
     totp_enabled: bool = False
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     class Config:
         from_attributes = True
@@ -133,8 +149,8 @@ class AccountResponse(AccountBase):
     user_id: uuid.UUID
     is_active: bool
     balance_paise: Optional[int] = 0  # Dynamic/calculated balance
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     class Config:
         from_attributes = True
@@ -160,8 +176,8 @@ class CategoryUpdate(BaseModel):
 class CategoryResponse(CategoryBase):
     id: uuid.UUID
     user_id: Optional[uuid.UUID] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     class Config:
         from_attributes = True
@@ -177,7 +193,7 @@ class TransactionBase(BaseModel):
     amount_minor: int = Field(ge=1, le=100_000_000_000)
     currency: str = "INR"
     description: Optional[str] = Field(default=None, max_length=500)
-    transaction_date: datetime
+    transaction_date: UtcDateTime
     client_mutation_id: uuid.UUID
     device_id: str
     sync_status: Optional[str] = "synced"
@@ -192,14 +208,14 @@ class TransactionUpdate(BaseModel):
     savings_goal_id: Optional[uuid.UUID] = None
     amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
     description: Optional[str] = Field(default=None, max_length=500)
-    transaction_date: Optional[datetime] = None
+    transaction_date: Optional[UtcDateTime] = None
     expected_version: Optional[int] = None
 
 class TransactionResponse(TransactionBase):
     id: uuid.UUID
     user_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
     version: int
 
     class Config:
@@ -211,8 +227,11 @@ class RecurringIncomeBase(BaseModel):
     source: str = Field(min_length=1, max_length=100)
     amount_minor: int = Field(ge=1, le=100_000_000_000)
     frequency: str
-    next_occurrence: datetime
+    next_occurrence: UtcDateTime
     active: Optional[bool] = True
+    #: Day of the month the stream is anchored to, so a month-end salary does
+    #: not drift down to the 28th after one February.
+    anchor_day: Optional[int] = Field(default=None, ge=1, le=31)
 
 class RecurringIncomeCreate(RecurringIncomeBase):
     pass
@@ -221,17 +240,50 @@ class RecurringIncomeUpdate(BaseModel):
     source: Optional[str] = Field(default=None, min_length=1, max_length=100)
     amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
     frequency: Optional[str] = None
-    next_occurrence: Optional[datetime] = None
+    next_occurrence: Optional[UtcDateTime] = None
     active: Optional[bool] = None
+    anchor_day: Optional[int] = Field(default=None, ge=1, le=31)
 
 class RecurringIncomeResponse(RecurringIncomeBase):
     id: uuid.UUID
     user_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     class Config:
         from_attributes = True
+
+
+class DueIncomeResponse(BaseModel):
+    """A stream whose date has come round without the money being recorded."""
+    id: uuid.UUID
+    source: str
+    frequency: str
+    #: The oldest occurrence still unrecorded - the one being asked about.
+    due_on: UtcDateTime
+    #: What the stream says to expect; the user can change it when confirming.
+    expected_amount_minor: int
+    #: How many occurrences have gone by unrecorded, this one included.
+    missed_count: int
+
+
+class SkipIncomePayload(BaseModel):
+    """Moves past due occurrences without recording any money."""
+    #: Clear the whole backlog in one go. A stream months behind otherwise
+    #: needs one tap per month, and the card barely changes between them, so
+    #: the button reads as dead.
+    all_missed: Optional[bool] = False
+
+
+class ConfirmIncomePayload(BaseModel):
+    """Records one occurrence of a stream as money that actually arrived."""
+    account_id: uuid.UUID
+    #: Defaults to the stream's amount when the payslip matched.
+    amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
+    category_id: Optional[uuid.UUID] = None
+    #: Defaults to the due date; set it when the money landed on another day.
+    received_on: Optional[UtcDateTime] = None
+    device_id: Optional[str] = None
 
 
 # ----------------- BILL SCHEMAS -----------------
@@ -239,7 +291,7 @@ class BillBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     amount_minor: int = Field(ge=1, le=100_000_000_000)
     currency: Optional[str] = "INR"
-    due_date: datetime
+    due_date: UtcDateTime
     recurrence: Optional[str] = None
     category_id: Optional[uuid.UUID] = None
     status: Optional[str] = "upcoming"
@@ -251,7 +303,7 @@ class BillCreate(BillBase):
 class BillUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
-    due_date: Optional[datetime] = None
+    due_date: Optional[UtcDateTime] = None
     recurrence: Optional[str] = None
     category_id: Optional[uuid.UUID] = None
     status: Optional[str] = None
@@ -262,13 +314,13 @@ class BillPayPayload(BaseModel):
     account_id: uuid.UUID
     client_mutation_id: uuid.UUID
     device_id: str
-    payment_date: Optional[datetime] = None
+    payment_date: Optional[UtcDateTime] = None
 
 class BillResponse(BillBase):
     id: uuid.UUID
     user_id: uuid.UUID
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     class Config:
         from_attributes = True
@@ -279,8 +331,8 @@ class BudgetBase(BaseModel):
     category_id: uuid.UUID
     limit_amount_minor: int = Field(ge=1, le=100_000_000_000)
     period: Optional[str] = "monthly"
-    start_date: datetime
-    end_date: datetime
+    start_date: UtcDateTime
+    end_date: UtcDateTime
 
 class BudgetCreate(BudgetBase):
     pass
@@ -288,8 +340,8 @@ class BudgetCreate(BudgetBase):
 class BudgetUpdate(BaseModel):
     limit_amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
     period: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    start_date: Optional[UtcDateTime] = None
+    end_date: Optional[UtcDateTime] = None
     expected_version: Optional[int] = None
 
 class BudgetResponse(BudgetBase):
@@ -300,8 +352,8 @@ class BudgetResponse(BudgetBase):
     category_name: Optional[str] = None
     spent_amount_minor: Optional[int] = 0
     remaining_amount_minor: Optional[int] = 0
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     class Config:
         from_attributes = True
@@ -311,7 +363,7 @@ class BudgetResponse(BudgetBase):
 class SavingsGoalBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     target_amount_minor: int = Field(ge=1, le=100_000_000_000)
-    target_date: Optional[datetime] = None
+    target_date: Optional[UtcDateTime] = None
     status: Optional[str] = "active"
 
 class SavingsGoalCreate(SavingsGoalBase):
@@ -320,7 +372,7 @@ class SavingsGoalCreate(SavingsGoalBase):
 class SavingsGoalUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     target_amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
-    target_date: Optional[datetime] = None
+    target_date: Optional[UtcDateTime] = None
     status: Optional[str] = None
     expected_version: Optional[int] = None
 
@@ -329,8 +381,8 @@ class SavingsGoalResponse(SavingsGoalBase):
     user_id: uuid.UUID
     current_saved_minor: Optional[int] = 0
     progress_percentage: Optional[float] = 0.0
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
 
     class Config:
         from_attributes = True
@@ -344,7 +396,7 @@ class NotificationResponse(BaseModel):
     message: str
     notification_type: str
     is_read: bool
-    created_at: datetime
+    created_at: UtcDateTime
 
     class Config:
         from_attributes = True
@@ -372,8 +424,8 @@ class FinancialSummaryResponse(BaseModel):
 
 class SalaryUsageResponse(BaseModel):
     """This month's salary versus what has been spent against it."""
-    period_start: datetime
-    period_end: datetime
+    period_start: UtcDateTime
+    period_end: UtcDateTime
     salary_received_minor: int      # salary/recurring income actually credited
     other_income_minor: int         # any other income this month
     total_income_minor: int

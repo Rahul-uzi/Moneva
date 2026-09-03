@@ -47,9 +47,13 @@
 }
 
 .rule-card {
+  /* Stacked, not side by side. On a phone the "Received Today" button and the
+     source name were fighting for the same row: neither could shrink, so the
+     name broke to three characters a line and the actions overlapped it. */
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   background-color: var(--moneva-surface);
   border: 1px solid var(--moneva-border);
   border-radius: var(--radius-md);
@@ -62,19 +66,36 @@
   flex-direction: column;
   gap: 4px;
   flex: 1;
+  min-width: 0;
 }
 
 .rule-title-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
 
+/* One line, ellipsised. A long payroll name used to wrap and shove every other
+   element out of place. */
+.rule-source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-title-row .number-sm {
+  flex-shrink: 0;
 }
 
 .rule-meta-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
 }
 
 .rule-date {
@@ -119,4 +140,16 @@
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+}
+
+/* Actions get their own full-width row beneath the detail. */
+.rule-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rule-card-actions > button:first-child {
+  flex: 1;
 }

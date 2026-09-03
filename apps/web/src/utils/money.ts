@@ -168,3 +168,35 @@ export function subtractMoney(a: MonetaryValue, b: MonetaryValue): MonetaryValue
     currency: a.currency,
   };
 }
+
+/**
+ * Whole rupees for summary tiles, e.g. ₹4,000 and ₹5,80,000.
+ *
+ * The three-up planner card shows a figure per column, and at that width the
+ * ".00" was enough to push the number past the edge and get it ellipsised -
+ * "₹4,00…" tells the reader nothing. Paise carry no meaning in a total this
+ * size, so they are dropped rather than the digits that matter.
+ *
+ * Rounds rather than truncating, so ₹99.60 reads as ₹100 and not ₹99.
+ */
+export function formatMonetaryCompact(valOrAmount: Paise | MonetaryValue, currency: string = 'INR'): string {
+  let paise: Paise;
+  let curr = currency;
+
+  if (typeof valOrAmount === 'object' && valOrAmount !== null) {
+    paise = valOrAmount.amount;
+    curr = valOrAmount.currency || 'INR';
+  } else {
+    paise = valOrAmount;
+  }
+
+  if (!isSafeMonetaryInteger(paise)) {
+    throw new Error(`Invalid monetary amount: "${paise}" is not a safe integer`);
+  }
+
+  const isNegative = paise < 0;
+  const major = Math.round(Math.abs(paise) / 100);
+  const symbol = curr === 'INR' ? '₹' : `${curr} `;
+
+  return `${isNegative ? '-' : ''}${symbol}${new Intl.NumberFormat('en-IN').format(major)}`;
+}

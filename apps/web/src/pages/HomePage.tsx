@@ -8,12 +8,17 @@ import { GoalCard } from '../components/financial/GoalCard';
 import { BillCard } from '../components/financial/BillCard';
 import { TransactionRow } from '../components/financial/TransactionRow';
 import { TransactionDetailModal } from '../components/financial/TransactionDetailModal';
+import { SalaryConfirmationModal } from '../components/financial/SalaryConfirmationModal';
+import { DueSalaryCard } from '../components/financial/DueSalaryCard';
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
 import { ChevronRight } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
 import { formatMonetaryValue } from '../utils/money';
 import { useUiStore } from '../stores/useUiStore';
-import type { FinancialSummary, Account, Budget, SavingsGoal, Bill, Transaction, SalaryUsage } from '../types/api';
+import type {
+  FinancialSummary, Account, Budget, SavingsGoal, Bill, Transaction, SalaryUsage, DueIncome,
+  Category,
+} from '../types/api';
 import './HomePage.css';
 
 interface OutletContextType {
@@ -47,14 +52,18 @@ export const HomePage: React.FC = () => {
   const { refreshTrigger } = useOutletContext<OutletContextType>() || {};
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [salaryUsage, setSalaryUsage] = useState<SalaryUsage | null>(null);
+  const [dueIncome, setDueIncome] = useState<DueIncome[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // Needed by the salary confirmation dialog so it can offer a category.
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [isSalaryDialogOpen, setIsSalaryDialogOpen] = useState<boolean>(false);
 
   const { addToast } = useUiStore();
 
@@ -91,12 +100,21 @@ export const HomePage: React.FC = () => {
         settle(apiClient.get<Transaction[]>('/transactions', { params: { limit: 5 } }), (d) =>
           setTransactions(d),
         ),
+        settle(apiClient.get<Category[]>('/categories'), (d) => setCategories(d)),
         // Optional: the dashboard still renders if this one fails.
         settle(
           apiClient
             .get<SalaryUsage | null>('/income/salary-usage')
             .catch(() => ({ data: null })),
           (d) => setSalaryUsage(d),
+        ),
+        // Salary that came round without being recorded. A saved stream posts
+        // nothing by itself, so without this it stayed silent for months.
+        settle(
+          apiClient
+            .get<DueIncome[]>('/income/recurring/due')
+            .catch(() => ({ data: [] as DueIncome[] })),
+          (d) => setDueIncome(d),
         ),
       ]);
 
@@ -170,12 +188,19 @@ export const HomePage: React.FC = () => {
         />
       )}
 
-      {/* 2. This month's income vs spending */}
+      {/* 2. Salary that is due but unrecorded - asked, never assumed. */}
+      <DueSalaryCard
+        due={dueIncome}
+        accounts={accounts}
+        onResolved={() => void fetchAllData(true)}
+      />
+
+      {/* 3. This month's income vs spending */}
       {salaryUsage && (
-        <SalaryUsageCard usage={salaryUsage} onSetUpSalary={() => navigate('/plan')} />
+        <SalaryUsageCard usage={salaryUsage} onSetUpSalary={() => setIsSalaryDialogOpen(true)} />
       )}
 
-      {/* 3. Accounts Overview */}
+      {/* 4. Accounts Overview */}
       <div className="home-section">
         <div className="section-title-row">
           <h2 className="heading-md">My Accounts</h2>
@@ -194,7 +219,7 @@ export const HomePage: React.FC = () => {
         )}
       </div>
 
-      {/* 3. Upcoming Bills */}
+      {/* 5. Upcoming Bills */}
       {bills.length > 0 && (
         <div className="home-section">
           <div className="section-title-row">
@@ -214,7 +239,7 @@ export const HomePage: React.FC = () => {
         </div>
       )}
 
-      {/* 4. Active Budgets */}
+      {/* 6. Active Budgets */}
       {budgets.length > 0 && (
         <div className="home-section">
           <div className="section-title-row">
@@ -234,7 +259,7 @@ export const HomePage: React.FC = () => {
         </div>
       )}
 
-      {/* 5. Savings Goals */}
+      {/* 7. Savings Goals */}
       {goals.length > 0 && (
         <div className="home-section">
           <div className="section-title-row">
@@ -249,7 +274,7 @@ export const HomePage: React.FC = () => {
         </div>
       )}
 
-      {/* 6. Recent Activity */}
+      {/* 8. Recent Activity */}
       <div className="home-section">
         <div className="section-title-row">
           <h2 className="heading-md">Recent Transactions</h2>
@@ -274,11 +299,22 @@ export const HomePage: React.FC = () => {
           </div>
         )}
       </div>
+      {/* One dialog: what arrived, and whether it repeats. */}
+      <SalaryConfirmationModal
+        isOpen={isSalaryDialogOpen}
+        recurringSalary={null}
+        accounts={accounts}
+        categories={categories}
+        onClose={() => setIsSalaryDialogOpen(false)}
+        onSuccess={() => void fetchAllData(true)}
+      />
+
       {selectedTransaction && (
         <TransactionDetailModal
           transaction={selectedTransaction}
           accountName={accounts.find((a) => a.id === selectedTransaction.account_id)?.name}
           onClose={() => setSelectedTransaction(null)}
+          onDeleted={() => void fetchAllData(true)}
         />
       )}
     </div>

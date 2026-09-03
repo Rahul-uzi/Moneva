@@ -1,9 +1,10 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './pages/ProtectedRoute';
 import { AppShell } from './components/layout/AppShell';
 import { BiometricGate } from './components/layout/BiometricGate';
 import { RouteFallback } from './components/layout/RouteFallback';
+import { useAuthStore } from './stores/useAuthStore';
 
 // Every screen is fetched on demand. Chunks are local files inside the APK, so
 // the fetch is effectively instant, and a returning signed-in user never pays
@@ -19,6 +20,21 @@ const AssistantPage = lazy(() => import('./pages/AssistantPage').then((m) => ({ 
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 
 export const App: React.FC = () => {
+  const { isInitialized, restoreSession } = useAuthStore();
+
+  /**
+   * Restore the session once, for every route.
+   *
+   * This used to live only in ProtectedRoute, so a cold start that landed
+   * straight on /login - which is exactly where a rejected session sends you -
+   * never mounted it. The store stayed at its initial `isLoading: true`, and
+   * the sign-in button, which is disabled while that flag is set, could never
+   * be pressed again.
+   */
+  useEffect(() => {
+    if (!isInitialized) void restoreSession();
+  }, [isInitialized, restoreSession]);
+
   return (
     <BrowserRouter>
       <BiometricGate>

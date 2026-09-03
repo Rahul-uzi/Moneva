@@ -10,6 +10,7 @@ import { formatMonetaryValue } from '../../utils/money';
 import type { RecurringIncome } from '../../types/api';
 import './RecurringSalaryModal.css';
 
+import { parseApiDate } from '../../utils/datetime';
 interface RecurringSalaryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -162,7 +163,7 @@ export const RecurringSalaryModal: React.FC<RecurringSalaryModalProps> = ({
                       <span className="rule-freq text-muted text-xs capitalize">{rule.frequency}</span>
                       <span className="rule-date text-muted text-xs">
                         <Calendar size={12} /> Expected:{' '}
-                        {new Date(rule.next_occurrence).toLocaleDateString('en-IN', {
+                        {parseApiDate(rule.next_occurrence).toLocaleDateString('en-IN', {
                           month: 'short',
                           day: 'numeric',
                         })}

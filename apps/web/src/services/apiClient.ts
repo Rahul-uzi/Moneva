@@ -1,14 +1,20 @@
 import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { Preferences } from '@capacitor/preferences';
+import { RefreshGate } from './refreshGate';
 import type { AuthTokens, User } from '../types/api';
 
 /**
  * The build-time default. Vite inlines this, so it is baked into the APK.
  * It is only a DEFAULT: the value below can be overridden at runtime, which
  * is what stops a DHCP lease change from requiring a rebuild.
+ *
+ * The fallback is production, not localhost. A build with no VITE_API_BASE_URL
+ * used to ship pointing at the developer's own machine, which on a phone is
+ * the phone itself - so nothing answered and the app looked broken.
  */
-const BUILD_TIME_API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+const BUILD_TIME_API_URL =
+  import.meta.env.VITE_API_BASE_URL || 'https://moneva.onrender.com/api';
 
 const API_URL_KEY = 'moneva_api_base_url';
 
@@ -195,19 +201,14 @@ const endSession = () => {
   }
 };
 
-let isRefreshing = false;
-let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
-
-const processQueue = (error: unknown, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (token) {
-      prom.resolve(token);
-    } else {
-      prom.reject(error);
-    }
-  });
-  failedQueue = [];
-};
+/**
+ * Only one refresh runs at a time; the rest wait for it.
+ *
+ * This was a loose boolean plus a queue array, and the flag was raised before
+ * an early `return` that skipped the `finally` clearing it. See RefreshGate for
+ * what that cost.
+ */
+const refreshGate = new RefreshGate<AuthTokens>();
 
 apiClient.interceptors.response.use(
   (response) => response,
@@ -221,39 +222,30 @@ apiClient.interceptors.response.use(
 
       originalRequest._retry = true;
 
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({
-            resolve: (newToken: string) => {
-              if (originalRequest.headers) {
-                originalRequest.headers.Authorization = `Bearer ${newToken}`;
-              }
-              resolve(apiClient(originalRequest));
-            },
-            reject: (err) => reject(err),
-          });
-        });
+      // Someone else is already refreshing: wait for their result, then retry.
+      if (refreshGate.isRefreshing) {
+        const newTokens = await refreshGate.wait();
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newTokens.access_token}`;
+        }
+        return apiClient(originalRequest);
       }
 
-      isRefreshing = true;
+      // Checked before anything is latched. Nothing below this point can leave
+      // the gate stuck: raising it is confined to `refreshGate.run`.
       const tokens = getStoredTokens();
-
       if (!tokens?.refresh_token) {
         endSession();
         return Promise.reject(error);
       }
 
       try {
-        const newTokens = await refreshSession();
-        processQueue(null, newTokens.access_token);
-
+        const newTokens = await refreshGate.run(() => refreshSession());
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${newTokens.access_token}`;
         }
         return apiClient(originalRequest);
       } catch (refreshErr) {
-        processQueue(refreshErr, null);
-
         // Only a rejected refresh token ends the session. If the refresh call
         // simply could not reach the server, keep the session so the user stays
         // signed in once connectivity returns.
@@ -262,8 +254,6 @@ apiClient.interceptors.response.use(
           endSession();
         }
         return Promise.reject(refreshErr);
-      } finally {
-        isRefreshing = false;
       }
     }
 

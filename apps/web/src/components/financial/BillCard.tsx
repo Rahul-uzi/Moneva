@@ -6,6 +6,7 @@ import type { Bill } from '../../types/api';
 import { formatMonetaryValue } from '../../utils/money';
 import './BillCard.css';
 
+import { parseApiDate } from '../../utils/datetime';
 interface BillCardProps {
   bill: Bill;
   onPay?: () => void;
@@ -14,7 +15,7 @@ interface BillCardProps {
 
 export const BillCard: React.FC<BillCardProps> = ({ bill, onPay, onClick }) => {
   const isPaid = bill.status === 'paid';
-  const dueDate = new Date(bill.due_date);
+  const dueDate = parseApiDate(bill.due_date);
   const now = new Date();
 
   // Strip time for exact day comparison
