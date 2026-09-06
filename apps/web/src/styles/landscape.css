@@ -1,0 +1,151 @@
+/* ===========================================================================
+   PHONES HELD SIDEWAYS
+
+   Measured on an A33 in landscape - 853x384 CSS px - before any of this:
+
+     - the app drew a 480px column on an 853px screen, so 44% of the width
+       was empty backdrop;
+     - the header took 106px and the tab bar plus its clearance another 105,
+       leaving 173px of the 384 for content. More than half the screen was
+       chrome;
+     - the sign-in card was taller than the screen and the page could not
+       scroll, so the sign-in button could not be reached.
+
+   Bounded by `max-height: 560px` as well as the orientation, so it applies to
+   a phone turned sideways and NOT to a tablet or a desktop window - both of
+   which have the vertical room the portrait layout was designed for.
+
+   Every selector is prefixed with `:root`, which costs nothing visually and
+   makes each rule (0,2,0) against the (0,1,0) it overrides. Without it these
+   would tie on specificity with the component stylesheets and be settled by
+   load order - and the component CSS is split per lazy-loaded route, so that
+   order is not ours to rely on.
+   =========================================================================== */
+
+@media (orientation: landscape) and (max-height: 560px) {
+  /* ---------- use the width, but only as much as the cards want ---------- */
+  /* Sideways there is twice the width and half the height, so the shell
+     widens and the cards divide it into two columns instead of sitting in one
+     480px column beside a void.
+     760, not the full 853: minus 12px padding each side and a 12px gutter,
+     that lands each column on about 362px - within a few pixels of the 384px
+     these cards are laid out for in portrait. Letting the shell run the whole
+     853 gave columns of 405px and stretched the full-width elements into
+     bands (the Plan metrics strip measured 829x116, a 7:1 ribbon), which is
+     the thing that reads as broken. The ~90px of backdrop left at each side is
+     the price of the cards keeping their proportions. */
+  :root .app-viewport {
+    max-width: min(100%, 760px);
+  }
+
+  /* ---------- give the content its height back ---------- */
+  :root .topbar {
+    /* 16/16 down to 8/8: 16px back, which is 4% of the whole screen. */
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
+  }
+
+  :root .app-content {
+    padding: 12px;
+    gap: 12px;
+    /* The bar is slimmer below, so its clearance shrinks with it. */
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  }
+
+  :root .dock {
+    margin: 0 12px calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 5px;
+  }
+
+  /* Still comfortably past the 40px Android asks for on a touch target. */
+  :root .dock-tab {
+    min-height: 42px;
+  }
+
+  :root .quick-action-btn {
+    width: 46px;
+    height: 46px;
+  }
+
+  /* ---------- two columns of cards ---------- */
+  /* align-items: start matters: without it every card in a row stretches to
+     the height of the tallest one beside it, which is the stretched look
+     this is meant to fix rather than cause. */
+  :root .home-container,
+  :root .plan-sections,
+  :root .accounts-page-container,
+  :root .analytics-page-container,
+  :root .profile-page-container {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  /* Only a page's TITLE row spans. Everything else stays one column wide.
+     Spanning the metrics strip, the status list and the filter tabs was the
+     mistake: each has its own inner columns sized for a phone, and stretching
+     them to 736px turned a compact three-stat card into a thin ribbon and
+     four tabs into four wide slabs. At one column they measure what they do
+     in portrait, and simply appear twice as often down the page. */
+  :root .plan-header,
+  :root .accounts-page-container > .page-header,
+  :root .analytics-page-container > .page-header,
+  :root .profile-page-container > .page-header {
+    grid-column: 1 / -1;
+  }
+
+  /* Plan's own header stack has to be in the grid too. Left as a flex column
+     its children each ran the full 736px, which is how the three-stat metrics
+     strip ended up 736x116 - a 6:1 ribbon, and the single worst-looking thing
+     on the screen. In the grid the strip and the status list sit side by side
+     at column width, where their inner columns measure what they do on a
+     phone. */
+  :root .plan-page-container {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  /* The title, the control row, and the sections block - which is a grid of
+     its own - each take the full width. */
+  :root .plan-filter-tabs,
+  :root .plan-sections {
+    grid-column: 1 / -1;
+  }
+
+  /* ---------- pages that are a list, not a grid ---------- */
+  /* A transaction row puts its description hard left and its amount hard
+     right. Stretched across 900px that is a line of text and a number with a
+     gulf between them, so these keep a readable measure and centre. */
+  :root .activity-container,
+  :root .assistant-container {
+    max-width: 620px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* ---------- sign in and register ---------- */
+  /* The card is about 480px tall and the screen is 384, so something has to
+     scroll. Making the auth panel its OWN scroll container rather than
+     letting the document grow: html and body carry `height: 100%`, which
+     pins the page to exactly one screen, and a page that scrolls only
+     because a descendant overflowed it scrolls unpredictably.
+     `max-height: 100dvh` needs no cooperation from any ancestor - unlike
+     `height: 100%`, which would need a definite height on #root and would
+     silently do nothing without it. */
+  :root .auth-viewport {
+    max-height: 100dvh;
+    overflow-y: auto;
+    /* Centred vertically, a card taller than its box overflows BOTH ways and
+       the top is unreachable however far you scroll. Top-anchored, the whole
+       card is always in reach. */
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  :root .auth-card {
+    padding: 20px;
+    gap: 14px;
+    /* Room under the last field once the card can scroll. */
+    margin-bottom: 16px;
+  }
+}

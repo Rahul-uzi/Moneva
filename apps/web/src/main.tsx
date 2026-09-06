@@ -1,6 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+// Last, so its media-bounded rules land after every component stylesheet and
+// do not depend on import order to win.
+import './styles/landscape.css'
 import App from './App.tsx'
 import { initTheme } from './services/themeService'
 import { clearStoredApiUrl } from './services/apiClient'

@@ -1,0 +1,40 @@
+/* A brand's colour and initials in place of its logo. */
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Never squeezed by a long name beside it in a flex row. */
+  flex: none;
+  font-family: var(--font-family);
+  font-weight: 800;
+  /* Tight tracking so two letters read as one mark rather than as text. */
+  letter-spacing: -0.03em;
+  line-height: 1;
+  user-select: none;
+  /* A hairline of the page colour, so a dark tile still has an edge against a
+     dark card and a light one against a light card. */
+  box-shadow: 0 0 0 1px var(--moneva-border);
+  overflow: hidden;
+}
+
+/* A real logo.
+   On white, always - most brand marks are drawn for a light ground and a
+   fair number are dark ink on transparency, which on this app's dark theme
+   would disappear entirely. A white chip is also how a bank's mark appears
+   on its own cards, so it reads as intended rather than as a recolour. */
+.brand-mark.is-logo {
+  background: #FFFFFF;
+  /* Inset comes from the component as pixels, NOT from a percentage here.
+     A percentage padding resolves against the CONTAINING BLOCK's width, not
+     the element's own - so `padding: 14%` on a 57px tile inside a 202px card
+     computed to 28px a side and left the image exactly 0px wide. The tile
+     looked like an empty white square and the logo was never visible. */
+}
+
+.brand-mark.is-logo img {
+  width: 100%;
+  height: 100%;
+  /* contain, never cover: a logo cropped to fill a square is a mangled logo. */
+  object-fit: contain;
+  display: block;
+}

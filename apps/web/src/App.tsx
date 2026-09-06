@@ -11,6 +11,7 @@ import { useAuthStore } from './stores/useAuthStore';
 // for the auth screens' form/validation libraries at all.
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import('./pages/RegisterPage').then((m) => ({ default: m.RegisterPage })));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })));
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
 const ActivityPage = lazy(() => import('./pages/ActivityPage').then((m) => ({ default: m.ActivityPage })));
 const AccountsPage = lazy(() => import('./pages/AccountsPage').then((m) => ({ default: m.AccountsPage })));
@@ -42,6 +43,7 @@ export const App: React.FC = () => {
           {/* Public Unauthenticated Auth Routes */}
           <Route path="/login" element={<Suspense fallback={<RouteFallback />}><LoginPage /></Suspense>} />
           <Route path="/register" element={<Suspense fallback={<RouteFallback />}><RegisterPage /></Suspense>} />
+          <Route path="/forgot-password" element={<Suspense fallback={<RouteFallback />}><ForgotPasswordPage /></Suspense>} />
 
           {/* Protected Authenticated Routes */}
           <Route element={<ProtectedRoute />}>

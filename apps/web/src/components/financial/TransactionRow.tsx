@@ -1,5 +1,7 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownLeft, ArrowRightLeft } from 'lucide-react';
+import { BrandMark } from '../ui/BrandMark';
+import { brandNameIn } from '../../utils/brandMark';
 import type { Transaction } from '../../types/api';
 import { formatMonetaryValue } from '../../utils/money';
 import './TransactionRow.css';
@@ -73,11 +75,22 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
         onLongPress();
       }}
     >
-      <div className={`tx-icon-badge tx-${transaction.transaction_type}`}>
-        {isIncome && <ArrowDownLeft size={18} />}
-        {isExpense && <ArrowUpRight size={18} />}
-        {isTransfer && <ArrowRightLeft size={18} />}
-      </div>
+      {/* A row whose description names a brand shows that brand's mark; the
+          rest keep the direction arrow. Both occupy the same slot at the same
+          size, so a mixed list still lines up.
+
+          The direction is not lost when a logo takes the slot - the amount at
+          the end of the row is already coloured and signed, and says it more
+          plainly than a small arrow does. */}
+      {brandNameIn(transaction.description ?? '') ? (
+        <BrandMark name={transaction.description ?? ''} size={40} className="tx-brand" />
+      ) : (
+        <div className={`tx-icon-badge tx-${transaction.transaction_type}`}>
+          {isIncome && <ArrowDownLeft size={18} />}
+          {isExpense && <ArrowUpRight size={18} />}
+          {isTransfer && <ArrowRightLeft size={18} />}
+        </div>
+      )}
       <div className="tx-info">
         <span className="tx-title">{transaction.description || (isTransfer ? 'Transfer' : isIncome ? 'Income' : 'Expense')}</span>
         <span className="tx-date">

@@ -62,6 +62,11 @@ async def create_transaction(
     Creates a new transaction idempotently.
     Repeated requests with the same client_mutation_id return the existing record cleanly.
     """
+    # Read once, up front - see the recovery path at the end of this function.
+    # After a rollback every ORM object is expired, and reading an attribute
+    # off one then issues a blocking reload that an async session cannot serve.
+    user_id = current_user.id
+
     # 1. Idempotency Check
     existing_stmt = select(Transaction).where(Transaction.client_mutation_id == payload.client_mutation_id)
     existing_res = await db.execute(existing_stmt)
@@ -161,7 +166,7 @@ async def create_transaction(
             select(Transaction).where(
                 and_(
                     Transaction.client_mutation_id == payload.client_mutation_id,
-                    Transaction.user_id == current_user.id
+                    Transaction.user_id == user_id
                 )
             )
         )

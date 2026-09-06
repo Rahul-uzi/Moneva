@@ -146,6 +146,12 @@ export const LoginPage: React.FC = () => {
 
         {!challengeToken && (
           <div className="auth-footer">
+            {/* There was no way back in at all before this: no reset endpoint
+                and no link, so a forgotten password meant a lost account. */}
+            <Link to="/forgot-password" className="auth-link">
+              Forgot password?
+            </Link>
+            <div className="auth-footer-divider" />
             <span className="text-body">Don't have an account?</span>{' '}
             <Link to="/register" className="auth-link">
               Create Account

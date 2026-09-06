@@ -118,6 +118,31 @@ class TotpVerifyRequest(BaseModel):
     code: str = Field(min_length=6, max_length=10)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(pattern=r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+
+
+class ForgotPasswordResponse(BaseModel):
+    """
+    Deliberately says nothing about whether the address has an account.
+
+    `delivery_configured` is about the SERVER, not the address - it tells the
+    app whether email is switched on at all, so it can say "check the server
+    log" during development instead of "check your inbox" for a mail that was
+    never sent.
+    """
+    message: str
+    delivery_configured: bool
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str = Field(pattern=r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+    # Either the six-digit code from the email, or an unused 2FA recovery code
+    # - which is longer, so the range covers both.
+    code: str = Field(min_length=6, max_length=32)
+    new_password: str = Field(min_length=6, max_length=128)
+
+
 class PasswordChangeRequest(BaseModel):
     # Optional: the app sets a new password directly for an already-authenticated
     # session. When supplied it is still verified.

@@ -2,12 +2,12 @@ import io as _io
 import json
 import secrets
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pyotp
 import qrcode
 import qrcode.image.svg
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +21,17 @@ from app.core.security import (
     decode_token,
     get_current_user
 )
+from app.core.ratelimit import (
+    FORGOT_BY_ACCOUNT,
+    FORGOT_BY_IP,
+    LOGIN_BY_ACCOUNT,
+    LOGIN_BY_IP,
+    RESET_BY_IP,
+    client_ip,
+    enforce,
+)
 from app.db.database import get_db
+from app.services.mailer import delivery_configured, masked, send_password_reset
 from app.models.models import User, Category
 from app.schemas.schemas import (
     UserCreate,
@@ -35,7 +45,18 @@ from app.schemas.schemas import (
     TotpDisableRequest,
     TwoFactorChallengeResponse,
     TotpVerifyRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    ResetPasswordRequest,
 )
+
+# How long a reset code is good for. Long enough to fetch it from a phone that
+# is slow to sync mail, short enough that a code sitting in an old inbox is not
+# a standing key to the account.
+RESET_CODE_TTL_MINUTES = 30
+# Wrong codes accepted before the code is destroyed. Six digits is a million
+# combinations, but five guesses is far below what a person needs.
+RESET_MAX_ATTEMPTS = 5
 
 # Starter categories every new account gets. The Category model already had
 # is_default/icon/colour fields for this, but nothing ever populated them, so
@@ -115,9 +136,19 @@ async def register_user(payload: UserCreate, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/login", response_model=None)
-async def login_user(payload: UserLogin, db: AsyncSession = Depends(get_db)):
+async def login_user(request: Request, payload: UserLogin, db: AsyncSession = Depends(get_db)):
     """Authenticates user credentials and returns JWT access and refresh tokens."""
-    stmt = select(User).where(User.email == payload.email.lower().strip())
+    email = payload.email.lower().strip()
+
+    # Throttled two ways, because they stop different attacks: one address
+    # working through many accounts, and many addresses working on one account.
+    # Both are counted BEFORE the password is checked, so a wrong guess costs
+    # an attempt whether or not the account exists - counting only real
+    # accounts would turn the limiter itself into an enumeration oracle.
+    enforce(LOGIN_BY_IP, client_ip(request))
+    enforce(LOGIN_BY_ACCOUNT, email)
+
+    stmt = select(User).where(User.email == email)
     res = await db.execute(stmt)
     user = res.scalar_one_or_none()
 
@@ -127,6 +158,10 @@ async def login_user(payload: UserLogin, db: AsyncSession = Depends(get_db)):
             detail="Invalid email or password.",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+    # Signing in clears the count, so somebody who mistyped twice and then got
+    # it right is not left throttled.
+    LOGIN_BY_ACCOUNT.reset(email)
 
     if not user.is_active:
         raise HTTPException(
@@ -201,6 +236,129 @@ async def refresh_tokens(payload: RefreshTokenRequest, db: AsyncSession = Depend
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Starts a password reset. Answers the same way whichever address is given.
+
+    Every branch below returns the same message. That is the point: `/login`
+    already refuses to say whether an address has an account, and an endpoint
+    that says "no such user" here would give away exactly what login protects.
+    So an unknown address, an inactive account and a successful send are
+    indistinguishable from outside.
+    """
+    email = payload.email.lower().strip()
+
+    enforce(FORGOT_BY_IP, client_ip(request))
+    enforce(FORGOT_BY_ACCOUNT, email)
+
+    same_answer = ForgotPasswordResponse(
+        message="If that email has an account, a reset code is on its way.",
+        delivery_configured=delivery_configured(),
+    )
+
+    res = await db.execute(select(User).where(User.email == email))
+    user = res.scalar_one_or_none()
+    if not user or not user.is_active:
+        return same_answer
+
+    # Six digits, from a generator meant for secrets rather than randint.
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    user.reset_code_hash = hash_password(code)
+    user.reset_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_CODE_TTL_MINUTES)
+    user.reset_code_attempts = 0
+    await db.commit()
+
+    # Committed before sending: an email that arrives with a code the database
+    # does not know about is worse than one that never arrives.
+    await send_password_reset(user.email, code, RESET_CODE_TTL_MINUTES)
+    return same_answer
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: Request,
+    payload: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Finishes a reset, with either the emailed code or a 2FA recovery code.
+
+    The recovery-code path matters for the case the email path cannot serve:
+    somebody locked out of their inbox. It reuses `_consume_second_factor`,
+    which already burns a recovery code on use, so a code cannot be replayed.
+    """
+    email = payload.email.lower().strip()
+    submitted = payload.code.strip().replace(" ", "")
+
+    enforce(RESET_BY_IP, client_ip(request))
+
+    # One message for every failure, for the same reason as above - and so a
+    # wrong code cannot be told apart from a wrong address.
+    def rejected() -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That code is not valid or has expired. Ask for a new one.",
+        )
+
+    res = await db.execute(select(User).where(User.email == email))
+    user = res.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise rejected()
+
+    accepted = False
+
+    # 1. The emailed code.
+    if user.reset_code_hash and user.reset_code_expires_at:
+        expires = user.reset_code_expires_at
+        # A column read back from SQLite comes without a timezone; treat a
+        # naive value as UTC rather than letting the comparison raise.
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+
+        if datetime.now(timezone.utc) > expires:
+            user.reset_code_hash = None
+            user.reset_code_expires_at = None
+            user.reset_code_attempts = 0
+            await db.commit()
+            raise rejected()
+
+        if verify_password(submitted, user.reset_code_hash):
+            accepted = True
+        else:
+            user.reset_code_attempts = int(user.reset_code_attempts or 0) + 1
+            if user.reset_code_attempts >= RESET_MAX_ATTEMPTS:
+                # Burn it rather than leave a known-under-attack code alive.
+                user.reset_code_hash = None
+                user.reset_code_expires_at = None
+            await db.commit()
+
+    # 2. A 2FA recovery code, for someone who cannot reach their email.
+    if not accepted and user.totp_recovery_codes:
+        if _consume_second_factor(user, submitted):
+            accepted = True
+
+    if not accepted:
+        raise rejected()
+
+    user.password_hash = hash_password(payload.new_password)
+    user.reset_code_hash = None
+    user.reset_code_expires_at = None
+    user.reset_code_attempts = 0
+    # Every existing session dies. Whoever reset the password now has to sign
+    # in with it - including, importantly, anyone who was already signed in on
+    # a device the real owner does not control.
+    user.token_version = int(user.token_version or 0) + 1
+    await db.commit()
+
+    LOGIN_BY_ACCOUNT.reset(email)
+    return {"message": "Password updated. Sign in with your new password."}
 
 
 @router.post("/logout")

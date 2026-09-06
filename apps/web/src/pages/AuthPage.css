@@ -84,3 +84,51 @@
   letter-spacing: 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* ---------- password reset ---------- */
+/* Says something true but not alarming - used for "a code is on its way", and
+   for the development case where email is not configured and the code went to
+   the server log instead. */
+.auth-notice {
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--moneva-text-secondary, var(--moneva-text-muted));
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: 12px;
+}
+
+.auth-hint {
+  margin: -6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--moneva-text-muted);
+}
+
+/* A secondary way out of a step, without the weight of a second button. */
+.auth-plain-link {
+  align-self: center;
+  padding: 6px 4px;
+  min-height: 44px;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--moneva-text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.auth-plain-link:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 2px;
+}
+
+/* Separates "forgot password" from "create account" - two different journeys
+   that should not read as one run-on sentence. */
+.auth-footer-divider {
+  height: 1px;
+  margin: 12px auto;
+  max-width: 180px;
+  background-color: var(--moneva-border);
+}

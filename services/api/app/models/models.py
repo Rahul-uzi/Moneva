@@ -30,6 +30,14 @@ class User(Base):
     totp_enabled = Column(Boolean, default=False, nullable=False)
     totp_recovery_codes = Column(Text, nullable=True)    # JSON list of bcrypt hashes, single-use
 
+    # Password reset. Stored as a bcrypt hash for the same reason the recovery
+    # codes above are: a leaked database must not hand over a live reset code.
+    # Single-use and short-lived; `attempts` caps guessing at a six-digit code
+    # even inside the expiry window.
+    reset_code_hash = Column(String, nullable=True)
+    reset_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+    reset_code_attempts = Column(SmallInteger, default=0, nullable=False)
+
     # Bumped to invalidate every token already issued for this account. Cheaper
     # than a server-side session store: the version is a claim inside the token,
     # so revocation is one integer write and needs no lookup table.

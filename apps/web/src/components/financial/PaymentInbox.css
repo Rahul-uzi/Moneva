@@ -1,0 +1,245 @@
+/* Payments the phone noticed, waiting on one tap each. */
+.pay-inbox {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pay-inbox-note {
+  margin: 8px 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--moneva-text-muted);
+  text-align: center;
+}
+
+/* ---------- turning it on ---------- */
+/* Two screens, because Android splits the decision in two: the app's own
+   switch, and an access grant that only its Settings app can give. */
+.pay-inbox-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  padding: 4px 2px 0;
+}
+
+.pay-inbox-icon {
+  align-self: center;
+  color: var(--moneva-blue);
+}
+
+.pay-inbox-intro h4 {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 800;
+  color: var(--moneva-text-primary);
+}
+
+.pay-inbox-intro p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--moneva-text-muted);
+}
+
+/* What is read, what is kept, and how to stop - said plainly and before
+   anything is switched on, not buried in a policy page. */
+.pay-inbox-facts {
+  margin: 2px 0 6px;
+  padding: 12px 14px;
+  list-style: none;
+  text-align: left;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.pay-inbox-facts li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--moneva-text-secondary, var(--moneva-text-muted));
+}
+
+.pay-inbox-facts li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--moneva-blue);
+}
+
+.pay-inbox-link {
+  align-self: center;
+  padding: 8px 4px;
+  min-height: 44px;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--moneva-text-muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.pay-inbox-link.is-off {
+  margin-top: 4px;
+  color: var(--moneva-coral);
+}
+
+/* ---------- which account ---------- */
+/* An alert names a bank, not one of this app's accounts, so this cannot be
+   inferred - it is asked once and applies to every card below. */
+.pay-inbox-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--moneva-text-muted);
+}
+
+.pay-inbox-account select {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 8px;
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--moneva-text-primary);
+  background: transparent;
+  border: 0;
+  text-align: right;
+  cursor: pointer;
+}
+
+/* ---------- one payment ---------- */
+.pay-inbox-card {
+  padding: 13px 14px;
+  background-color: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+  border-radius: 16px;
+}
+
+.pay-inbox-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pay-inbox-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pay-inbox-amount .money {
+  font-size: 20px;
+  font-weight: 800;
+}
+.pay-inbox-amount .is-out { color: var(--moneva-text-primary); }
+.pay-inbox-amount .is-in { color: var(--moneva-blue); }
+
+.pay-inbox-kind {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--moneva-text-muted);
+}
+
+.pay-inbox-actions {
+  display: flex;
+  gap: 8px;
+  /* Never squeezed by a long merchant name beside it. */
+  flex: none;
+}
+
+.pay-inbox-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: transform 0.14s ease, opacity 0.18s ease;
+}
+.pay-inbox-btn:active { transform: scale(0.94); }
+.pay-inbox-btn:disabled { opacity: 0.5; cursor: default; }
+
+.pay-inbox-btn.is-confirm {
+  color: var(--moneva-on-brand);
+  background-color: var(--moneva-blue);
+  border: 1px solid var(--moneva-blue);
+}
+.pay-inbox-btn.is-dismiss {
+  color: var(--moneva-text-muted);
+  background-color: transparent;
+  border: 1px solid var(--moneva-border);
+}
+
+.pay-inbox-meta,
+.pay-inbox-source {
+  margin: 7px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--moneva-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.pay-inbox-meta strong {
+  color: var(--moneva-text-primary);
+  font-weight: 700;
+}
+
+/* Saying where a reading came from is what lets someone judge it - "seen in
+   Google Pay and Messages" is a much stronger claim than either alone. */
+.pay-inbox-source {
+  margin-top: 3px;
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pay-inbox-btn:active { transform: none; }
+}
+
+/* The category the app worked out, and why it thinks so. */
+.pay-inbox-category {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--moneva-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.pay-inbox-cat-name {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-right: 5px;
+  font-weight: 800;
+  color: var(--moneva-blue);
+  background-color: rgba(205, 255, 74, 0.12);
+  border-radius: var(--radius-full);
+}
+
+:root[data-theme='light'] .pay-inbox-cat-name {
+  background-color: rgba(110, 150, 0, 0.1);
+}

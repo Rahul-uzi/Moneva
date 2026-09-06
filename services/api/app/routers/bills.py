@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
@@ -130,6 +131,13 @@ async def pay_bill(
     Marks a bill as paid and creates the corresponding expense Transaction event
     in an atomic database transaction.
     """
+    # Read once, up front. A rollback expires every ORM object in the session,
+    # so reading current_user.id AFTER one triggers a lazy reload - which is a
+    # blocking database call on an async session, and raises MissingGreenlet
+    # instead of recovering. The recovery path below is exactly where that
+    # happens, so it must not touch the User object at all.
+    user_id = current_user.id
+
     # 1. User-scoped Idempotency Check
     existing_stmt = select(Transaction).where(
         and_(
@@ -189,7 +197,7 @@ async def pay_bill(
             select(Transaction).where(
                 and_(
                     Transaction.client_mutation_id == payload.client_mutation_id,
-                    Transaction.user_id == current_user.id
+                    Transaction.user_id == user_id
                 )
             )
         )

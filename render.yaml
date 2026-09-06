@@ -36,6 +36,24 @@ services:
           name: moneva-db
           property: connectionString
 
+      # Password-reset email. `sync: false` means Render prompts for the value
+      # in the dashboard and never reads it from this file - which is the only
+      # correct place for a mail password, since this file is in git.
+      #
+      # Without these the reset endpoint still works: it writes the code to the
+      # service log instead of sending it. That is fine for a smoke test and
+      # useless for a real user, so set them before anyone else signs up.
+      - key: SMTP_HOST
+        sync: false        # smtp.gmail.com
+      - key: SMTP_PORT
+        sync: false        # 587
+      - key: SMTP_USER
+        sync: false        # the full Gmail address
+      - key: SMTP_PASSWORD
+        sync: false        # a Google APP PASSWORD, not the account password
+      - key: RESET_EMAIL_FROM
+        sync: false        # MONEVA <that same address>
+
       # Render generates a strong value once and keeps it. The app refuses to
       # start with a secret shorter than 32 characters.
       - key: JWT_SECRET

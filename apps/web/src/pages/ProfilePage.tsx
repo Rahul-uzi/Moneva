@@ -48,6 +48,12 @@ import {
 } from '../services/biometricService';
 import type { BiometricStatus } from '../services/biometricService';
 import { markOnboardingPending } from '../services/onboardingService';
+import { PaymentInbox } from '../components/financial/PaymentInbox';
+import {
+  getCaptureStatus,
+  isCaptureSupported,
+  type CaptureStatus,
+} from '../services/notificationCapture';
 import { markTourPending } from '../services/tourService';
 import { exportBinaryFile } from '../services/exportService';
 import './ProfilePage.css';
@@ -70,6 +76,17 @@ export const ProfilePage: React.FC = () => {
   // toggles below meant nothing while the OS permission had never been asked.
   const [devicePerm, setDevicePerm] = useState<PermissionStatus>('prompt');
   const [isEnablingPerm, setIsEnablingPerm] = useState<boolean>(false);
+
+  // Reading payment alerts. Two states worth telling apart in the copy below:
+  // Android has granted access, and the user still wants it used.
+  const [capture, setCapture] = useState<CaptureStatus>({ granted: false, capturing: false });
+  const [isPayInboxOpen, setIsPayInboxOpen] = useState<boolean>(false);
+  useEffect(() => {
+    // Re-read when the inbox closes: the user may have granted access, or
+    // turned the whole thing off, while it was open.
+    if (isPayInboxOpen) return;
+    void getCaptureStatus().then(setCapture);
+  }, [isPayInboxOpen]);
   useEffect(() => {
     const timer = setTimeout(() => {
       void nativeNotificationService.checkPermission().then(setDevicePerm);
@@ -729,6 +746,31 @@ export const ProfilePage: React.FC = () => {
             )}
           </div>
 
+          {/* Reading payment alerts. Only on Android - there is no
+              notification shade to read in a browser. */}
+          {isCaptureSupported() && (
+            <div className="toggle-row">
+              <div className="toggle-info">
+                <span className="toggle-label">Read payment alerts</span>
+                <span className="toggle-sub">
+                  {capture.capturing && capture.granted
+                    ? 'On. Payments from UPI apps and banks appear for you to confirm.'
+                    : capture.capturing && !capture.granted
+                      ? 'Waiting for notification access in Android settings.'
+                      : 'Off. Let MONEVA fill in payments from GPay, PhonePe and bank alerts.'}
+                </span>
+              </div>
+              <Button
+                variant={capture.capturing && capture.granted ? 'secondary' : 'primary'}
+                size="sm"
+                className="row-action-btn"
+                onClick={() => setIsPayInboxOpen(true)}
+              >
+                {capture.capturing && capture.granted ? 'Manage' : 'Set up'}
+              </Button>
+            </div>
+          )}
+
           <label className="toggle-row">
             <div className="toggle-info">
               <span className="toggle-label">Upcoming Bill Reminders</span>
@@ -903,7 +945,12 @@ export const ProfilePage: React.FC = () => {
             isLoading={isSigningOutAll}
             onClick={() => setConfirmSignOutAll(true)}
           >
-            <LogOut size={14} /> Sign out
+            {/* "Sign out others", not "Sign out". This button revokes every
+                OTHER session and is the more drastic of the two on this page;
+                labelling it with the words people look for when they simply
+                want to leave made it the one they would reach for first. It
+                now matches the wording of its own confirmation dialog. */}
+            <LogOut size={14} /> Sign out others
           </Button>
         </div>
 
@@ -937,8 +984,11 @@ export const ProfilePage: React.FC = () => {
 
       {/* 8. Danger Zone */}
       <div className="account-actions-group danger-zone">
+        {/* The ordinary one: leave, on this device. Plainly "Sign out" -
+            "Sign Out Session" reads like a technical variant of something
+            else, which is how it ended up as the harder of the two to find. */}
         <Button variant="secondary" fullWidth onClick={handleLogout}>
-          <LogOut size={16} /> Sign Out Session
+          <LogOut size={16} /> Sign out
         </Button>
 
         <Button variant="danger" fullWidth onClick={() => setIsDeleteDialogOpen(true)}>
@@ -1277,6 +1327,17 @@ export const ProfilePage: React.FC = () => {
         onClose={() => setIsDeleteDialogOpen(false)}
         isLoading={isDeletingAccount}
       />
+
+      {/* Mounted only while open, so each visit starts from a fresh read of
+          the permission state and the queue rather than whatever was on
+          screen last time. */}
+      {isPayInboxOpen && (
+        <PaymentInbox
+          isOpen
+          onClose={() => setIsPayInboxOpen(false)}
+          onSuccess={() => addToast('Payment added.', 'success')}
+        />
+      )}
     </div>
   );
 };

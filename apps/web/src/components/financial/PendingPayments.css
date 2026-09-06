@@ -1,0 +1,70 @@
+/* "2 payments noticed" - shown on the dashboard only when there is something
+   waiting, so it costs nothing on the ordinary day. */
+.pending-pay {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  text-align: left;
+  font-family: var(--font-family);
+  /* The accent ground, not a plain card: this is the one thing on the screen
+     asking to be tapped, and it has to survive being scrolled past. */
+  background-color: rgba(205, 255, 74, 0.1);
+  border: 1px solid rgba(205, 255, 74, 0.28);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.14s ease, background-color 0.18s ease;
+}
+.pending-pay:active { transform: scale(0.985); }
+
+:root[data-theme='light'] .pending-pay {
+  background-color: rgba(110, 150, 0, 0.08);
+  border-color: rgba(110, 150, 0, 0.24);
+}
+
+.pending-pay-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  color: var(--moneva-on-brand);
+  background-color: var(--moneva-blue);
+  border-radius: var(--radius-full);
+}
+
+.pending-pay-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pending-pay-text strong {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--moneva-text-primary);
+}
+
+.pending-pay-text span {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--moneva-text-muted);
+}
+
+.pending-pay-chevron {
+  flex: none;
+  color: var(--moneva-text-muted);
+}
+
+.pending-pay:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pending-pay:active { transform: none; }
+}

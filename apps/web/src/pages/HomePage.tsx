@@ -11,6 +11,7 @@ import { TransactionDetailModal } from '../components/financial/TransactionDetai
 import { SalaryConfirmationModal } from '../components/financial/SalaryConfirmationModal';
 import { DueSalaryCard } from '../components/financial/DueSalaryCard';
 import { PaydayCard } from '../components/financial/PaydayCard';
+import { PendingPayments } from '../components/financial/PendingPayments';
 import { ErrorState, EmptyState } from '../components/ui/States';
 import { HomeSkeleton } from '../components/ui/Skeleton';
 import { ChevronRight } from 'lucide-react';
@@ -207,6 +208,13 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="home-container">
+      {/* 0. Payments the phone noticed and nobody has confirmed yet.
+             Above the fold on purpose: this used to live three taps into
+             Profile, behind a settings row, which is no use for something
+             that wants dealing with today. Renders nothing when the queue is
+             empty, so on an ordinary day it costs no space. */}
+      <PendingPayments onAdded={() => void fetchAllData(true)} />
+
       {/* 1. Net Worth Financial Summary Card */}
       {summary && (
         <FinancialSummaryCard

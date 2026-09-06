@@ -366,7 +366,7 @@ async def export_data_xlsx(
 
     add_sheet("Bills",
         ["Name", f"Amount ({currency})", "Due date", "Frequency", "Status"],
-        [[b.name, rupees(b.amount_minor), when(b.due_date), b.frequency, b.status] for b in bills],
+        [[b.name, rupees(b.amount_minor), when(b.due_date), b.recurrence or "", b.status] for b in bills],
         money_cols=(2,))
 
     add_sheet("Recurring Income",
