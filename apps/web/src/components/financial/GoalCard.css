@@ -20,7 +20,7 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background-color: rgba(124, 58, 237, 0.15);
+  background-color: rgba(205, 255, 74, 0.15);
   color: var(--moneva-violet);
   display: flex;
   align-items: center;
@@ -45,9 +45,9 @@
 }
 
 .badge-not-started { background-color: rgba(148, 163, 184, 0.15); color: var(--moneva-text-secondary); }
-.badge-in-progress { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); }
-.badge-near-target { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); }
-.badge-completed { background-color: rgba(16, 185, 129, 0.15); color: var(--moneva-teal); }
+.badge-in-progress { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-blue); }
+.badge-near-target { background-color: rgba(232, 182, 44, 0.15); color: var(--moneva-orange); }
+.badge-completed { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-teal); }
 
 .goal-amounts {
   display: flex;
@@ -105,7 +105,7 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--moneva-teal);
-  background-color: rgba(16, 185, 129, 0.12);
+  background-color: rgba(205, 255, 74, 0.12);
   border: 1px solid var(--moneva-teal);
   border-radius: 12px;
   padding: 3px 8px;

@@ -1,0 +1,143 @@
+/* A floating glass bar whose active marker is a body of liquid.
+
+   The bar leaves the page edge and content scrolls underneath it, which is what
+   makes the glass worth having - frosting a solid colour looks the same as not
+   frosting it. .app-content carries matching bottom padding so nothing ends up
+   hidden behind it. */
+
+.bottom-nav {
+  /* Positioned against .app-viewport, so on a wide screen it stays inside the
+     phone-width shell instead of spanning the whole window. */
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  margin: 0 12px calc(10px + env(safe-area-inset-bottom, 0px));
+
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 64px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 999px;
+
+  /* Dark is the default theme here; light overrides these below. */
+  --nav-glass: rgba(14, 19, 32, 0.78);
+  --nav-edge: rgba(255, 255, 255, 0.14);
+  --nav-sheen: rgba(255, 255, 255, 0.1);
+  --nav-shadow: 0 10px 34px rgba(0, 0, 0, 0.5);
+  --nav-liquid: #2F6BFF;
+  --nav-glow: #4C8DFF;
+  --nav-halo: rgba(76, 141, 255, 0.5);
+  --nav-bloom: rgba(64, 130, 255, 0.42);
+  --nav-well: rgba(255, 255, 255, 0.15);
+  --nav-wire: rgba(255, 255, 255, 0.22);
+
+  background-color: var(--nav-glass);
+  border: 1px solid var(--nav-edge);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+  box-shadow: var(--nav-shadow), inset 0 1px 0 var(--nav-sheen);
+}
+
+:root[data-theme='light'] .bottom-nav {
+  --nav-glass: rgba(255, 255, 255, 0.82);
+  --nav-edge: rgba(13, 19, 33, 0.09);
+  --nav-sheen: rgba(255, 255, 255, 0.85);
+  --nav-shadow: 0 10px 30px rgba(13, 19, 33, 0.16);
+  --nav-liquid: #2563EB;
+  --nav-glow: #3B82F6;
+  --nav-halo: rgba(37, 99, 235, 0.34);
+  --nav-bloom: rgba(37, 99, 235, 0.26);
+  --nav-well: rgba(13, 19, 33, 0.11);
+  --nav-wire: rgba(13, 19, 33, 0.18);
+}
+
+/* ---------- the liquid ---------- */
+
+/* One drawing surface across the whole bar, in CSS pixels; the component
+   scales the backing store for the display's pixel ratio. */
+.lgn-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ---------- items ---------- */
+
+.nav-item {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  /* Comfortably past the 44px minimum in both directions. */
+  min-width: 56px;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--moneva-text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  /* Long, so the handover reads as a crossfade rather than a switch. */
+  transition: color 0.34s ease;
+}
+
+.nav-icon {
+  display: flex;
+  transition: transform 0.42s cubic-bezier(0.34, 1.24, 0.5, 1);
+}
+
+.nav-label {
+  transition: opacity 0.34s ease, font-weight 0.34s ease;
+  opacity: 0.85;
+}
+
+.nav-active {
+  color: var(--moneva-white);
+  font-weight: 600;
+}
+
+.nav-active .nav-icon {
+  transform: translateY(-1px) scale(1.08);
+}
+
+.nav-active .nav-label {
+  opacity: 1;
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--nav-glow);
+  outline-offset: 2px;
+  border-radius: 14px;
+}
+
+.nav-quick-wrapper {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+}
+
+/* The liquid is decoration; without it the active tab must still be obvious. */
+@media (prefers-reduced-motion: reduce) {
+  .nav-item,
+  .nav-icon,
+  .nav-label {
+    transition: none;
+  }
+  .lgn-liquid {
+    filter: none;
+  }
+}

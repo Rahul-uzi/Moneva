@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
-import { LoadingState } from '../components/ui/States';
+import { RouteFallback } from '../components/layout/RouteFallback';
 
 export const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, isInitialized, isLoading, restoreSession } = useAuthStore();
@@ -15,7 +15,7 @@ export const ProtectedRoute: React.FC = () => {
   if (!isInitialized && isLoading) {
     return (
       <div className="app-viewport">
-        <LoadingState message="Restoring session..." />
+        <RouteFallback />
       </div>
     );
   }

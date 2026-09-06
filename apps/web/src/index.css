@@ -1,69 +1,114 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+/* ===========================================================================
+   MONEVA SIGNAL
+   Two colours and a ground. Voltage is in / active / positive; ember is out /
+   negative; amber is the one reserved status colour, because a money app needs
+   a warning that is neither of those. Nothing else is coloured.
+
+   Every value here was measured against the surface it actually sits on, not
+   picked by eye. The four that were wrong before this pass are marked.
+   =========================================================================== */
 
 :root {
-  /* Locked MONEVA Brand Palette */
-  --moneva-navy: #0D1321;
-  --moneva-blue: #2563EB;
-  --moneva-teal: #10B981;
-  --moneva-violet: #7C3AED;
-  --moneva-coral: #FF6B6B;
-  --moneva-orange: #F59E0B;
-  --moneva-white: #FFFFFF;
+  /* Brand. The three former accents (blue, violet, teal) collapse onto one
+     voltage, which is the whole point of the direction - the names are kept so
+     that every existing stylesheet inherits the change. */
+  --moneva-navy: #0A0B0D;      /* pitch, the ground */
+  --moneva-blue: #CDFF4A;      /* voltage - the single accent */
+  --moneva-teal: #CDFF4A;      /* voltage - positive */
+  --moneva-violet: #CDFF4A;    /* voltage - there is no second accent */
+  --moneva-coral: #FF6B4A;     /* ember - negative */
+  --moneva-orange: #E8B62C;    /* amber - reserved for warning only */
+  --moneva-white: #F5F4EF;     /* ink */
 
-  /* UI Surface Colors */
-  --moneva-bg: #000000;
-  --moneva-surface: #0B0E14;
-  --moneva-card: #101520;
-  --moneva-card-hover: #161C2A;
-  --moneva-border: #1B2233;
+  /* Text sitting ON a brand fill is always dark, in both themes. White fails
+     on ember (2.56:1) and on the day voltage (3.49:1); this ink clears AA on
+     all three fills - 16.1 / 6.7 / 10.0 at night, 5.4 / 4.8 / 7.7 by day. */
+  --moneva-on-brand: #10130A;
 
-  /* Composite surfaces (theme-aware) */
-  --moneva-card-gradient: linear-gradient(135deg, #121A2A 0%, #06080D 100%);
-  --moneva-card-gradient-alt: linear-gradient(135deg, #150F1F 0%, #06080D 100%);
+  /* UI surfaces */
+  --moneva-bg: #0A0B0D;
+  --moneva-surface: #131519;
+  --moneva-card: #14171B;
+  --moneva-card-hover: #1B1E23;
+  --moneva-border: #2A2F38;    /* was #242830 - a hairline at 1.33:1 barely read */
+
+  /* Gradients are gone. A hairline and a radius do the separating now, so
+     these resolve to flat surfaces and every existing `background:
+     var(--moneva-card-gradient)` keeps working. */
+  --moneva-card-gradient: #14171B;
+  --moneva-card-gradient-alt: #14171B;
 
   /* Subtle elevation overlays layered on the current surface */
-  --moneva-overlay-weak: rgba(255, 255, 255, 0.05);
-  --moneva-overlay: rgba(255, 255, 255, 0.08);
-  --moneva-overlay-strong: rgba(255, 255, 255, 0.1);
+  --moneva-overlay-weak: rgba(245, 244, 239, 0.05);
+  --moneva-overlay: rgba(245, 244, 239, 0.08);
+  --moneva-overlay-strong: rgba(245, 244, 239, 0.11);
 
-  /* Status text sitting on a 15%-tinted status background */
-  --moneva-text-on-danger: #FECACA;
-  --moneva-text-on-success: #A7F3D0;
+  /* Status text sitting on a 15-20% tinted pill of the same hue */
+  --moneva-text-on-danger: #FF6B4A;
+  --moneva-text-on-success: #CDFF4A;
+  --moneva-text-on-warning: #E8B62C;
+  --moneva-text-on-info: #CDFF4A;
+  --moneva-text-on-accent: #CDFF4A;
 
-  /* Money figures. The two tokens above are for text sitting on a TINTED pill
-     (a 20%-opacity badge), where a pale tone is right. Used on a card they
-     read as washed-out mint and pink rather than green and red. On the dark
-     card the brand colours themselves clear AA comfortably - 7.20:1 and
-     6.58:1 - so figures use them directly. */
-  --moneva-figure-income: #10B981;
-  --moneva-figure-expense: #FF6B6B;
-  --moneva-text-on-warning: #FDE68A;
-  --moneva-text-on-info: #BFDBFE;
-  --moneva-text-on-accent: #DDD6FE;
+  /* Money figures, on the card rather than on a pill. */
+  --moneva-figure-income: #CDFF4A;
+  --moneva-figure-expense: #FF6B4A;
 
   /* Page backdrop behind the 480px mobile container */
   --moneva-backdrop: #000000;
   --moneva-viewport-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
 
   /* Base stop for accent-tinted panels: linear-gradient(accent 15% -> this) */
-  --moneva-accent-panel-base: rgba(6, 8, 13, 0.95);
+  --moneva-accent-panel-base: rgba(10, 11, 13, 0.95);
 
-  /* Checkmark drawn inside a filled control - white on the dark theme. */
-  --moneva-tick: #FFFFFF;
+  /* A tick drawn inside a filled control. The fill is voltage now, so the
+     tick is dark in both themes. */
+  --moneva-tick: #10130A;
 
-  /* Text Typography Colors */
-  --moneva-text-main: #FFFFFF;
-  --moneva-text-secondary: #94A3B8;
-  --moneva-text-muted: #7C8AA0;
+  /* Text */
+  --moneva-text-main: #F5F4EF;
+  --moneva-text-primary: #F5F4EF;   /* was used in PlanPage.css but never defined */
+  --moneva-text-secondary: #9CA3AD;
+  --moneva-text-muted: #8A929D;     /* was #7C8AA0 at 4.23:1 - under AA for body text */
 
-  /* Fonts */
-  --font-family: 'Be Vietnam Pro', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Type. One family, 400-800, doing the work with weight and tracking. */
+  --font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   /* Spacing & Radius */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
   --radius-full: 9999px;
+
+  /* Illustration tints. Inherited, so any container - the guided tour card,
+     which is navy in either theme - can restate them for its own ground
+     without having to out-specify a theme rule. */
+  --illo-panel: rgba(205, 255, 74, 0.075);
+  --illo-back: rgba(205, 255, 74, 0.07);
+  --illo-fill: rgba(205, 255, 74, 0.17);
+  --illo-area: rgba(205, 255, 74, 0.13);
+  --illo-trackwash: rgba(205, 255, 74, 0.18);
+  --illo-facefill: #0A0B0D;
+  --illo-shadowfill: rgba(0, 0, 0, 0.45);
+  /* What a drawing is inked in. Variables rather than tokens read directly,
+     so a container on a ground of its own restates three values instead of
+     re-listing every class the drawings use - which is how the guided tour
+     came to render its scenes in the page's colours. Declared once: each
+     resolves against whichever theme is on the root. */
+  --illo-accent: var(--moneva-blue);
+  --illo-warnc: var(--moneva-coral);
+  /* Knocked out of a solid accent shape: the accent's own contrast colour. */
+  --illo-knockout: var(--moneva-on-brand);
+
+  /* Motion. One easing curve for arrivals, one for presses. */
+  --ease-out: cubic-bezier(0.16, 0.84, 0.44, 1);
+  --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-press: 120ms;
+  --dur-fast: 180ms;
+  --dur-base: 260ms;
+  --dur-draw: 620ms;
 
   /* Transitions */
   --transition-fast: 0.15s ease;
@@ -71,51 +116,61 @@
 }
 
 /*
-  LIGHT THEME
-  Only surface + text tokens are redefined; the locked MONEVA brand palette
-  (navy/blue/teal/violet/coral/orange) is identical in both themes.
-  Applied by services/themeService.ts, which stamps <html data-theme="...">.
+  DAY
+  The same system on bone. Voltage cannot be one value here: a fill owes 3:1
+  and a word owes 4.5:1, and #8FBE00 met neither at 1.95:1 on this ground. So
+  the fill and the text are separate steps of the same hue.
 */
 :root[data-theme="light"] {
-  --moneva-bg: #F4F6FA;
+  --moneva-navy: #0A0B0D;
+  --moneva-blue: #6E9600;      /* voltage fill, 3.08:1 - was #8FBE00 at 1.95:1 */
+  --moneva-teal: #6E9600;
+  --moneva-violet: #6E9600;
+  --moneva-coral: #E24F2B;     /* ember fill, 3.45:1 */
+  --moneva-orange: #A87700;    /* amber fill, 3.50:1 */
+  --moneva-white: #FFFFFF;
+  --moneva-on-brand: #10130A;
+
+  --moneva-bg: #F2F1EC;
   --moneva-surface: #FFFFFF;
   --moneva-card: #FFFFFF;
-  --moneva-card-hover: #F1F5F9;
-  --moneva-border: #E2E8F0;
+  --moneva-card-hover: #FAF9F5;
+  --moneva-border: #E0DED6;
 
-  --moneva-text-main: #0D1321;
-  --moneva-text-secondary: #475569;
-  --moneva-text-muted: #5C6B80;
+  --moneva-card-gradient: #FFFFFF;
+  --moneva-card-gradient-alt: #FAF9F5;
 
-  --moneva-card-gradient: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%);
-  --moneva-card-gradient-alt: linear-gradient(135deg, #FBF9FF 0%, #F5F3FF 100%);
+  --moneva-overlay-weak: rgba(10, 11, 13, 0.04);
+  --moneva-overlay: rgba(10, 11, 13, 0.06);
+  --moneva-overlay-strong: rgba(10, 11, 13, 0.09);
 
-  --moneva-overlay-weak: rgba(13, 19, 33, 0.04);
-  --moneva-overlay: rgba(13, 19, 33, 0.06);
-  --moneva-overlay-strong: rgba(13, 19, 33, 0.09);
+  /* Text steps of each hue, deep enough to read as words rather than fills. */
+  --moneva-text-on-danger: #C4341A;   /* was #E24F2B at 3.45:1 */
+  --moneva-text-on-success: #4F7200;
+  --moneva-text-on-warning: #8A6200;
+  --moneva-text-on-info: #4F7200;
+  --moneva-text-on-accent: #4F7200;
 
-  /* Darkened so they stay legible on the pale tinted backgrounds */
-  --moneva-text-on-danger: #B91C1C;
-  --moneva-text-on-success: #047857;
+  --moneva-figure-income: #4F7200;    /* 4.97:1 on bone */
+  --moneva-figure-expense: #C4341A;   /* 4.82:1 on bone */
 
-  /* On white the brand colours fail badly (2.54:1 and 2.78:1), so figures take
-     a deeper tone - but not as deep as the brick red used for badge text.
-     Checked against BOTH light surfaces, since some figures sit on the tinted
-     page rather than a white card: red-600 (#DC2626) reads 4.83:1 on white but
-     only 4.46:1 on #F4F6FA, so this is a shade darker and clears both. */
-  --moneva-figure-income: #047857;   /* 5.48:1 on white, 5.07:1 on the page */
-  --moneva-figure-expense: #CF2222;  /* 5.38:1 on white, 4.97:1 on the page */
-  --moneva-text-on-warning: #B45309;
-  --moneva-text-on-info: #1D4ED8;
-  --moneva-text-on-accent: #6D28D9;
-
-  --moneva-backdrop: #E8ECF3;
-  --moneva-viewport-shadow: 0 0 40px rgba(13, 19, 33, 0.12);
-
+  --moneva-backdrop: #E4E2DA;
+  --moneva-viewport-shadow: 0 0 40px rgba(10, 11, 13, 0.12);
   --moneva-accent-panel-base: rgba(255, 255, 255, 0.92);
+  --moneva-tick: #10130A;
 
-  /* ...and near-black on the light theme. */
-  --moneva-tick: #0D1321;
+  --moneva-text-main: #0A0B0D;
+  --moneva-text-primary: #0A0B0D;
+  --moneva-text-secondary: #4D535B;
+  --moneva-text-muted: #5E646D;       /* was #5C6B80 at 3.72:1 - under AA */
+
+  --illo-panel: rgba(110, 150, 0, 0.08);
+  --illo-back: rgba(110, 150, 0, 0.08);
+  --illo-fill: rgba(110, 150, 0, 0.16);
+  --illo-area: rgba(110, 150, 0, 0.12);
+  --illo-trackwash: rgba(110, 150, 0, 0.18);
+  --illo-facefill: #F2F1EC;
+  --illo-shadowfill: rgba(10, 11, 13, 0.18);
 }
 
 
@@ -238,29 +293,46 @@ html, body {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* Each screen fades up as it mounts, so route changes read as movement
-   rather than a hard swap. */
-/*
-  `both` keeps the final keyframe applied forever, so `transform: none` computes
-  to an identity matrix - and ANY transform makes the element the containing
-  block for position:fixed descendants. That pushed every modal on the page far
-  off screen. `backwards` applies the start frame before the run and then lets
-  the property return to its normal value.
-*/
-.page-enter,
-.accounts-page-container,
-.activity-container,
-.analytics-page-container,
-.assistant-container,
-.home-container,
-.plan-page-container,
-.profile-page-container {
-  animation: monevaFadeUp 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+/* ROUTE TRANSITION
+   One screen replaces another with a short directional slide: right-to-left
+   when you move right along the dock, left-to-right when you move back. The
+   direction is decided in RouteTransition.tsx from the tab order, so the
+   movement always matches the tab you tapped.
+
+   `backwards` fill, never `both`. `both` keeps the final keyframe applied
+   forever, so `transform: none` computes to an identity matrix - and ANY
+   transform makes the element the containing block for position:fixed
+   descendants, which pushed every modal on the page far off screen.
+   `backwards` applies the start frame before the run and then lets the
+   property return to its normal value. */
+.route-swap {
+  /* Grows to fill a short screen, never shrinks below its content, and keeps
+     the column gap the pages were written against. */
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@keyframes monevaSlideFwd {
+  from { opacity: 0; transform: translate3d(16px, 0, 0); }
+}
+
+@keyframes monevaSlideBack {
+  from { opacity: 0; transform: translate3d(-16px, 0, 0); }
+}
+
+.route-swap[data-dir="fwd"]  { animation: monevaSlideFwd var(--dur-base) var(--ease-out) backwards; }
+.route-swap[data-dir="back"] { animation: monevaSlideBack var(--dur-base) var(--ease-out) backwards; }
+
+/* Anything outside the shell - the auth screens - still just arrives. */
+.page-enter {
+  animation: monevaFadeUp var(--dur-base) var(--ease-out) backwards;
 }
 
 /* Cards stagger in behind the screen so a list assembles instead of blinking. */
 .moneva-card {
-  animation: monevaFadeUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  animation: monevaFadeUp var(--dur-base) var(--ease-out) backwards;
 }
 .moneva-card:nth-child(2) { animation-delay: 0.04s; }
 .moneva-card:nth-child(3) { animation-delay: 0.08s; }
@@ -272,7 +344,7 @@ html, body {
 .tfa-modal,
 .moneva-modal,
 .modal-content {
-  animation: monevaPop 0.22s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: monevaPop var(--dur-fast) var(--ease-soft) both;
 }
 
 /* Universal press feedback: anything tappable dips slightly under the finger. */
@@ -354,34 +426,18 @@ button,
 }
 
 /* Selected filter pills - the tinted variants also fix contrast in both themes. */
-.tab-active-all       { background-color: var(--moneva-blue); color: var(--moneva-white); }
-.tab-active-asset     { background-color: rgba(37, 99, 235, 0.2);  color: var(--moneva-text-on-info); }
-.tab-active-liability { background-color: rgba(255, 107, 107, 0.2); color: var(--moneva-text-on-danger); }
-.tab-active-income    { background-color: rgba(16, 185, 129, 0.2);  color: var(--moneva-text-on-success); }
-.tab-active-expense   { background-color: rgba(255, 107, 107, 0.2); color: var(--moneva-text-on-danger); }
-.tab-active-transfer  { background-color: rgba(124, 58, 237, 0.2);  color: var(--moneva-text-on-accent); }
+.tab-active-all       { background-color: var(--moneva-blue); color: var(--moneva-on-brand); }
+.tab-active-asset     { background-color: rgba(205, 255, 74, 0.2);  color: var(--moneva-text-on-info); }
+.tab-active-liability { background-color: rgba(255, 107, 74, 0.2); color: var(--moneva-text-on-danger); }
+.tab-active-income    { background-color: rgba(205, 255, 74, 0.2);  color: var(--moneva-text-on-success); }
+.tab-active-expense   { background-color: rgba(255, 107, 74, 0.2); color: var(--moneva-text-on-danger); }
+.tab-active-transfer  { background-color: var(--moneva-overlay); color: var(--moneva-text-secondary); }
 
 /* Undefined utilities that were in use across the app. */
 .text-xs   { font-size: 12px; }
 .text-muted { color: var(--moneva-text-muted); }
 .number-sm { font-size: 13px; font-weight: 600; font-feature-settings: "tnum"; }
 .capitalize { text-transform: capitalize; }
-
-/* ---------------------------------------------------------------------------
-   LOGO IN DARK MODE
-   The mark's hand is deep navy (#0D1321). Against the true-black dark canvas
-   it disappears, leaving only the coloured line visible. A tight light rim
-   separates the silhouette without altering the brand colours.
-   --------------------------------------------------------------------------- */
-:root[data-theme="dark"] .topbar-logo,
-:root[data-theme="dark"] .auth-logo,
-:root[data-theme="dark"] .assistant-logo-mark,
-:root[data-theme="dark"] .msg-avatar-logo,
-:root[data-theme="dark"] .tut-logo {
-  filter:
-    drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.85))
-    drop-shadow(0 0 1.6px rgba(148, 163, 184, 0.5));
-}
 
 /* Close control shared by modal headers. */
 .modal-close-btn {
@@ -449,7 +505,7 @@ button,
 .card-action-btn:hover,
 .card-action-btn:focus-visible {
   color: var(--moneva-blue);
-  background-color: rgba(37, 99, 235, 0.1);
+  background-color: rgba(205, 255, 74, 0.1);
 }
 
 /* `.btn-danger` is the filled Button variant; on an icon-only row action we
@@ -463,7 +519,7 @@ button,
 .card-action-btn.btn-danger:hover,
 .card-action-btn.btn-danger:focus-visible {
   color: var(--moneva-coral);
-  background-color: rgba(255, 107, 107, 0.12);
+  background-color: rgba(255, 107, 74, 0.12);
 }
 
 /* Keep the chips pills once they are taller. */

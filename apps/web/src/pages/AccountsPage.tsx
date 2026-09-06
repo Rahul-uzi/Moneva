@@ -6,8 +6,9 @@ import { AccountModal } from '../components/financial/AccountModal';
 import { AccountDetailModal } from '../components/financial/AccountDetailModal';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { Button } from '../components/ui/Button';
-import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
-import { apiClient } from '../services/apiClient';
+import { ErrorState, EmptyState } from '../components/ui/States';
+import { AccountsSkeleton } from '../components/ui/Skeleton';
+import { apiClient, describeApiError } from '../services/apiClient';
 import { useUiStore } from '../stores/useUiStore';
 import { formatMonetaryValue } from '../utils/money';
 import type { Account } from '../types/api';
@@ -44,7 +45,7 @@ export const AccountsPage: React.FC = () => {
       }
     } catch (err: unknown) {
       if (isMounted) {
-        const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to load accounts.';
+        const msg = describeApiError(err, 'Failed to load accounts.');
         setError(msg);
       }
     } finally {
@@ -118,7 +119,7 @@ export const AccountsPage: React.FC = () => {
     }
   };
 
-  if (isLoading) return <LoadingState message="Loading financial accounts..." />;
+  if (isLoading) return <AccountsSkeleton />;
   if (error) return <ErrorState title="Accounts Error" message={error} onRetry={() => void fetchAccounts(true)} />;
 
   return (
@@ -179,6 +180,7 @@ export const AccountsPage: React.FC = () => {
       {/* Accounts List */}
       {filteredAccounts.length === 0 ? (
         <EmptyState
+          art="wallet"
           title="No Accounts Found"
           description={
             accounts.length === 0

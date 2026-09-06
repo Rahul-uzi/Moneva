@@ -1,0 +1,311 @@
+.activity-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+
+.activity-header-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.activity-filter-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background-color: var(--moneva-surface);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moneva-border);
+}
+
+.activity-search-box {
+  display: flex;
+  align-items: center;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  gap: 10px;
+}
+.activity-search-box:focus-within {
+  border-color: var(--moneva-blue);
+}
+
+.search-icon {
+  color: var(--moneva-text-muted);
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--moneva-text-main);
+  font-family: var(--font-family);
+  font-size: 14px;
+  outline: none;
+}
+
+.activity-metrics-card {
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+}
+
+.activity-metrics-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.activity-metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.metric-sub {
+  font-size: 11px;
+  color: var(--moneva-text-secondary);
+}
+
+.metric-separator {
+  width: 1px;
+  height: 28px;
+  background: var(--moneva-border);
+}
+
+.grouped-transactions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.date-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-group-header {
+  padding-left: 4px;
+}
+
+.group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   MOTION
+
+   backwards, never both: `both` retains the final keyframe, and an identity
+   transform makes the element a containing block for anything fixed inside it.
+   --------------------------------------------------------------------------- */
+.activity-container > * {
+  animation: activityIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.activity-container > *:nth-child(1) { animation-delay: 0.02s; }
+.activity-container > *:nth-child(2) { animation-delay: 0.07s; }
+.activity-container > *:nth-child(3) { animation-delay: 0.12s; }
+.activity-container > *:nth-child(4) { animation-delay: 0.17s; }
+.activity-container > *:nth-child(n + 5) { animation-delay: 0.2s; }
+
+@keyframes activityIn {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Each day's block arrives after the one above it. */
+.date-group {
+  animation: activityIn 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.date-group:nth-child(2) { animation-delay: 0.06s; }
+.date-group:nth-child(3) { animation-delay: 0.12s; }
+.date-group:nth-child(n + 4) { animation-delay: 0.16s; }
+
+/* Rows cascade within their day. The list is keyed on the active filter, so
+   this replays whenever the tab or the search changes rather than the rows
+   swapping in place with no indication anything happened. */
+.group-items > * {
+  animation: rowIn 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+.group-items > *:nth-child(2) { animation-delay: 0.04s; }
+.group-items > *:nth-child(3) { animation-delay: 0.08s; }
+.group-items > *:nth-child(4) { animation-delay: 0.12s; }
+.group-items > *:nth-child(5) { animation-delay: 0.16s; }
+.group-items > *:nth-child(n + 6) { animation-delay: 0.2s; }
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translate3d(-8px, 0, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Touch feedback: the phone has no hover to confirm a tap. */
+.transaction-row.is-tappable {
+  transition: transform 0.14s ease, background-color 0.18s ease;
+}
+.transaction-row.is-tappable:active {
+  transform: scale(0.985);
+}
+
+.activity-filter-tabs button {
+  transition: background-color 0.18s ease, color 0.18s ease, transform 0.14s ease;
+}
+.activity-filter-tabs button:active {
+  transform: scale(0.96);
+}
+
+.search-input {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-container > *,
+  .date-group,
+  .group-items > * {
+    animation: none;
+  }
+  .transaction-row.is-tappable:active,
+  .activity-filter-tabs button:active {
+    transform: none;
+  }
+}
+
+
+.date-group-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.date-group-net {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+
+/* A chip, not a form field: the select itself is transparent and sits over a
+   pill, so it reads as a scope control beside the title rather than an input
+   the user is expected to fill in. */
+.period-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 10px;
+  border-radius: var(--radius-full);
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  color: var(--moneva-text-secondary);
+  transition: border-color 0.18s ease, transform 0.14s ease;
+}
+
+.period-chip:active {
+  transform: scale(0.97);
+  border-color: var(--moneva-blue);
+}
+
+.activity-period-select {
+  /* Full tap height, its own chevron hidden in favour of the chip's. */
+  min-height: 44px;
+  max-width: 130px;
+  padding: 0 2px 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--moneva-text-secondary);
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.activity-period-select:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 2px;
+  border-radius: var(--radius-full);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-period-select:active { transform: none; }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .period-chip:active { transform: none; }
+}
+
+/* ---------- long-press action sheet ---------- */
+.tx-action-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.tx-action-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--moneva-text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tx-action-amount {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  margin-bottom: 4px;
+}
+
+.tx-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  background-color: var(--moneva-surface);
+  color: var(--moneva-text-main);
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.18s ease;
+}
+
+.tx-action-btn:active {
+  transform: scale(0.985);
+  border-color: var(--moneva-blue);
+}
+
+.tx-action-btn.is-danger {
+  color: var(--moneva-figure-expense);
+}
+
+.tx-action-btn.is-danger:active {
+  border-color: var(--moneva-coral);
+}
+
+.tx-action-btn.is-plain {
+  border-color: transparent;
+  background: transparent;
+  color: var(--moneva-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tx-action-btn:active { transform: none; }
+}

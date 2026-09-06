@@ -16,7 +16,7 @@
 }
 .amount-input-box:focus-within {
   border-color: var(--moneva-blue);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  box-shadow: 0 0 0 3px rgba(205, 255, 74, 0.2);
 }
 
 .currency-symbol {
@@ -42,5 +42,5 @@
    so a rejected amount gave the user no visual signal at all. */
 .input-box-error {
   border-color: var(--moneva-coral) !important;
-  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.18);
+  box-shadow: 0 0 0 2px rgba(255, 107, 74, 0.18);
 }

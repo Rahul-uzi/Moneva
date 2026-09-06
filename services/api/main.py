@@ -43,6 +43,18 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # How long a browser may reuse a preflight answer. Starlette defaults to
+    # 600s, and the access log shows what that costs: every ten minutes, and on
+    # every app launch, a dozen OPTIONS round trips to this server before a
+    # single GET is allowed out - the app talks to roughly twelve endpoints and
+    # each one is preflighted separately.
+    #
+    # 7200 is Chrome's ceiling; larger values are silently clamped to it, and
+    # Firefox caps at 86400. Nothing here is per-user or per-token, so a stale
+    # preflight answer cannot leak or misauthorise anything: the reply says
+    # which origins, methods and headers are permitted, and those change only
+    # when this file does.
+    max_age=7200,
 )
 
 @app.exception_handler(RequestValidationError)

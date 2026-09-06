@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
-import { apiClient } from '../services/apiClient';
+import { ErrorState, EmptyState } from '../components/ui/States';
+import { AnalyticsSkeleton } from '../components/ui/Skeleton';
+import { apiClient, describeApiError } from '../services/apiClient';
 import { exportJsonFile } from '../services/exportService';
 import { useUiStore } from '../stores/useUiStore';
 import { formatMonetaryValue } from '../utils/money';
@@ -99,7 +100,7 @@ export const AnalyticsPage: React.FC = () => {
       }
     } catch (err: unknown) {
       if (isMounted) {
-        const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to load analytics data.';
+        const msg = describeApiError(err, 'Failed to load analytics data.');
         setError(msg);
       }
     } finally {
@@ -166,7 +167,7 @@ export const AnalyticsPage: React.FC = () => {
     [visibleCategories],
   );
 
-  if (isLoading) return <LoadingState message="Calculating real financial analytics..." />;
+  if (isLoading) return <AnalyticsSkeleton />;
   if (error) return <ErrorState title="Analytics Error" message={error} onRetry={() => void fetchAnalyticsData(true)} />;
 
   const hasData = (summary?.income_minor || 0) > 0 || (summary?.expense_minor || 0) > 0 || categories.length > 0;
@@ -222,6 +223,7 @@ export const AnalyticsPage: React.FC = () => {
 
       {!hasData ? (
         <EmptyState
+          art="chart"
           title="Not Enough Data Yet"
           description="Add income, expenses, or record transactions to unlock dynamic analytics, category breakdowns, and spending trends."
           actionLabel="Record Transaction"
@@ -411,7 +413,7 @@ export const AnalyticsPage: React.FC = () => {
                 {visibleCategories.map((c) => (
                   <div key={c.category_id} className="category-breakdown-item">
                     <div className="cat-item-left">
-                      <div className="cat-icon-badge" style={{ backgroundColor: `${c.color || '#7C3AED'}20`, color: c.color || '#7C3AED' }}>
+                      <div className="cat-icon-badge" style={{ backgroundColor: `${c.color || '#CDFF4A'}20`, color: c.color || '#CDFF4A' }}>
                         <Tag size={16} />
                       </div>
                       <div className="cat-info">

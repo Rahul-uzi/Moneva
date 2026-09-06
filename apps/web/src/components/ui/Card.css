@@ -38,7 +38,7 @@
 @media (hover: hover) and (pointer: fine) {
   .card-interactive:hover {
     background-color: var(--moneva-card-hover);
-    border-color: rgba(37, 99, 235, 0.4);
+    border-color: rgba(205, 255, 74, 0.4);
     transform: translateY(-2px);
   }
 }

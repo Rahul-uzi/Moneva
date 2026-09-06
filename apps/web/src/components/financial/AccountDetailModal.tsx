@@ -5,7 +5,7 @@ import { TransactionRow } from './TransactionRow';
 import { LoadingState } from '../ui/States';
 import { apiClient } from '../../services/apiClient';
 import type { Account, Transaction } from '../../types/api';
-import { formatMonetaryValue } from '../../utils/money';
+import { Money } from '../ui/Money';
 import './AccountDetailModal.css';
 
 interface AccountDetailModalProps {
@@ -60,10 +60,10 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({
           <span className="account-type-badge">{account.account_type.toUpperCase()}</span>
           <h2 className="heading-md">{account.name}</h2>
           <span className={`number-xl ${isLiability ? 'text-coral' : 'text-main'}`}>
-            {formatMonetaryValue(currentBalance, account.currency)}
+            <Money amount={currentBalance} currency={account.currency} />
           </span>
           <span className="text-body text-sm">
-            Opening Balance: {formatMonetaryValue(account.opening_balance_minor, account.currency)}
+            Opening Balance: <Money amount={account.opening_balance_minor} currency={account.currency} />
           </span>
         </div>
 

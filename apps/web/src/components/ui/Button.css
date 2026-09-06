@@ -23,9 +23,8 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--moneva-blue), #1D4ED8);
-  color: var(--moneva-white);
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  background: var(--moneva-blue);
+  color: var(--moneva-on-brand);
 }
 
 .btn-secondary {
@@ -37,13 +36,13 @@
 }
 
 .btn-accent {
-  background: linear-gradient(135deg, var(--moneva-teal), #059669);
-  color: var(--moneva-white);
+  background: var(--moneva-teal);
+  color: var(--moneva-on-brand);
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, var(--moneva-coral), #DC2626);
-  color: var(--moneva-white);
+  background: var(--moneva-coral);
+  color: var(--moneva-on-brand);
 }
 
 .btn-ghost {

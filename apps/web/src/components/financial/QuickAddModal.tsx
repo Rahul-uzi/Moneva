@@ -102,7 +102,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
         name: catName,
         type,
         icon: type === 'income' ? 'Wallet' : 'Tag',
-        color: type === 'income' ? '#2563EB' : '#FF6B6B',
+        color: type === 'income' ? 'var(--moneva-figure-income)' : 'var(--moneva-figure-expense)',
       });
       addToast(`Created "${catName}" category.`, 'success');
       await loadOptions();

@@ -1,63 +1,195 @@
+/* Three values, and a ground.
+   The panel the drawing is composed on, a flat mid-tone fill with body, and
+   the bright ink line. On transparency any drawing reads as a large icon; on
+   a ground of its own it reads as a picture. */
 .moneva-illustration {
   display: block;
   overflow: visible;
+  fill: none;
+  /* The tints it draws with are inherited from the theme (see index.css), so a
+     container can restate them for a ground of its own. */
 }
 
-.illo-ground {
-  fill: var(--moneva-text-muted);
-  opacity: 0.14;
-}
+/* The ground. */
+.illo-panel { fill: var(--illo-panel); stroke: none; }
 
-.illo-surface {
-  fill: var(--moneva-card);
-  stroke: var(--moneva-border);
-  stroke-width: 2;
-}
+/* ---- the plates ---- */
 
-.illo-lid {
-  fill: var(--moneva-surface);
-  stroke: var(--moneva-border);
-  stroke-width: 2;
+/* The mass behind an object. Solid, not a wash - this is the whole difference
+   between an object with weight and a shape with a shadow hint. It shows only
+   along the bottom and right, where an extruded edge would be. */
+.illo-extrude { fill: var(--illo-accent); stroke: none; }
+
+/* The face, in the ground's own colour, so the object reads as cut from the
+   same material the drawing sits on. */
+.illo-face { fill: var(--illo-facefill); stroke: none; }
+
+/* What the object stands on. */
+.illo-shadow { fill: var(--illo-shadowfill); stroke: none; }
+
+/* The contour. Heavier than anything inside it, which is what stops the
+   drawing reading as an icon. */
+.illo-ink {
+  fill: none;
+  stroke: var(--illo-accent);
+  stroke-width: 2.8;
+  stroke-linecap: round;
   stroke-linejoin: round;
 }
 
-.illo-line { fill: var(--moneva-blue); opacity: 0.55; }
-.illo-line-dim { opacity: 0.28; }
-
-.illo-accent { fill: var(--moneva-teal); opacity: 0.75; }
-.illo-accent-2 { fill: var(--moneva-violet); }
-
-.illo-stroke {
-  stroke: var(--moneva-text-secondary);
-  stroke-width: 3.5;
+/* Everything inside the contour is drawn with a lighter hand. */
+.illo-detail {
   fill: none;
+  stroke: var(--illo-accent);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
 }
 
-.illo-danger { fill: var(--moneva-coral); }
-.illo-danger-mark { stroke: var(--moneva-white); stroke-width: 2.4; }
-.illo-danger-mark-dot { fill: var(--moneva-white); }
+/* A number written inside a shape. Deliberately heavier than .illo-detail:
+   at detail weight a value and its caption are the same line twice. */
+.illo-figure {
+  fill: none;
+  stroke: var(--illo-accent);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}
 
-.illo-slash {
-  stroke: var(--moneva-coral);
+/* An ellipse outline needs no fill of its own; the face pass already laid one. */
+ellipse.illo-ink { fill: none; }
+
+/* What has not happened yet: the shape is there, the value is not. */
+.illo-open {
+  fill: none;
+  stroke: var(--illo-accent);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+  stroke-dasharray: 7 8;
+  opacity: 0.45;
+}
+
+/* One small solid thing per drawing, in front. Scale contrast, and the only
+   place the accent runs at full strength. */
+.illo-solid { fill: var(--illo-accent); stroke: none; }
+.illo-solid-shape { fill: var(--illo-accent); stroke: none; }
+.illo-warn-dot { fill: var(--illo-warnc); stroke: none; }
+.illo-warn-mass { fill: var(--illo-warnc); opacity: 0.45; stroke: none; }
+
+/* Scatter: what keeps the corners of the frame from going dead. */
+.illo-spark { fill: var(--illo-accent); opacity: 0.42; stroke: none; }
+.illo-dot-soft { fill: var(--illo-accent); opacity: 0.3; stroke: none; }
+
+/* Knocked out of a solid shape, so it reads as cut rather than drawn over. */
+.illo-cut {
+  fill: none;
+  stroke: var(--illo-knockout);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.illo-cut-thick {
+  fill: none;
+  stroke: var(--illo-accent);
   stroke-width: 4;
+  stroke-linecap: round;
+}
+.illo-warn-cut {
   fill: none;
+  stroke: var(--illo-knockout);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.illo-warn-cut-dot { fill: var(--illo-knockout); stroke: none; }
+
+/* The gauge: a wide soft track with a wide bright arc over it. */
+.illo-track {
+  fill: none;
+  stroke: var(--illo-trackwash);
+  stroke-width: 13;
+  stroke-linecap: round;
+}
+.illo-value {
+  fill: none;
+  stroke: var(--illo-accent);
+  stroke-width: 13;
+  stroke-linecap: round;
 }
 
-.illo-success-ring {
+.illo-warn {
   fill: none;
-  stroke: var(--moneva-teal);
-  stroke-width: 3;
-  opacity: 0.55;
+  stroke: var(--illo-warnc);
+  stroke-width: 3.4;
+  stroke-linecap: round;
 }
 
-.illo-success-check {
-  fill: none;
-  stroke: var(--moneva-teal);
-  stroke-width: 5;
-  /* Draw the tick on mount so success feels earned rather than just appearing. */
+/* ---- the welcome sequence ----
+   The mark is the app's own path, scaled into this canvas. Its length in local
+   units is about 48, so 52 covers it. Every step below is off under reduced
+   motion; the drawing then simply appears, complete. */
+.illo-mark {
+  stroke: var(--illo-accent);
+  stroke-width: 2.6;
   stroke-dasharray: 52;
   stroke-dashoffset: 52;
-  animation: illoDraw 0.45s ease-out 0.1s forwards;
+  animation: illoMark 0.85s var(--ease-out) 0.24s forwards;
+}
+
+@keyframes illoMark {
+  to { stroke-dashoffset: 0; }
+}
+
+/* The disc it is drawn into. */
+.illo-rise {
+  transform-box: view-box;
+  transform-origin: 100px 68px;
+  animation: illoRise 0.42s var(--ease-out) both;
+}
+
+@keyframes illoRise {
+  from { opacity: 0; transform: scale(0.86); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Scatter arrives once the stroke has landed, so the eye follows the mark
+   first and the corners fill in behind it. */
+.illo-late-1,
+.illo-late-2,
+.illo-late-3 {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: illoLate 0.34s var(--ease-out) forwards;
+}
+.illo-late-1 { animation-delay: 0.78s; }
+.illo-late-2 { animation-delay: 0.9s; }
+.illo-late-3 { animation-delay: 1.02s; }
+
+@keyframes illoLate {
+  from { opacity: 0; transform: scale(0.5); }
+  to { transform: none; }
+}
+.illo-spark.illo-late-1,
+.illo-spark.illo-late-2 { animation-name: illoLateSpark; }
+.illo-dot-soft.illo-late-2,
+.illo-dot-soft.illo-late-3 { animation-name: illoLateDot; }
+
+/* Each ends on the opacity its own class already carries. */
+@keyframes illoLateSpark {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 0.42; transform: none; }
+}
+
+@keyframes illoLateDot {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 0.3; transform: none; }
+}
+
+/* Success draws itself, so the state feels earned rather than asserted.
+   The tick measures ~74; 90 covers it with room to spare. */
+.illo-draw {
+  stroke-dasharray: 90;
+  stroke-dashoffset: 90;
+  animation: illoDraw 0.5s var(--ease-out) 0.12s forwards;
 }
 
 @keyframes illoDraw {
@@ -65,5 +197,180 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .illo-success-check { animation: none; stroke-dashoffset: 0; }
+  .illo-draw,
+  .illo-mark { animation: none; stroke-dashoffset: 0; }
+  .illo-rise { animation: none; }
+  .illo-late-1,
+  .illo-late-2 { animation: none; opacity: 0.42; }
+  .illo-dot-soft.illo-late-2,
+  .illo-dot-soft.illo-late-3 { animation: none; opacity: 0.3; }
+}
+
+/* ===========================================================================
+   MOTION
+   Loops only where the subject implies continuous motion; a one-shot entrance
+   where the movement explains a state arriving; nothing at all elsewhere. A
+   wallet does not move.
+
+   Transform and stroke-dashoffset only, so none of it costs a layout pass.
+   =========================================================================== */
+
+.illo-swing,
+.illo-wave,
+.illo-breathe,
+.illo-scan,
+.illo-column,
+.illo-tear-left,
+.illo-tear-right {
+  transform-box: view-box;
+}
+
+/* --- loops --- */
+
+/* The bell rings, then hangs still for three quarters of the cycle. A bell
+   that swings continuously reads as a pendulum. */
+.illo-swing {
+  transform-origin: 96px 26px;
+  animation: illoSwing 4s ease-in-out infinite;
+}
+
+@keyframes illoSwing {
+  0%, 62%, 100% { transform: rotate(0deg); }
+  8%  { transform: rotate(7deg); }
+  20% { transform: rotate(-5deg); }
+  32% { transform: rotate(3deg); }
+  44% { transform: rotate(-1.5deg); }
+}
+
+/* The sound rides out on the same beat. */
+.illo-ripple { animation: illoRipple 4s ease-in-out infinite; }
+
+@keyframes illoRipple {
+  0%, 62%, 100% { opacity: 0.4; }
+  14% { opacity: 0.9; }
+  38% { opacity: 0.55; }
+}
+
+/* A flag is never quite still. */
+.illo-wave {
+  transform-origin: 142px 22px;
+  animation: illoWave 3.4s ease-in-out infinite;
+}
+
+@keyframes illoWave {
+  0%, 100% { transform: rotate(0deg) scaleX(1); }
+  50% { transform: rotate(-3.5deg) scaleX(0.93); }
+}
+
+/* The invitation breathes. */
+.illo-breathe {
+  transform-origin: 62px 52px;
+  animation: illoBreathe 3.2s ease-in-out infinite;
+}
+
+@keyframes illoBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+
+/* A search keeps looking. */
+.illo-scan {
+  transform-origin: 128px 62px;
+  animation: illoScan 4.6s ease-in-out infinite;
+}
+
+@keyframes illoScan {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-16px); }
+}
+
+/* --- entrances --- */
+
+/* Columns grow out of the baseline they are measured from. */
+.illo-column {
+  transform-origin: 100px 116px;
+  animation: illoColumn 0.52s cubic-bezier(0.16, 0.84, 0.44, 1) both;
+}
+.illo-column-1 { animation-delay: 0.05s; }
+.illo-column-2 { animation-delay: 0.15s; }
+.illo-column-3 { animation-delay: 0.25s; }
+
+@keyframes illoColumn {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+/* Then the line runs over them, and the point lands. */
+.illo-trace {
+  stroke-dasharray: 165;
+  stroke-dashoffset: 165;
+  animation: illoTrace 0.72s cubic-bezier(0.16, 0.84, 0.44, 1) 0.36s forwards;
+}
+
+@keyframes illoTrace {
+  to { stroke-dashoffset: 0; }
+}
+
+.illo-tip {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: illoTip 0.3s cubic-bezier(0.16, 0.84, 0.44, 1) 1s both;
+}
+
+@keyframes illoTip {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
+/* The gauge sweeps to where it stands. Radius 40 over 223 degrees is about
+   156 user units. */
+.illo-fillup {
+  stroke-dasharray: 160;
+  stroke-dashoffset: 160;
+  animation: illoFillup 0.78s cubic-bezier(0.16, 0.84, 0.44, 1) 0.15s forwards;
+}
+
+@keyframes illoFillup {
+  to { stroke-dashoffset: 0; }
+}
+
+/* The slip comes apart, and stays apart. */
+.illo-tear-left  { animation: illoTearLeft 0.5s cubic-bezier(0.16, 0.84, 0.44, 1) both; }
+.illo-tear-right { animation: illoTearRight 0.5s cubic-bezier(0.16, 0.84, 0.44, 1) both; }
+
+@keyframes illoTearLeft {
+  from { transform: translateX(9px); }
+  to { transform: translateX(0); }
+}
+
+@keyframes illoTearRight {
+  from { transform: translateX(-9px); }
+  to { transform: translateX(0); }
+}
+
+/* The line is struck through. */
+.illo-strike {
+  stroke-dasharray: 150;
+  stroke-dashoffset: 150;
+  animation: illoStrike 0.46s cubic-bezier(0.16, 0.84, 0.44, 1) 0.24s forwards;
+}
+
+@keyframes illoStrike {
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .illo-swing,
+  .illo-ripple,
+  .illo-wave,
+  .illo-breathe,
+  .illo-scan,
+  .illo-column,
+  .illo-tip,
+  .illo-tear-left,
+  .illo-tear-right { animation: none; }
+  .illo-trace,
+  .illo-fillup,
+  .illo-strike { animation: none; stroke-dashoffset: 0; }
+  .illo-ripple { opacity: 0.85; }
 }

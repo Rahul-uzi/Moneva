@@ -1,6 +1,7 @@
 import React from 'react';
-import { Fingerprint, LockKeyhole } from 'lucide-react';
+import { Fingerprint } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { Illustration } from '../ui/Illustration';
 import { isBiometricLockEnabled, promptBiometric } from '../../services/biometricService';
 import { useAuthStore } from '../../stores/useAuthStore';
 import './BiometricGate.css';
@@ -47,9 +48,7 @@ export const BiometricGate: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <div className="biometric-gate">
       <div className="biometric-gate-inner">
-        <div className="biometric-gate-icon">
-          {state === 'checking' ? <LockKeyhole size={30} /> : <Fingerprint size={30} />}
-        </div>
+        <Illustration name="secure" size={196} />
         <h1 className="heading-lg">MONEVA is locked</h1>
         <p className="text-body">
           {state === 'checking'

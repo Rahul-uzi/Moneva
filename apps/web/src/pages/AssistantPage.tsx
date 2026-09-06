@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Send, Sparkles, AlertCircle, ShieldCheck, Plus, History } from 'lucide-react';
-import logoMark from '../assets/logo/MONEVA_Logo_Mark_FullColor.png';
+import { Logo } from '../components/ui/Logo';
 import { ActionProposalCard, type ProposedAction } from '../components/financial/ActionProposalCard';
 import { QuickAddModal } from '../components/financial/QuickAddModal';
 import { apiClient } from '../services/apiClient';
@@ -372,7 +372,7 @@ export const AssistantPage: React.FC = () => {
       {/* Brand Header */}
       <div className="assistant-header-card">
         <div className="assistant-brand-badge">
-          <img src={logoMark} alt="MONEVA Logo Mark" className="assistant-logo-mark" />
+          <Logo className="assistant-logo-mark" />
         </div>
         <div className="assistant-header-text">
           <h1 className="heading-md text-main">MONEVA Assistant</h1>
@@ -483,7 +483,7 @@ export const AssistantPage: React.FC = () => {
               className={`message-wrapper ${msg.sender === 'user' ? 'user-msg' : 'assistant-msg'} ${msg.proposal ? 'has-proposal' : ''}`}
             >
               {msg.sender === 'assistant' && (
-                <img src={logoMark} alt="MONEVA" className="msg-avatar-logo" />
+                <Logo className="msg-avatar-logo" label={null} />
               )}
               <div className="message-bubble">
                 <p className="msg-text">{msg.text}</p>
@@ -505,7 +505,7 @@ export const AssistantPage: React.FC = () => {
         {/* Thinking / Processing State Indicator */}
         {isThinking && (
           <div className="message-wrapper assistant-msg">
-            <img src={logoMark} alt="MONEVA" className="msg-avatar-logo thinking-pulse" />
+            <Logo className="msg-avatar-logo thinking-pulse" label={null} />
             <div className="message-bubble thinking-bubble">
               {/* Three bouncing dots read as "working" at a glance; the old
                   static sentence looked like a message that had already
@@ -523,7 +523,7 @@ export const AssistantPage: React.FC = () => {
       </div>
 
       {/* Input Controls Bar */}
-      <div className="assistant-input-bar">
+      <div className="assistant-input-bar" data-tour="assistant-input">
         <input
           type="text"
           placeholder="Ask MONEVA about budgets, bills, or expenses..."

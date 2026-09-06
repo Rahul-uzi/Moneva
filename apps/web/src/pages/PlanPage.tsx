@@ -13,8 +13,9 @@ import { BillModal } from '../components/financial/BillModal';
 import { BillDetailModal } from '../components/financial/BillDetailModal';
 import { BillPayModal } from '../components/financial/BillPayModal';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
-import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
-import { apiClient } from '../services/apiClient';
+import { ErrorState, EmptyState } from '../components/ui/States';
+import { PlanSkeleton } from '../components/ui/Skeleton';
+import { apiClient, describeApiError } from '../services/apiClient';
 import { useUiStore } from '../stores/useUiStore';
 import { formatMonetaryCompact } from '../utils/money';
 import { parseApiDate } from '../utils/datetime';
@@ -86,7 +87,7 @@ export const PlanPage: React.FC = () => {
       }
     } catch (err: unknown) {
       if (isMounted) {
-        const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to load financial plan.';
+        const msg = describeApiError(err, 'Failed to load financial plan.');
         setError(msg);
       }
     } finally {
@@ -253,7 +254,7 @@ export const PlanPage: React.FC = () => {
     }
   };
 
-  if (isLoading) return <LoadingState message="Calculating budgets & goal targets..." />;
+  if (isLoading) return <PlanSkeleton />;
   if (error) return <ErrorState title="Plan Error" message={error} onRetry={() => void fetchPlanData(true)} />;
 
   return (
@@ -266,7 +267,7 @@ export const PlanPage: React.FC = () => {
         {/* Hidden while the plan is empty: the card below already offers these
             three, and showing both put the same actions on screen twice. */}
         {!isPlanEmpty && (
-        <div className="plan-action-btns">
+        <div className="plan-action-btns" data-tour="plan-add">
           <button type="button" className="plan-add-btn" onClick={() => setIsBudgetModalOpen(true)}>
             <Plus size={14} /> Budget
           </button>
@@ -285,7 +286,7 @@ export const PlanPage: React.FC = () => {
           heights and the bills icon was orphaned beside its label. The figure
           that matters is now on top with its context beneath it. */}
       {!isPlanEmpty && (
-        <div className="plan-metrics-card">
+        <div className="plan-metrics-card" data-tour="plan-metrics">
           <div className="plan-metric-box">
             <span className="metric-label"><PieChart size={13} className="icon-blue" /> Budgets</span>
             <span className={`number-md ${metrics.isOverBudget ? 'text-coral' : 'text-main'}`}>
@@ -439,6 +440,7 @@ export const PlanPage: React.FC = () => {
 
           {budgets.length === 0 ? (
             <EmptyState
+              art="budget"
               title="No Budgets Defined"
               description="Define category spending limits to prevent overspending."
               actionLabel="Add Budget"
@@ -498,6 +500,7 @@ export const PlanPage: React.FC = () => {
 
           {goals.length === 0 ? (
             <EmptyState
+              art="goal"
               title="No Savings Goals"
               description="Set targets for emergency funds, vacations, or major purchases."
               actionLabel="Add Goal"
@@ -554,6 +557,7 @@ export const PlanPage: React.FC = () => {
 
           {bills.length === 0 ? (
             <EmptyState
+              art="calendar"
               title="No Bill Reminders"
               description="Keep track of recurring electricity, internet, or subscription bills."
               actionLabel="Add Bill"

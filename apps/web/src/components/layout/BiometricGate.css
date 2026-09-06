@@ -22,14 +22,7 @@
   width: 100%;
 }
 
-.biometric-gate-icon {
-  width: 62px;
-  height: 62px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--moneva-blue), var(--moneva-violet));
-  color: var(--moneva-white);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* The lock screen carries the drawing instead of a glyph in a disc. */
+.biometric-gate .moneva-illustration {
   margin-bottom: 4px;
 }

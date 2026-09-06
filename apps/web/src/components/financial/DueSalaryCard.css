@@ -7,7 +7,7 @@
   background-color: var(--moneva-card);
   /* Tinted edge rather than a filled panel: this is a question, not an alert.
      A red or amber block for a salary that is merely due reads as an error. */
-  border: 1px solid rgba(37, 99, 235, 0.35);
+  border: 1px solid rgba(205, 255, 74, 0.35);
   box-shadow: var(--shadow-card, 0 2px 10px rgba(0, 0, 0, 0.06));
 }
 
@@ -28,7 +28,7 @@
   flex-shrink: 0;
   border-radius: var(--radius-full, 999px);
   color: var(--moneva-text-on-info);
-  background-color: rgba(37, 99, 235, 0.16);
+  background-color: rgba(205, 255, 74, 0.16);
 }
 
 .due-salary-copy {

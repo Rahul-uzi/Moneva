@@ -1,0 +1,28 @@
+.moneva-arc {
+  position: relative;
+  flex: none;
+}
+
+.arc-track {
+  fill: none;
+  stroke: var(--moneva-overlay-weak);
+}
+
+.arc-fill {
+  fill: none;
+  transition: stroke-dashoffset var(--dur-draw) var(--ease-out);
+}
+
+.arc-accent { stroke: var(--moneva-blue); }
+.arc-warn   { stroke: var(--moneva-coral); }
+
+.arc-middle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  text-align: center;
+}

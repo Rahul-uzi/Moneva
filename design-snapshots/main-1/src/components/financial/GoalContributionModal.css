@@ -1,0 +1,103 @@
+.contribution-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.goal-summary-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
+  border: 1px solid var(--moneva-violet);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  text-align: center;
+}
+
+.confirmation-preview-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
+  border: 1px solid var(--moneva-teal);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.preview-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview-title {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+
+.preview-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.modal-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.contribution-confirmed-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.confirmed-icon-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--moneva-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmed-summary-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 16px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  gap: 4px;
+}
+
+.confirmed-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  margin-top: 4px;
+}

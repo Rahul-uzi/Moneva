@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RELEASE network security configuration for MONEVA.
+
+  Cleartext is refused outright here. Development builds do NOT use this file:
+  src/debug/res/xml/network_security_config.xml overrides it and allows plain
+  HTTP to the local API, so a DHCP address change needs no edit here.
+
+  Nothing in this file should ever be relaxed to make local development work.
+-->
+<network-security-config>
+    <!-- Trust system CA store for all connections (default) -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    
+</network-security-config>

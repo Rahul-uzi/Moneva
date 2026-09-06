@@ -8,7 +8,7 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: rgba(37, 99, 235, 0.12);
+  background: rgba(205, 255, 74, 0.12);
   border: 1px solid var(--moneva-blue);
   border-radius: var(--radius-md);
   padding: 10px 12px;
@@ -122,7 +122,7 @@
 
 .icon-delete-btn:hover {
   color: var(--moneva-coral);
-  background-color: rgba(255, 107, 107, 0.1);
+  background-color: rgba(255, 107, 74, 0.1);
 }
 
 .add-rule-form {

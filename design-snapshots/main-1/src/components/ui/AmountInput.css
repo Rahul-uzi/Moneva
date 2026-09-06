@@ -1,0 +1,46 @@
+.amount-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.amount-input-box {
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  display: flex;
+  align-items: center;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+}
+.amount-input-box:focus-within {
+  border-color: var(--moneva-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.currency-symbol {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--moneva-blue);
+  margin-right: 8px;
+}
+
+.amount-field {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--moneva-text-main);
+  font-family: var(--font-family);
+  font-size: 28px;
+  font-weight: 700;
+  outline: none;
+}
+
+
+/* Invalid amount - previously this class existed in markup with no rule,
+   so a rejected amount gave the user no visual signal at all. */
+.input-box-error {
+  border-color: var(--moneva-coral) !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.18);
+}

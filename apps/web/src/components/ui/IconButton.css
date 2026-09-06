@@ -16,7 +16,7 @@
 
 .icon-btn-primary {
   background-color: var(--moneva-blue);
-  color: var(--moneva-white);
+  color: var(--moneva-on-brand);
 }
 
 .icon-btn-secondary {

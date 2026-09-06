@@ -31,9 +31,8 @@
 
 .auth-logo {
   height: 48px;
-  width: auto;
+  width: 48px;
   margin-bottom: 8px;
-  object-fit: contain;
 }
 
 .auth-form {
@@ -43,7 +42,7 @@
 }
 
 .auth-error-banner {
-  background-color: rgba(255, 107, 107, 0.15);
+  background-color: rgba(255, 107, 74, 0.15);
   border: 1px solid var(--moneva-coral);
   color: var(--moneva-text-on-danger);
   padding: 10px 14px;

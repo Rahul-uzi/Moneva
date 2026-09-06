@@ -1,0 +1,54 @@
+.sync-indicator-bar {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--moneva-border);
+  transition: var(--transition-fast);
+}
+
+.sync-indicator-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sync-state-syncing {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: var(--moneva-blue);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.sync-state-offline {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--moneva-orange);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.sync-state-sync_error {
+  background-color: rgba(255, 107, 107, 0.15);
+  color: var(--moneva-coral);
+  border-color: rgba(255, 107, 107, 0.3);
+}
+
+.sync-state-online {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--moneva-teal);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

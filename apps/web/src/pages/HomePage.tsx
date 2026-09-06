@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { FinancialSummaryCard } from '../components/financial/FinancialSummaryCard';
 import { SalaryUsageCard } from '../components/financial/SalaryUsageCard';
@@ -10,12 +10,18 @@ import { TransactionRow } from '../components/financial/TransactionRow';
 import { TransactionDetailModal } from '../components/financial/TransactionDetailModal';
 import { SalaryConfirmationModal } from '../components/financial/SalaryConfirmationModal';
 import { DueSalaryCard } from '../components/financial/DueSalaryCard';
-import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
+import { PaydayCard } from '../components/financial/PaydayCard';
+import { ErrorState, EmptyState } from '../components/ui/States';
+import { HomeSkeleton } from '../components/ui/Skeleton';
 import { ChevronRight } from 'lucide-react';
-import { apiClient } from '../services/apiClient';
+import { apiClient, describeApiError } from '../services/apiClient';
 import { formatMonetaryValue } from '../utils/money';
 import { useUiStore } from '../stores/useUiStore';
+import { nextPayday } from '../utils/payday';
+import { isNewSince } from '../utils/activity';
+import { readLastSeen, writeLastSeen } from '../services/lastSeen';
 import type {
+  RecurringIncome,
   FinancialSummary, Account, Budget, SavingsGoal, Bill, Transaction, SalaryUsage, DueIncome,
   Category,
 } from '../types/api';
@@ -53,6 +59,13 @@ export const HomePage: React.FC = () => {
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [salaryUsage, setSalaryUsage] = useState<SalaryUsage | null>(null);
   const [dueIncome, setDueIncome] = useState<DueIncome[]>([]);
+  const [salaryStreams, setSalaryStreams] = useState<RecurringIncome[]>([]);
+  /**
+   * What this device had already seen when the page opened. Captured once so
+   * the markers stay put while you read, rather than clearing under your eyes,
+   * and the clock is moved on immediately so the next visit compares to now.
+   */
+  const [seenAt] = useState<string | null>(() => readLastSeen());
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
@@ -66,6 +79,14 @@ export const HomePage: React.FC = () => {
   const [isSalaryDialogOpen, setIsSalaryDialogOpen] = useState<boolean>(false);
 
   const { addToast } = useUiStore();
+
+  // Recomputed only when the streams change; `new Date()` inside would make
+  // this a new value on every render.
+  const payday = useMemo(() => nextPayday(salaryStreams), [salaryStreams]);
+
+  useEffect(() => {
+    writeLastSeen(new Date().toISOString());
+  }, []);
 
   const fetchAllData = async (isMounted: boolean) => {
     try {
@@ -116,12 +137,20 @@ export const HomePage: React.FC = () => {
             .catch(() => ({ data: [] as DueIncome[] })),
           (d) => setDueIncome(d),
         ),
+        // The streams themselves, for the countdown to the next one. Optional
+        // in the same way: no streams, no card, no error.
+        settle(
+          apiClient
+            .get<RecurringIncome[]>('/income/recurring')
+            .catch(() => ({ data: [] as RecurringIncome[] })),
+          (d) => setSalaryStreams(d),
+        ),
       ]);
 
       if (isMounted) setError(null);
     } catch (err: unknown) {
       if (isMounted) {
-        const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to load financial dashboard.';
+        const msg = describeApiError(err, 'Failed to load financial dashboard.');
         setError(msg);
       }
     } finally {
@@ -173,7 +202,7 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  if (isLoading) return <LoadingState message="Calculating live ledger metrics..." />;
+  if (isLoading) return <HomeSkeleton />;
   if (error) return <ErrorState title="Dashboard Error" message={error} onRetry={() => void fetchAllData(true)} />;
 
   return (
@@ -188,7 +217,11 @@ export const HomePage: React.FC = () => {
         />
       )}
 
-      {/* 2. Salary that is due but unrecorded - asked, never assumed. */}
+      {/* 2. When the next one lands. Only shown while nothing is overdue - two
+             answers to "where is my salary" would contradict each other. */}
+      {dueIncome.length === 0 && payday && <PaydayCard payday={payday} />}
+
+      {/* 3. Salary that is due but unrecorded - asked, never assumed. */}
       <DueSalaryCard
         due={dueIncome}
         accounts={accounts}
@@ -201,13 +234,18 @@ export const HomePage: React.FC = () => {
       )}
 
       {/* 4. Accounts Overview */}
-      <div className="home-section">
+      {/* The tour points at the whole section, heading included: it frosts the
+          page around whatever it highlights, and anchoring on the card row
+          alone left the title blurred inside the highlight. It also means the
+          step still has something to point at on an account with no accounts
+          yet. */}
+      <div className="home-section" data-tour="accounts">
         <div className="section-title-row">
           <h2 className="heading-md">My Accounts</h2>
           <span className="text-label">{accounts.length} Total</span>
         </div>
         {accounts.length === 0 ? (
-          <EmptyState title="No Accounts" description="Create an account to begin tracking transactions." />
+          <EmptyState art="wallet" title="No Accounts" description="Create an account to begin tracking transactions." />
         ) : (
           <div className="accounts-scroll-row">
             {accounts.map((acc) => (
@@ -286,13 +324,14 @@ export const HomePage: React.FC = () => {
           )}
         </div>
         {transactions.length === 0 ? (
-          <EmptyState title="No Recent Activity" description="Click + to add your first transaction." />
+          <EmptyState art="ledger" title="No Recent Activity" description="Click + to add your first transaction." />
         ) : (
           <div className="transactions-list">
             {transactions.map((tx) => (
               <TransactionRow
                 key={tx.id}
                 transaction={tx}
+                isNew={isNewSince(tx.transaction_date, seenAt)}
                 onClick={() => setSelectedTransaction(tx)}
               />
             ))}

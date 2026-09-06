@@ -19,14 +19,13 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--moneva-blue), var(--moneva-violet));
-  color: var(--moneva-white);
+  background: var(--moneva-blue);
+  color: var(--moneva-on-brand);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 26px;
   font-weight: 700;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
   flex-shrink: 0;
 }
 
@@ -98,7 +97,7 @@
 }
 
 .active-theme {
-  background-color: rgba(37, 99, 235, 0.15);
+  background-color: rgba(205, 255, 74, 0.15);
   border-color: var(--moneva-blue);
   color: var(--moneva-blue);
 }
@@ -281,7 +280,7 @@
   height: 22px;
   border-radius: 50%;
   background-color: var(--moneva-blue);
-  color: var(--moneva-white);
+  color: var(--moneva-on-brand);
   border: 2px solid var(--moneva-surface);
   display: flex;
   align-items: center;
@@ -419,7 +418,7 @@
 .form-input:focus,
 .form-select:focus {
   border-color: var(--moneva-blue);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  box-shadow: 0 0 0 3px rgba(205, 255, 74, 0.18);
   outline: none;
 }
 
@@ -471,7 +470,7 @@
 
 /* ---------- currency change ---------- */
 .currency-warning {
-  background-color: rgba(245, 158, 11, 0.15);
+  background-color: rgba(232, 182, 44, 0.15);
   border: 1px solid var(--moneva-orange);
   color: var(--moneva-text-on-warning);
   border-radius: var(--radius-sm);
@@ -705,7 +704,7 @@
   padding: 16px;
   border: 1px solid var(--moneva-coral);
   border-radius: var(--radius-lg);
-  background-color: rgba(255, 107, 107, 0.06);
+  background-color: rgba(255, 107, 74, 0.06);
   animation: monevaFadeUp 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 

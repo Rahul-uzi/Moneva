@@ -6,17 +6,6 @@
   padding: 8px 0;
 }
 
-.success-icon-ring {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background-color: rgba(16, 185, 129, 0.15);
-  color: var(--moneva-teal);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .success-amount-card {
   display: flex;
   flex-direction: column;

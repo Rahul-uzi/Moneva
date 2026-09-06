@@ -34,22 +34,22 @@
 }
 
 .badge-healthy {
-  background-color: rgba(16, 185, 129, 0.15);
+  background-color: rgba(205, 255, 74, 0.15);
   color: var(--moneva-teal);
 }
 
 .badge-normal {
-  background-color: rgba(37, 99, 235, 0.15);
+  background-color: rgba(205, 255, 74, 0.15);
   color: var(--moneva-blue);
 }
 
 .badge-warning {
-  background-color: rgba(245, 158, 11, 0.15);
+  background-color: rgba(232, 182, 44, 0.15);
   color: var(--moneva-orange);
 }
 
 .badge-over {
-  background-color: rgba(255, 107, 107, 0.15);
+  background-color: rgba(255, 107, 74, 0.15);
   color: var(--moneva-coral);
 }
 

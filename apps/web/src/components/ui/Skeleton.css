@@ -1,0 +1,171 @@
+/* Placeholder blocks, sized and spaced like the cards they stand in for. */
+
+.sk-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sk-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* One shimmer, defined once. The tint rides across a flat base rather than
+   fading the whole block in and out, so a column of them does not pulse in
+   unison and read as a flashing screen. */
+.sk {
+  display: block;
+  flex: none;
+  background-color: var(--moneva-card-hover);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--moneva-overlay) 50%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: skSweep 1.5s ease-in-out infinite;
+}
+
+@keyframes skSweep {
+  from { background-position: 130% 0; }
+  to   { background-position: -30% 0; }
+}
+
+/* Cards keep the real card's edge and padding, so the page does not resettle
+   when the data arrives. */
+.sk-card {
+  background-color: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.sk-hero { gap: 12px; }
+
+.sk-divider {
+  display: block;
+  height: 1px;
+  background-color: var(--moneva-border);
+}
+
+.sk-split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.sk-col {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sk-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.sk-tabs {
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.sk-metrics {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+/* A row of items: icon, two lines of text, an amount on the right. */
+.sk-list-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.sk-list-row.is-tall { padding: 16px 14px; }
+
+.sk-list-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* The accounts strip scrolls sideways, so its cards are a fixed share of the
+   width rather than an even split. */
+.sk-account-row {
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.sk-account {
+  flex: none;
+  width: 62%;
+  max-width: 220px;
+  gap: 9px;
+}
+
+.sk-chart { gap: 14px; }
+
+.sk-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  height: 132px;
+}
+
+/* Shown only when a request is waiting on a server that has not answered. */
+.sk-waking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: var(--radius-md);
+  background-color: var(--moneva-overlay-weak);
+  border: 1px solid var(--moneva-border);
+  color: var(--moneva-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.sk-waking-pulse {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background-color: var(--moneva-blue);
+  animation: skPulse 1.3s ease-in-out infinite;
+}
+
+@keyframes skPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.72); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk {
+    animation: none;
+    background-image: none;
+  }
+  .sk-waking-pulse { animation: none; }
+}

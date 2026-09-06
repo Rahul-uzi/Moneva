@@ -61,8 +61,8 @@
 }
 
 .unread-card {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.1) 0%, var(--moneva-accent-panel-base) 100%);
-  border-color: rgba(37, 99, 235, 0.4);
+  background: linear-gradient(135deg, rgba(205, 255, 74, 0.1) 0%, var(--moneva-accent-panel-base) 100%);
+  border-color: rgba(205, 255, 74, 0.4);
 }
 
 .notif-item-header {
@@ -128,7 +128,7 @@
 }
 
 .mark-read-btn:hover {
-  background-color: rgba(16, 185, 129, 0.1);
+  background-color: rgba(205, 255, 74, 0.1);
 }
 
 .notif-item-card:nth-child(2) { animation-delay: 0.04s; }

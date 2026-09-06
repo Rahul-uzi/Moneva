@@ -1,0 +1,69 @@
+.account-card {
+  display: flex;
+  flex-direction: column;
+  /* Pushes the balance to the bottom so cards of differing name lengths line
+     their figures up with each other. */
+  /* No height:100% - stretching every card to the tallest one left a band of
+     empty space between the icon row and the figure. */
+  gap: 10px;
+  min-width: 0;
+}
+
+.account-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.account-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-asset { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); }
+.icon-liability { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); }
+
+.account-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--moneva-text-muted);
+  background-color: var(--moneva-overlay-weak);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Owed is a state worth seeing, so it is tinted rather than muted grey. */
+.badge-owed {
+  color: var(--moneva-text-on-danger);
+  background-color: rgba(255, 107, 107, 0.16);
+}
+
+.account-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* A long balance used to run to the very edge of a 240px card. */
+.account-details .number-lg {
+  font-size: clamp(18px, 5.2vw, 24px);
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+}
+
+.account-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  /* One line: a two-line name used to shove the balance out of alignment. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

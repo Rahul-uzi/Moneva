@@ -1,0 +1,82 @@
+.action-proposal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
+  border: 1px solid var(--moneva-violet);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin: 8px 0;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.2);
+}
+
+.proposal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--moneva-violet);
+  border-bottom: 1px solid rgba(124, 58, 237, 0.3);
+  padding-bottom: 8px;
+}
+
+.proposal-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.proposal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proposal-detail-row {
+  display: flex;
+  /* Top-aligned with a real gap: a long description used to wrap under the
+     label and overlap it, because neither side was allowed to shrink. */
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.proposal-detail-row .detail-label {
+  flex-shrink: 0;
+  color: var(--moneva-text-secondary);
+}
+
+.proposal-detail-row .detail-val {
+  min-width: 0;
+  flex: 1;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.proposal-error {
+  background-color: rgba(255, 107, 107, 0.15);
+  border: 1px solid var(--moneva-coral);
+  color: var(--moneva-text-on-danger);
+  padding: 8px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  text-align: center;
+}
+
+.proposal-actions {
+  display: flex;
+  align-items: stretch;
+  /* Wrap is the safety net: on a very narrow card the buttons stack rather
+     than overflow, since their labels are not allowed to break. */
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+/* Each button takes half the row and keeps its label on one line; "Confirm &
+   Execute" was wrapping onto three lines inside the narrow card. */
+.proposal-actions > button {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}

@@ -2,6 +2,7 @@ import React from 'react';
 import { WifiOff, RefreshCw } from 'lucide-react';
 import { Button } from './Button';
 import { Illustration } from './Illustration';
+import type { IllustrationName } from './Illustration';
 import './States.css';
 
 interface EmptyStateProps {
@@ -9,6 +10,12 @@ interface EmptyStateProps {
   description?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /**
+   * Which drawing to show. Every empty state in the app used to render the
+   * same wallet, whether it was about transactions, budgets or notifications;
+   * naming the subject is the whole point of having a set.
+   */
+  art?: IllustrationName;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
@@ -16,9 +23,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   description = 'There are no items recorded yet.',
   actionLabel,
   onAction,
+  art = 'ledger',
 }) => (
   <div className="state-container empty-state">
-    <Illustration name="empty" />
+    <Illustration name={art} />
     <h3 className="heading-sm">{title}</h3>
     <p className="text-body">{description}</p>
     {actionLabel && onAction && (

@@ -1,0 +1,41 @@
+.route-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background-color: var(--moneva-card);
+}
+
+/* A single sweeping highlight - cheap to composite, no layout work. */
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--moneva-overlay) 50%,
+    transparent 100%
+  );
+  animation: skeletonSweep 1.25s ease-in-out infinite;
+}
+
+@keyframes skeletonSweep {
+  to { transform: translateX(100%); }
+}
+
+.skeleton-hero { height: 132px; border-radius: var(--radius-lg); }
+.skeleton-card { height: 88px; }
+.skeleton-line { height: 14px; border-radius: var(--radius-sm); }
+.skeleton-line-short { width: 42%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
+}

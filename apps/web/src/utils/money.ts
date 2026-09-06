@@ -125,6 +125,29 @@ export function formatMonetaryValue(valOrAmount: Paise | MonetaryValue, currency
   return `${isNegative ? '-' : ''}${symbol}${formattedMajor}.${minorStr}`;
 }
 
+/** The parts of a formatted figure: sign, symbol, whole units, minor units. */
+export interface MoneyParts {
+  negative: boolean;
+  symbol: string;
+  major: string;
+  minor: string;
+}
+
+/**
+ * Splits what `formatMonetaryValue` produced back into its parts, so a figure
+ * can be SET rather than merely printed - the symbol and the paise want their
+ * own size and weight, and a mask needs to replace the digits without losing
+ * the currency.
+ *
+ * Returns null for anything it does not recognise, so the caller can fall back
+ * to the formatter's own string rather than dropping the amount.
+ */
+export function splitFormattedMoney(text: string): MoneyParts | null {
+  const parts = /^(-?)([^\d]+)([\d,]+)\.(\d{2})$/.exec(text);
+  if (!parts) return null;
+  return { negative: parts[1] === '-', symbol: parts[2].trim(), major: parts[3], minor: parts[4] };
+}
+
 /**
  * Safely adds two monetary values of the same currency using integer minor unit arithmetic.
  */

@@ -1,3 +1,19 @@
+/* Marks a row that arrived while this device was away. Deliberately quiet -
+   it is orientation, not an alert. */
+.tx-new {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--moneva-blue);
+  color: var(--moneva-on-brand);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
 .transaction-row {
   display: flex;
   align-items: center;
@@ -44,9 +60,9 @@
   flex-shrink: 0;
 }
 
-.tx-income { background-color: rgba(16, 185, 129, 0.15); color: var(--moneva-teal); }
-.tx-expense { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); }
-.tx-transfer { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); }
+.tx-income { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-teal); }
+.tx-expense { background-color: rgba(255, 107, 74, 0.15); color: var(--moneva-coral); }
+.tx-transfer { background-color: var(--moneva-overlay); color: var(--moneva-text-secondary); }
 
 .tx-info {
   display: flex;

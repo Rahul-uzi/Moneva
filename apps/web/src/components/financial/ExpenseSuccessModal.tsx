@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Modal } from '../ui/Modal';
+import { Illustration } from '../ui/Illustration';
 import { Button } from '../ui/Button';
 import { formatMonetaryValue } from '../../utils/money';
 import type { Transaction } from '../../types/api';
@@ -46,9 +47,7 @@ export const ExpenseSuccessModal: React.FC<ExpenseSuccessModalProps> = ({
   return (
     <Modal isOpen={!!transaction} onClose={onClose} title={copy.title}>
       <div className="expense-success-body">
-        <div className="success-icon-ring">
-          <CheckCircle2 size={40} />
-        </div>
+        <Illustration name="success" size={186} />
 
         <div className="success-amount-card">
           <span className={`text-label ${copy.tone} font-bold uppercase`}>{copy.label}</span>

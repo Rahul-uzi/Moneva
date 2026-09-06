@@ -8,7 +8,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
+  background: linear-gradient(135deg, rgba(205, 255, 74, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
   border: 1px solid var(--moneva-blue);
   border-radius: var(--radius-md);
   padding: 12px;
@@ -39,7 +39,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background-color: rgba(16, 185, 129, 0.15);
+  background-color: rgba(205, 255, 74, 0.15);
   color: var(--moneva-teal);
   display: flex;
   align-items: center;

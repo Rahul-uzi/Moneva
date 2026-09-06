@@ -1,0 +1,87 @@
+.salary-usage-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.salary-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.salary-pct {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--moneva-text-on-info);
+  background-color: rgba(37, 99, 235, 0.18);
+  border-radius: var(--radius-full);
+  padding: 3px 9px;
+}
+.salary-pct.is-over {
+  color: var(--moneva-text-on-danger);
+  background-color: rgba(255, 107, 107, 0.18);
+}
+
+.salary-amounts {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.salary-amount {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.salary-bar-track {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--moneva-overlay-strong);
+  overflow: hidden;
+}
+
+.salary-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--moneva-teal), var(--moneva-blue));
+  /* Animates from empty on mount, and again whenever the figure changes. */
+  transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.salary-bar-fill.is-over {
+  background: linear-gradient(90deg, var(--moneva-orange), var(--moneva-coral));
+}
+
+.salary-remaining {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.salary-remaining strong {
+  margin-left: auto;
+}
+
+.salary-breakdown {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.salary-setup-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--moneva-blue);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

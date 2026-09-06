@@ -1,0 +1,317 @@
+/* Above the bottom nav (100) and modals (1000), below the welcome slideshow
+   (1500) so the two can never fight for the screen. */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  /* Blocks taps on the app underneath while the tour is up. */
+  touch-action: pan-y;
+}
+
+/* ---------- the backdrop ---------- */
+/* One layer frosts AND dims the app beneath the tour, clipped by an even-odd
+   path from the component so the spotlit element stays sharp and undimmed.
+   Doing both here matters: the dim used to be a 9999px box-shadow on the
+   spotlight, which repainted most of the screen on every frame the hole moved.
+
+   The soft focus is not done here. A full-screen backdrop-filter is
+   recomputed on every frame the page produces - every frame, with a scene
+   animating beside it - and measured at about a quarter of the frame budget on
+   a mid-range phone. The page's own elements are blurred instead (.tour-frost,
+   applied by the component), which rasterises once and then costs nothing to
+   hold. This layer carries the dim and the hole. */
+.tour-blur {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(8, 12, 24, 0.58);
+  opacity: 0;
+  transition: opacity 0.25s ease, clip-path 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Tapping it leaves the tour, so it has to receive the tap. It used to be
+     click-through, which meant that past step 1 - where the left button
+     becomes "Restart" - a phone had no way out of the tour at all. */
+  pointer-events: auto;
+  cursor: pointer;
+}
+.tour-blur.is-ready {
+  opacity: 1;
+}
+
+/* ---------- the spotlight ---------- */
+.tour-spotlight {
+  position: fixed;
+  border-radius: 16px;
+  opacity: 0;
+  /* Moving the box moves the hole; this carries it between steps. The radius
+     transitions too, so a box target morphs into a pill rather than snapping. */
+  transition:
+    top 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+    left 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+    width 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+    height 0.3s cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-radius 0.3s ease,
+    opacity 0.2s ease;
+  pointer-events: none;
+}
+.tour-spotlight.is-ready {
+  opacity: 1;
+}
+
+/* A white ring that breathes: "look here", not "cut out". The pulse is a
+   second ring scaling and fading - transform and opacity only, so it runs on
+   the compositor. Animating box-shadow spread instead repainted the ring's
+   whole neighbourhood 60 times a second. */
+.tour-spotlight-ring {
+  position: absolute;
+  inset: -3px;
+  border: 2.5px solid #FFFFFF;
+  transition: border-radius 0.3s ease;
+}
+.tour-spotlight-ring::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2.5px solid rgba(255, 255, 255, 0.55);
+  transform-origin: center;
+  animation: tourPulse 1.8s ease-out infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes tourPulse {
+  0%   { transform: scale(1); opacity: 0.55; }
+  70%  { transform: scale(1.055); opacity: 0; }
+  100% { transform: scale(1.055); opacity: 0; }
+}
+
+/* ---------- the card ---------- */
+/* A dark panel in both themes: it is a guide laid over the app, not part of
+   the page, and the scenes are drawn for a dark ground. Text is white on navy
+   whichever theme the app is in. */
+.tour-card {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  overflow: hidden;
+  border-radius: 22px;
+  background-color: #0E1B3D;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  animation-duration: 0.32s;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: forwards;
+}
+.tour-card.is-ready.tour-card-from-right { animation-name: tourCardInRight; }
+.tour-card.is-ready.tour-card-from-left  { animation-name: tourCardInLeft; }
+/* Put up centred while a slow screen loads, then glides to its place. */
+.tour-card.tour-card-glide { transition: top 0.32s cubic-bezier(0.22, 0.61, 0.36, 1); }
+
+/* A little further, and settling out of a slight shrink, so each card reads as
+   arriving rather than cutting. Transform and opacity only. */
+@keyframes tourCardInRight {
+  from { opacity: 0; transform: translate3d(34px, 0, 0) scale(0.965); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tourCardInLeft {
+  from { opacity: 0; transform: translate3d(-34px, 0, 0) scale(0.965); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------- scene ---------- */
+/* A line drawing needs a stage of its own, or it reads as floating type. */
+.tour-scene {
+  position: relative;
+  line-height: 0;
+  padding: 16px 0 10px;
+  display: flex;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  /* The card is navy in BOTH themes, so the drawings inside cannot take their
+     ground from the page. Restated here, on the container, which every scene
+     inherits from. */
+  --illo-panel: rgba(205, 255, 74, 0.07);
+  --illo-back: rgba(205, 255, 74, 0.07);
+  --illo-fill: rgba(205, 255, 74, 0.17);
+  --illo-area: rgba(205, 255, 74, 0.13);
+  --illo-trackwash: rgba(205, 255, 74, 0.18);
+  --illo-facefill: #0E1B3D;
+  --illo-shadowfill: rgba(0, 0, 0, 0.4);
+  /* Night values whichever theme the app is in. This used to be a list of
+     twenty `.tour-scene .illo-*` rules, which lost to `:root[data-theme]
+     .moneva-illustration ...` on specificity and drew the scenes in the
+     page's colours - and needed a new line for every class a drawing added. */
+  --illo-accent: #CDFF4A;
+  --illo-warnc: #FF6B4A;
+  --illo-knockout: #0E1B3D;
+}
+.tour-scene .moneva-illustration {
+  width: 64%;
+  max-width: 210px;
+  height: auto;
+}
+
+/* Mirrors the step badge across the scene: leave on the left, position on
+   the right. 34px square, so it clears the 44px touch minimum with the
+   scene's own padding around it. */
+.tour-close {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color 0.18s ease, transform 0.14s ease;
+}
+.tour-close:active { transform: scale(0.94); }
+.tour-close:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-close:active { transform: none; }
+}
+
+.tour-scene-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-full);
+}
+
+/* ---------- copy ---------- */
+.tour-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px 0;
+  min-width: 0;
+}
+
+.tour-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #FFFFFF;
+}
+
+.tour-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* ---------- progress dots ---------- */
+.tour-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin: 12px 0 8px;
+}
+.tour-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background-color: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: width 0.25s ease, background-color 0.25s ease;
+}
+.tour-dot.is-done   { background-color: rgba(255, 255, 255, 0.5); }
+.tour-dot.is-active { width: 20px; background-color: #FFFFFF; }
+
+/* ---------- actions: Restart · n of N · Next ---------- */
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+.tour-counter {
+  flex: 1;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.85);
+}
+.tour-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.14s ease, background-color 0.18s ease, opacity 0.18s ease;
+}
+.tour-btn:active { transform: scale(0.97); }
+/* Restart / Skip is plain text, as in the reference. */
+.tour-btn-text {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  color: #FFFFFF;
+  background: none;
+  border: 0;
+}
+.tour-btn-icon {
+  flex: 0 0 auto;
+  width: 44px;
+  padding: 0;
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+/* The primary action is a white pill with dark text, as in the reference. */
+.tour-btn-primary {
+  flex: 0 0 auto;
+  min-width: 104px;
+  color: #0E1B3D;
+  background-color: #FFFFFF;
+  border: 1px solid #FFFFFF;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-blur { transition: opacity 0.2s ease; }
+  .tour-spotlight { transition: opacity 0.2s ease; }
+  .tour-spotlight-ring::after { animation: none; opacity: 0; }
+  .tour-card.is-ready { animation: none; opacity: 1; }
+  .tour-btn:active { transform: none; }
+}
+
+/* ---------- the frosted page ---------- */
+/* Put on every element around the step's target while the tour is up. A
+   static filter: the browser draws each subtree once and reuses it, unlike a
+   backdrop-filter, which redraws with every frame. No transition on the
+   filter itself - animating a blur radius means re-rasterising the subtree on
+   every frame of the animation, which is the cost this avoids. */
+.tour-frost {
+  filter: blur(5px);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-frost { filter: blur(3px); }
+}

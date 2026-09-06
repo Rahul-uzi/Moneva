@@ -1,0 +1,75 @@
+.moneva-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-family);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  outline: none;
+}
+
+.moneva-btn:active {
+  transform: scale(0.97);
+}
+
+.moneva-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--moneva-blue), #1D4ED8);
+  color: var(--moneva-white);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.btn-secondary {
+  background-color: var(--moneva-surface);
+  /* Was --moneva-white, a locked brand token that does NOT swap with the theme.
+     On the light surface (#FFFFFF) that is 1.00:1 - the label was invisible. */
+  color: var(--moneva-text-main);
+  border: 1px solid var(--moneva-border);
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, var(--moneva-teal), #059669);
+  color: var(--moneva-white);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--moneva-coral), #DC2626);
+  color: var(--moneva-white);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--moneva-text-secondary);
+}
+.btn-ghost:hover {
+  color: var(--moneva-text-main);
+  background-color: var(--moneva-overlay-weak);
+}
+
+.btn-sm { padding: 8px 14px; font-size: 13px; }
+.btn-md { padding: 12px 20px; font-size: 15px; }
+.btn-lg { padding: 16px 24px; font-size: 16px; }
+
+.btn-full { width: 100%; }
+
+.btn-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--moneva-white);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

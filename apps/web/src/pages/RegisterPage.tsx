@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
-import logoMark from '../assets/logo/MONEVA_Logo_Mark_FullColor.png';
+import { Logo } from '../components/ui/Logo';
+import { Illustration } from '../components/ui/Illustration';
 import { FormField } from '../components/ui/FormField';
 import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -63,7 +64,8 @@ export const RegisterPage: React.FC = () => {
     <div className="auth-viewport">
       <div className="auth-card">
         <div className="auth-header">
-          <img src={logoMark} alt="MONEVA" className="auth-logo" />
+          <Logo tile className="auth-logo" />
+          <Illustration name="welcome" size={188} />
           <h1 className="heading-lg">Create Account</h1>
           <p className="text-body">Join MONEVA Personal Finance</p>
         </div>

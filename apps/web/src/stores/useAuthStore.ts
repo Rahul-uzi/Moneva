@@ -9,7 +9,7 @@ import {
   setCachedUser,
   hydrateSessionFromNative,
   isAccessTokenExpired,
-  refreshSession,
+  refreshSessionShared,
 } from '../services/apiClient';
 import type { AxiosError } from 'axios';
 
@@ -167,7 +167,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     try {
       if (isAccessTokenExpired(tokens)) {
-        tokens = await refreshSession();
+        // Through the shared gate, not straight at the endpoint: restoring
+        // the session runs at the same moment the first requests go out, and
+        // those renew the same expired token via the interceptor. Calling the
+        // unguarded version here put two refreshes on the wire at launch.
+        tokens = await refreshSessionShared();
       }
 
       const userRes = await apiClient.get<User>('/auth/me');

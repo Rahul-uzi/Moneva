@@ -37,11 +37,11 @@
   text-transform: uppercase;
 }
 
-.status-upcoming-badge { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); border: 1px solid var(--moneva-blue); }
-.status-paid-badge { background-color: rgba(16, 185, 129, 0.15); color: var(--moneva-teal); border: 1px solid var(--moneva-teal); }
-.status-overdue-badge { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); border: 1px solid var(--moneva-coral); }
-.status-due-today-badge { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); border: 1px solid var(--moneva-orange); }
-.status-due-soon-badge { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); border: 1px solid var(--moneva-orange); }
+.status-upcoming-badge { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-blue); border: 1px solid var(--moneva-blue); }
+.status-paid-badge { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-teal); border: 1px solid var(--moneva-teal); }
+.status-overdue-badge { background-color: rgba(255, 107, 74, 0.15); color: var(--moneva-coral); border: 1px solid var(--moneva-coral); }
+.status-due-today-badge { background-color: rgba(232, 182, 44, 0.15); color: var(--moneva-orange); border: 1px solid var(--moneva-orange); }
+.status-due-soon-badge { background-color: rgba(232, 182, 44, 0.15); color: var(--moneva-orange); border: 1px solid var(--moneva-orange); }
 
 .bill-amount-display {
   display: flex;

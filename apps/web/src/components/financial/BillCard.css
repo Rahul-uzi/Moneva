@@ -14,7 +14,7 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background-color: rgba(245, 158, 11, 0.15);
+  background-color: rgba(232, 182, 44, 0.15);
   color: var(--moneva-orange);
   display: flex;
   align-items: center;
@@ -69,11 +69,11 @@
   text-transform: uppercase;
 }
 
-.status-upcoming { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); }
-.status-paid { background-color: rgba(16, 185, 129, 0.15); color: var(--moneva-teal); }
-.status-overdue { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); }
-.status-due-today { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); }
-.status-due-soon { background-color: rgba(245, 158, 11, 0.15); color: var(--moneva-orange); }
+.status-upcoming { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-blue); }
+.status-paid { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-teal); }
+.status-overdue { background-color: rgba(255, 107, 74, 0.15); color: var(--moneva-coral); }
+.status-due-today { background-color: rgba(232, 182, 44, 0.15); color: var(--moneva-orange); }
+.status-due-soon { background-color: rgba(232, 182, 44, 0.15); color: var(--moneva-orange); }
 
 .bill-footer {
   display: flex;

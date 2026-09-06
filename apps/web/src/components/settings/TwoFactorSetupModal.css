@@ -105,7 +105,7 @@
 
 .tfa-warning {
   color: var(--moneva-text-on-warning);
-  background-color: rgba(245, 158, 11, 0.15);
+  background-color: rgba(232, 182, 44, 0.15);
   border: 1px solid var(--moneva-orange);
   border-radius: var(--radius-sm);
   padding: 10px;

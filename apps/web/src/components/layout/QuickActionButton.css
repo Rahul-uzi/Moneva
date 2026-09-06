@@ -1,19 +1,30 @@
+/* Raised out of the dock it sits in. The lift is a plain drop shadow, not a
+   voltage bloom - the direction has no glows, and a coloured halo around an
+   already-saturated fill only muddies its edge. */
 .quick-action-btn {
+  /* Never shrinks. In a flex row `width` is a starting size, not a minimum,
+     so without this the button deforms into an oval whenever the open tab's
+     label makes the row overflow. */
+  flex: none;
   width: 54px;
   height: 54px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--moneva-blue), var(--moneva-violet));
-  color: var(--moneva-white);
-  border: 3px solid var(--moneva-bg);
+  background: var(--moneva-blue);
+  color: var(--moneva-on-brand);
+  border: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
-  transition: var(--transition-fast);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.5, 1), box-shadow 0.22s ease;
   transform: translateY(-16px);
 }
 
 .quick-action-btn:active {
   transform: translateY(-16px) scale(0.92);
+}
+
+:root[data-theme="light"] .quick-action-btn {
+  box-shadow: 0 8px 18px rgba(10, 11, 13, 0.18);
 }

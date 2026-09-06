@@ -24,7 +24,7 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: rgba(124, 58, 237, 0.2);
+  background: rgba(205, 255, 74, 0.2);
   border: 1px solid var(--moneva-violet);
   display: flex;
   align-items: center;
@@ -34,7 +34,7 @@
 .assistant-logo-mark {
   width: 26px;
   height: 26px;
-  object-fit: contain;
+  color: var(--moneva-blue);
 }
 
 .assistant-header-text {
@@ -62,7 +62,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: rgba(245, 158, 11, 0.15);
+  background-color: rgba(232, 182, 44, 0.15);
   border: 1px solid var(--moneva-orange);
   color: var(--moneva-text-on-warning);
   padding: 8px 12px;
@@ -142,7 +142,7 @@
 }
 
 .chip-primary {
-  background: rgba(124, 58, 237, 0.15);
+  background: rgba(205, 255, 74, 0.15);
   border-color: var(--moneva-violet);
   color: var(--moneva-text-on-accent);
 }
@@ -170,7 +170,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background-color: rgba(124, 58, 237, 0.15);
+  background-color: rgba(205, 255, 74, 0.15);
   color: var(--moneva-violet);
   display: flex;
   align-items: center;
@@ -211,9 +211,10 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: rgba(124, 58, 237, 0.2);
+  background: var(--moneva-overlay-weak);
   padding: 4px;
-  border: 1px solid var(--moneva-violet);
+  border: 1px solid var(--moneva-border);
+  color: var(--moneva-blue);
 }
 
 .message-bubble {
@@ -228,7 +229,7 @@
 
 .user-msg .message-bubble {
   background-color: var(--moneva-blue);
-  color: var(--moneva-white);
+  color: var(--moneva-on-brand);
   border-bottom-right-radius: 4px;
 }
 
@@ -382,7 +383,7 @@
   border-radius: 50%;
   cursor: pointer;
   background-color: var(--moneva-violet);
-  color: var(--moneva-white);
+  color: var(--moneva-on-brand);
   transition: var(--transition-fast);
 }
 .send-btn:disabled {

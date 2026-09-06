@@ -44,6 +44,13 @@ export const useCountUp = (target: number, durationMs = 650): number => {
     return () => {
       if (frame.current !== null) cancelAnimationFrame(frame.current);
       window.clearTimeout(settle);
+      // Undo the guard along with the work it was guarding. StrictMode mounts,
+      // cleans up, and mounts again; leaving this set meant the second mount
+      // took the early return above, no frame was ever scheduled, and the
+      // figure stayed at zero for good. Replay-on-target-change is already
+      // prevented by the effect's deps, so the ref only needs to survive
+      // within a single mount.
+      started.current = false;
     };
   }, [durationMs]);
 

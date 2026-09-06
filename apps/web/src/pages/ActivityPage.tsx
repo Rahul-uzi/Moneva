@@ -5,8 +5,9 @@ import { TransactionRow } from '../components/financial/TransactionRow';
 import { TransactionDetailModal } from '../components/financial/TransactionDetailModal';
 import { TransactionEditModal } from '../components/financial/TransactionEditModal';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
-import { LoadingState, ErrorState, EmptyState } from '../components/ui/States';
-import { apiClient } from '../services/apiClient';
+import { ErrorState, EmptyState } from '../components/ui/States';
+import { ActivitySkeleton } from '../components/ui/Skeleton';
+import { apiClient, describeApiError } from '../services/apiClient';
 import { formatMonetaryValue } from '../utils/money';
 import { useUiStore } from '../stores/useUiStore';
 import type { Transaction, Account, Category } from '../types/api';
@@ -53,7 +54,7 @@ export const ActivityPage: React.FC = () => {
       }
     } catch (err: unknown) {
       if (isMounted) {
-        const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to load activity log.';
+        const msg = describeApiError(err, 'Failed to load activity log.');
         setError(msg);
       }
     } finally {
@@ -198,7 +199,7 @@ export const ActivityPage: React.FC = () => {
     }
   };
 
-  if (isLoading) return <LoadingState message="Loading transaction activity..." />;
+  if (isLoading) return <ActivitySkeleton />;
   if (error) return <ErrorState title="Activity Error" message={error} onRetry={() => void fetchActivityData(true)} />;
 
   return (
@@ -225,7 +226,7 @@ export const ActivityPage: React.FC = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="activity-filter-tabs">
+      <div className="activity-filter-tabs" data-tour="activity-tabs">
         <button
           type="button"
           className={`filter-tab ${activeTab === 'all' ? 'tab-active-all' : ''}`}
@@ -257,7 +258,10 @@ export const ActivityPage: React.FC = () => {
       </div>
 
       {/* Search + period */}
-      <div className="activity-search-box">
+      {/* The tour highlights the whole field, icon included: anchored on the
+          input alone the magnifier sat outside the highlight and was blurred
+          with the rest of the page. */}
+      <div className="activity-search-box" data-tour="activity-search">
         <Search size={16} className="search-icon" />
         <input
           type="text"
@@ -286,6 +290,7 @@ export const ActivityPage: React.FC = () => {
       {/* Grouped Transactions List */}
       {filteredTransactions.length === 0 ? (
         <EmptyState
+          art="ledger"
           title="No Transactions Found"
           description={
             searchQuery || activeTab !== 'all'

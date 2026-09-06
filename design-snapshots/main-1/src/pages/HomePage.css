@@ -1,0 +1,303 @@
+.home-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 24px;
+}
+
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.accounts-scroll-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  /* A scroll container clips to its content box, and the card shadow needs
+     22px (6px offset + 16px blur). With none, the shadow was cut off flush at
+     every edge and the card read as a hard rectangle beside the floating cards
+     above it. The negative margin cancels the padding so the cards stay lined
+     up with the rest of the page. */
+  padding: 20px 20px 22px;
+  margin: -20px -20px -16px;
+  /* Snapping ignores padding unless told otherwise: mandatory snap pulled the
+     first card flush to the container edge, eating the 20px of shadow room and
+     leaving it 20px out of line with every other card on the page. */
+  scroll-padding: 0 20px;
+}
+.accounts-scroll-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.account-scroll-item {
+  /* Grows to share the row when there are only one or two accounts, instead
+     of sitting at a fixed 240px and leaving the rest of the row empty. */
+  flex: 1 1 240px;
+  min-width: 240px;
+  max-width: 100%;
+  scroll-snap-align: start;
+}
+
+.vertical-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------------------
+   MOTION
+   Sections now paint as their own request lands, so each one arrives on its
+   own rather than the whole page appearing at once. backwards, not both: a
+   retained identity transform would make a section a containing block for any
+   fixed-position descendant.
+   --------------------------------------------------------------------------- */
+.home-section,
+.home-container > *:not(.home-section) {
+  animation: homeSectionIn 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.home-container > *:nth-child(1) { animation-delay: 0.02s; }
+.home-container > *:nth-child(2) { animation-delay: 0.07s; }
+.home-container > *:nth-child(3) { animation-delay: 0.12s; }
+.home-container > *:nth-child(4) { animation-delay: 0.17s; }
+.home-container > *:nth-child(5) { animation-delay: 0.22s; }
+.home-container > *:nth-child(6) { animation-delay: 0.27s; }
+.home-container > *:nth-child(n + 7) { animation-delay: 0.3s; }
+
+@keyframes homeSectionIn {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Cards inside a list cascade rather than snapping in together. */
+.vertical-cards-list > *,
+.transactions-list > *,
+.account-scroll-item {
+  animation: homeCardIn 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.vertical-cards-list > *:nth-child(2),
+.transactions-list > *:nth-child(2),
+.account-scroll-item:nth-child(2) { animation-delay: 0.06s; }
+.vertical-cards-list > *:nth-child(3),
+.transactions-list > *:nth-child(3),
+.account-scroll-item:nth-child(3) { animation-delay: 0.12s; }
+.transactions-list > *:nth-child(4),
+.account-scroll-item:nth-child(4) { animation-delay: 0.18s; }
+.transactions-list > *:nth-child(n + 5),
+.account-scroll-item:nth-child(n + 5) { animation-delay: 0.24s; }
+
+@keyframes homeCardIn {
+  from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Press feedback on the cards that are actually tappable. */
+.account-scroll-item > *:active,
+.vertical-cards-list > *:active {
+  transform: scale(0.985);
+}
+
+.account-scroll-item > *,
+.vertical-cards-list > * {
+  transition: transform 0.14s ease;
+}
+
+/* The scroll row keeps momentum on a touch device and does not drag the page
+   with it when it reaches the end. */
+.accounts-scroll-row {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-section,
+  .home-container > *,
+  .vertical-cards-list > *,
+  .transactions-list > *,
+  .account-scroll-item {
+    animation: none;
+  }
+  .account-scroll-item > *:active,
+  .vertical-cards-list > *:active {
+    transform: none;
+  }
+}
+
+
+/* ---------------------------------------------------------------------------
+   NEUMORPHISM (home screen only)
+
+   The effect is two opposing shadows - a light one where the notional light
+   falls and a darker one opposite - over a surface that shares the page's
+   colour. Scoped to .home-container so the rest of the app keeps its current
+   treatment.
+
+   Text colours are deliberately untouched: the surface barely shifts, so every
+   figure keeps the contrast it already passed.
+   --------------------------------------------------------------------------- */
+.home-container {
+  /* White cards on the tinted page. Classic neumorphism tints the card to
+     match its background; keeping the card white instead holds the figures
+     legible, and the paired shadows still do the lifting because the page
+     behind them is not white. */
+  --neu-surface: #FFFFFF;
+  --neu-light: #FFFFFF;
+  --neu-dark: rgba(148, 163, 184, 0.34);
+  --neu-distance: 6px;
+  --neu-blur: 16px;
+}
+
+/* Dark mode cannot use the same recipe. The canvas is true black, and no
+   shadow can be darker than #000 - the "dark" half of the pair would be
+   invisible. The surface is lifted off black instead and carries a soft top
+   highlight, so the card still reads as raised without abandoning the
+   true-black canvas. */
+/* Dark mode uses the app's own black.
+
+   Neumorphism needs a mid-tone base to cast an opposing pair of shadows, and
+   nothing can be darker than #000 - so on this canvas the dark half of the
+   pair is invisible and the effect only half works. Rather than ship an
+   imitation, dark mode uses the surface every other page already uses, and
+   home stops being a different shade of black from Plan or Activity. The
+   neumorphic treatment stays in light mode, where it reads properly. */
+:root[data-theme="dark"] .home-container {
+  --neu-surface: var(--moneva-card);
+  --neu-light: transparent;
+  --neu-dark: transparent;
+  --neu-distance: 0px;
+  --neu-blur: 0px;
+}
+
+.home-container .moneva-card,
+.home-container .account-card,
+.home-container .budget-card,
+.home-container .goal-card,
+.home-container .bill-card {
+  background: var(--neu-surface);
+  background-image: none;
+  border: 1px solid transparent;
+  box-shadow:
+    calc(var(--neu-distance) * -1) calc(var(--neu-distance) * -1) var(--neu-blur) var(--neu-light),
+    var(--neu-distance) var(--neu-distance) var(--neu-blur) var(--neu-dark);
+}
+
+/* Exactly .card-surface, so a home card and a Plan card are the same object. */
+:root[data-theme="dark"] .home-container .moneva-card,
+:root[data-theme="dark"] .home-container .account-card,
+:root[data-theme="dark"] .home-container .budget-card,
+:root[data-theme="dark"] .home-container .goal-card,
+:root[data-theme="dark"] .home-container .bill-card {
+  background: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+  box-shadow: none;
+}
+
+/* A track reads as recessed by sitting darker than its card, which is how the
+   rest of the app does it; an inset highlight would be invisible on black. */
+:root[data-theme="dark"] .home-container .salary-bar-track,
+:root[data-theme="dark"] .home-container .budget-progress-bar,
+:root[data-theme="dark"] .home-container .goal-progress-bar {
+  background: var(--moneva-bg);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .home-container .account-icon,
+:root[data-theme="dark"] .home-container .goal-icon,
+:root[data-theme="dark"] .home-container .summary-icon-box {
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .home-container .card-interactive:active {
+  box-shadow: none;
+  transform: scale(0.985);
+}
+
+/* Pressing pushes the card in rather than lifting it, which is the whole point
+   of the style: the same two shadows, inset. */
+.home-container .card-interactive:active {
+  transform: none;
+  box-shadow:
+    inset calc(var(--neu-distance) * -1) calc(var(--neu-distance) * -1)
+      calc(var(--neu-blur) - 4px) var(--neu-light),
+    inset var(--neu-distance) var(--neu-distance) calc(var(--neu-blur) - 4px) var(--neu-dark);
+}
+
+/* Progress tracks are carved into the surface; their fills stay raised so the
+   value still reads as a solid bar. */
+.home-container .salary-bar-track,
+.home-container .budget-progress-bar,
+.home-container .goal-progress-bar {
+  /* Slightly tinted: an inset shadow is invisible on a pure white track. */
+  background: #EDF1F7;
+  box-shadow:
+    inset 2px 2px 4px var(--neu-dark),
+    inset -2px -2px 4px var(--neu-light);
+}
+
+/* The round icon tiles read as small raised buttons. */
+.home-container .account-icon,
+.home-container .goal-icon,
+.home-container .summary-icon-box {
+  box-shadow:
+    -3px -3px 6px var(--neu-light),
+    3px 3px 6px var(--neu-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-container .card-interactive:active {
+    box-shadow:
+      calc(var(--neu-distance) * -1) calc(var(--neu-distance) * -1) var(--neu-blur) var(--neu-light),
+      var(--neu-distance) var(--neu-distance) var(--neu-blur) var(--neu-dark);
+  }
+}
+
+
+/* "See all" in a section header. Sized as a real touch target rather than a
+   bare text link, since it sits beside a heading on a phone. */
+.section-see-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 2px 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--moneva-blue);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.14s ease;
+}
+
+.section-see-all:active {
+  transform: scale(0.96);
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-see-all:active { transform: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   DARK MODE USES THE APP'S OWN BLACK
+
+   The charcoal experiment is gone: home now sits on the same pure black as
+   Plan, Activity and Profile, with the same card colour and border, so moving
+   between tabs no longer changes the shade of the page.
+
+   Neumorphism proper is a light-mode treatment here. It needs a mid-tone base
+   to cast an opposing pair of shadows, and on #000 the dark half is invisible
+   - so in dark mode the cards use the app's established surface instead of a
+   half-working imitation.
+   --------------------------------------------------------------------------- */

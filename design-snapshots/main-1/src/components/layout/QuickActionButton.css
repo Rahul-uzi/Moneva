@@ -1,0 +1,32 @@
+/* Raised out of the glass bar it sits in. The ring used to be painted in the
+   page background colour, which worked while the bar was opaque and the same
+   colour; over glass it drew a solid disc through the frosting. It is now a
+   translucent rim, so whatever scrolls past shows through the gap. */
+.quick-action-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--moneva-blue), var(--moneva-violet));
+  color: var(--moneva-white);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 8px 22px rgba(37, 99, 235, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.5, 1), box-shadow 0.22s ease;
+  transform: translateY(-16px);
+}
+
+.quick-action-btn:active {
+  transform: translateY(-16px) scale(0.92);
+}
+
+:root[data-theme="light"] .quick-action-btn {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 8px 20px rgba(37, 99, 235, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}

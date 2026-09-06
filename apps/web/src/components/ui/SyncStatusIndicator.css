@@ -17,27 +17,27 @@
 }
 
 .sync-state-syncing {
-  background-color: rgba(37, 99, 235, 0.15);
+  background-color: rgba(205, 255, 74, 0.15);
   color: var(--moneva-blue);
-  border-color: rgba(37, 99, 235, 0.3);
+  border-color: rgba(205, 255, 74, 0.3);
 }
 
 .sync-state-offline {
-  background-color: rgba(245, 158, 11, 0.15);
+  background-color: rgba(232, 182, 44, 0.15);
   color: var(--moneva-orange);
-  border-color: rgba(245, 158, 11, 0.3);
+  border-color: rgba(232, 182, 44, 0.3);
 }
 
 .sync-state-sync_error {
-  background-color: rgba(255, 107, 107, 0.15);
+  background-color: rgba(255, 107, 74, 0.15);
   color: var(--moneva-coral);
-  border-color: rgba(255, 107, 107, 0.3);
+  border-color: rgba(255, 107, 74, 0.3);
 }
 
 .sync-state-online {
-  background-color: rgba(16, 185, 129, 0.15);
+  background-color: rgba(205, 255, 74, 0.15);
   color: var(--moneva-teal);
-  border-color: rgba(16, 185, 129, 0.3);
+  border-color: rgba(205, 255, 74, 0.3);
 }
 
 .spin-icon {

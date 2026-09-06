@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { readBalancesHidden, writeBalancesHidden } from '../services/balancePrivacy';
 
 export interface ToastMessage {
   id: string;
@@ -8,6 +9,9 @@ export interface ToastMessage {
 
 interface UiState {
   isOnline: boolean;
+  /** Masks every displayed holding. Remembered on this device. */
+  balancesHidden: boolean;
+  toggleBalances: () => void;
   toasts: ToastMessage[];
   addToast: (message: string, type?: ToastMessage['type']) => void;
   removeToast: (id: string) => void;
@@ -16,7 +20,15 @@ interface UiState {
 
 export const useUiStore = create<UiState>((set) => ({
   isOnline: navigator.onLine,
+  balancesHidden: readBalancesHidden(),
   toasts: [],
+
+  toggleBalances: () =>
+    set((state) => {
+      const balancesHidden = !state.balancesHidden;
+      writeBalancesHidden(balancesHidden);
+      return { balancesHidden };
+    }),
 
   addToast: (message, type = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);

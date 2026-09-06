@@ -24,8 +24,8 @@
   justify-content: center;
 }
 
-.icon-asset { background-color: rgba(37, 99, 235, 0.15); color: var(--moneva-blue); }
-.icon-liability { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); }
+.icon-asset { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-blue); }
+.icon-liability { background-color: rgba(255, 107, 74, 0.15); color: var(--moneva-coral); }
 
 .account-type-badge {
   font-size: 10px;
@@ -40,7 +40,7 @@
 /* Owed is a state worth seeing, so it is tinted rather than muted grey. */
 .badge-owed {
   color: var(--moneva-text-on-danger);
-  background-color: rgba(255, 107, 107, 0.16);
+  background-color: rgba(255, 107, 74, 0.16);
 }
 
 .account-details {

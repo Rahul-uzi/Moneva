@@ -1,0 +1,155 @@
+.recurring-salary-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.distinction-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid var(--moneva-blue);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  color: var(--moneva-text-main);
+}
+
+.notice-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.rules-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rules-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.empty-rules-box {
+  background-color: var(--moneva-surface);
+  border: 1px dashed var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rule-card {
+  /* Stacked, not side by side. On a phone the "Received Today" button and the
+     source name were fighting for the same row: neither could shrink, so the
+     name broke to three characters a line and the actions overlapped it. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+.rule-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* One line, ellipsised. A long payroll name used to wrap and shove every other
+   element out of place. */
+.rule-source {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rule-title-row .number-sm {
+  flex-shrink: 0;
+}
+
+.rule-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+
+.rule-date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rule-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--moneva-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  transition: var(--transition-fast);
+}
+
+.icon-delete-btn:hover {
+  color: var(--moneva-coral);
+  background-color: rgba(255, 107, 107, 0.1);
+}
+
+.add-rule-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.form-action-btns {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Actions get their own full-width row beneath the detail. */
+.rule-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.rule-card-actions > button:first-child {
+  flex: 1;
+}

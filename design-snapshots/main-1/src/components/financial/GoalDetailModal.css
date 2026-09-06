@@ -1,0 +1,129 @@
+.goal-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.goal-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.goal-detail-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.goal-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.goal-status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge-not-started {
+  background-color: rgba(148, 163, 184, 0.15);
+  color: var(--moneva-text-secondary);
+  border: 1px solid var(--moneva-text-secondary);
+}
+
+.badge-in-progress {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: var(--moneva-blue);
+  border: 1px solid var(--moneva-blue);
+}
+
+.badge-near-target {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--moneva-orange);
+  border: 1px solid var(--moneva-orange);
+}
+
+.badge-completed {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--moneva-teal);
+  border: 1px solid var(--moneva-teal);
+}
+
+.goal-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.detail-progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.detail-progress-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background-color: var(--moneva-overlay-strong);
+  overflow: hidden;
+}
+
+.detail-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--moneva-violet), var(--moneva-teal));
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.contributions-history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.empty-contributions-box {
+  background-color: var(--moneva-surface);
+  border: 1px dashed var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.contributions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.goal-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.left-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

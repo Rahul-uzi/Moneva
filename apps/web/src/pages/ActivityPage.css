@@ -232,9 +232,12 @@
 }
 
 .activity-period-select:focus-visible {
+  outline: none;
+}
+
+.period-chip:focus-within {
   outline: 2px solid var(--moneva-blue);
   outline-offset: 2px;
-  border-radius: var(--radius-full);
 }
 
 @media (prefers-reduced-motion: reduce) {

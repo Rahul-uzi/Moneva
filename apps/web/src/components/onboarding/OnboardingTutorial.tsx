@@ -1,34 +1,41 @@
 import React from 'react';
 import { ArrowRight, Check } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { TutorialArt } from './TutorialArt';
-import type { TutorialArtName } from './TutorialArt';
+import { Illustration } from '../ui/Illustration';
+import type { IllustrationName } from '../ui/Illustration';
 import './OnboardingTutorial.css';
 
 interface Slide {
-  art: TutorialArtName;
+  art: IllustrationName;
   title: string;
   body: string;
+  /**
+   * The opening slide is the brand itself: the mark draws itself in and the
+   * wordmark completes the lockup beneath it. A drawing of the mark under a
+   * heading reading "Welcome to MONEVA" said the same thing twice.
+   */
+  brand?: boolean;
 }
 
 const SLIDES: Slide[] = [
   {
     art: 'welcome',
-    title: 'Welcome to MONEVA',
+    title: 'MONEVA',
+    brand: true,
     body: 'Your money in one clear picture. Here is a quick tour — it takes about twenty seconds.',
   },
   {
-    art: 'track',
+    art: 'add',
     title: 'Record it in seconds',
     body: 'Tap the + button on any screen to log an expense, income, or transfer. Every amount is stored to the exact paisa.',
   },
   {
-    art: 'plan',
+    art: 'goal',
     title: 'Set budgets and goals',
     body: 'Open Plan to cap a category, build a savings goal, and watch progress fill as you go.',
   },
   {
-    art: 'bills',
+    art: 'calendar',
     title: 'Never miss a bill',
     body: 'Add your recurring bills once. MONEVA reminds you before each due date and records the payment when you pay.',
   },
@@ -103,8 +110,18 @@ export const OnboardingTutorial: React.FC<Props> = ({ onFinish }) => {
           key={index}
           className={direction > 0 ? 'onboarding-slide slide-from-right' : 'onboarding-slide slide-from-left'}
         >
-          <TutorialArt name={slide.art} />
-          <h2 className="heading-lg onboarding-title">{slide.title}</h2>
+          <Illustration name={slide.art} size={230} />
+          {/* Still a heading, so it is announced and outlined like one - the
+              word is the wordmark, it is only set as one. */}
+          <h2
+            className={
+              slide.brand
+                ? 'onboarding-title onboarding-wordmark'
+                : 'heading-lg onboarding-title'
+            }
+          >
+            {slide.title}
+          </h2>
           <p className="text-body onboarding-body">{slide.body}</p>
         </div>
 

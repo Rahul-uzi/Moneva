@@ -1,0 +1,132 @@
+.tfa-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  animation: tfaFade 0.18s ease;
+}
+
+@keyframes tfaFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.tfa-modal {
+  overscroll-behavior: contain;
+  width: 100%;
+  max-width: 380px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: tfaRise 0.22s ease;
+}
+
+@keyframes tfaRise {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.tfa-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tfa-close {
+  margin: -13px -9px -13px auto;
+  background: transparent;
+  border: none;
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+  padding: 13px;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  display: flex;
+  transition: var(--transition-fast);
+}
+.tfa-close:hover {
+  color: var(--moneva-text-main);
+  background-color: var(--moneva-overlay-weak);
+}
+
+.tfa-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The QR must stay on a light ground to remain scannable in dark mode. */
+.tfa-qr {
+  align-self: center;
+  background: #FFFFFF;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  line-height: 0;
+}
+.tfa-qr svg {
+  width: 190px;
+  height: 190px;
+  display: block;
+}
+
+.tfa-secret {
+  display: block;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  word-break: break-all;
+  color: var(--moneva-text-main);
+  background-color: var(--moneva-overlay-weak);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+}
+
+.tfa-code-input {
+  text-align: center;
+  font-size: 22px;
+  letter-spacing: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tfa-warning {
+  color: var(--moneva-text-on-warning);
+  background-color: rgba(245, 158, 11, 0.15);
+  border: 1px solid var(--moneva-orange);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+
+.tfa-recovery-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+}
+.tfa-recovery-list code {
+  display: block;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: var(--moneva-text-main);
+  background-color: var(--moneva-overlay-weak);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 4px;
+}

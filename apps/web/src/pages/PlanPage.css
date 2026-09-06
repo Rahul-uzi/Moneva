@@ -114,8 +114,8 @@
   transition: width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-.metric-bar-fill.is-budget { background-color: var(--moneva-blue, #2563EB); }
-.metric-bar-fill.is-goal   { background-color: var(--moneva-teal, #10B981); }
+.metric-bar-fill.is-budget { background-color: var(--moneva-blue, #CDFF4A); }
+.metric-bar-fill.is-goal   { background-color: var(--moneva-teal, #CDFF4A); }
 .metric-bar-fill.is-over   { background-color: var(--moneva-figure-expense, #CF2222); }
 
 .plan-filter-tabs {
@@ -183,8 +183,8 @@
   border-radius: var(--radius-full);
   border: 1px solid transparent;
   color: var(--moneva-text-on-info);
-  background-color: rgba(37, 99, 235, 0.12);
-  border-color: rgba(37, 99, 235, 0.22);
+  background-color: rgba(205, 255, 74, 0.12);
+  border-color: rgba(205, 255, 74, 0.22);
 }
 
 /* Destructive, and it should look it - without shouting louder than the card
@@ -201,7 +201,7 @@
 
 @media (hover: hover) and (pointer: fine) {
   .card-quick-actions .card-action-btn:hover {
-    background-color: rgba(37, 99, 235, 0.2);
+    background-color: rgba(205, 255, 74, 0.2);
   }
   .card-quick-actions .card-action-btn.btn-danger:hover {
     background-color: rgba(207, 34, 34, 0.18);
@@ -285,7 +285,7 @@
   margin-bottom: 2px;
   border-radius: var(--radius-full);
   color: var(--moneva-text-on-info);
-  background-color: rgba(37, 99, 235, 0.14);
+  background-color: rgba(205, 255, 74, 0.14);
 }
 
 .plan-empty-actions {
@@ -478,12 +478,12 @@
 .plan-status-danger .plan-status-dot { background-color: var(--moneva-figure-expense, #CF2222); }
 .plan-status-danger .plan-status-text { color: var(--moneva-text-on-danger); }
 
-.plan-status-warn { border-color: rgba(245, 158, 11, 0.4); }
-.plan-status-warn .plan-status-dot { background-color: #F59E0B; }
+.plan-status-warn { border-color: rgba(232, 182, 44, 0.4); }
+.plan-status-warn .plan-status-dot { background-color: var(--moneva-orange); }
 .plan-status-warn .plan-status-text { color: var(--moneva-text-primary); }
 
-.plan-status-good { border-color: rgba(16, 185, 129, 0.35); }
-.plan-status-good .plan-status-dot { background-color: var(--moneva-teal, #10B981); }
+.plan-status-good { border-color: rgba(205, 255, 74, 0.35); }
+.plan-status-good .plan-status-dot { background-color: var(--moneva-teal, #CDFF4A); }
 .plan-status-good .plan-status-text { color: var(--moneva-text-primary); }
 
 /* A live dot for something already wrong, so it reads as current rather than
@@ -504,8 +504,8 @@
    Three grey columns made the card read as one undifferentiated block. Each
    metric now carries its own tint, matching the icon already beside its label.
    --------------------------------------------------------------------------- */
-.plan-metric-box:nth-child(1) { --metric-tint: rgba(37, 99, 235, 0.07); }
-.plan-metric-box:nth-child(2) { --metric-tint: rgba(16, 185, 129, 0.08); }
+.plan-metric-box:nth-child(1) { --metric-tint: rgba(205, 255, 74, 0.07); }
+.plan-metric-box:nth-child(2) { --metric-tint: rgba(205, 255, 74, 0.08); }
 .plan-metric-box:nth-child(3) { --metric-tint: rgba(207, 34, 34, 0.06); }
 
 .plan-metric-box {

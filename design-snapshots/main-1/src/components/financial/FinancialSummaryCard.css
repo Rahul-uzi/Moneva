@@ -1,0 +1,62 @@
+.financial-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: var(--moneva-text-muted);
+}
+
+.summary-icon {
+  /* An explicit square, centred with flex. The icon is an inline SVG, so the
+     box was taking its height from the line box (24.75px) and its width from
+     the icon (18px) plus padding - 30x37, and border-radius:50% turned that
+     into an oval rather than a circle. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--moneva-blue);
+  background: rgba(37, 99, 235, 0.15);
+  border-radius: 50%;
+}
+
+.summary-net-worth {
+  color: var(--moneva-text-main);
+}
+
+.summary-divider {
+  height: 1px;
+  background: var(--moneva-overlay);
+  margin: 4px 0;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.summary-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.icon-teal { color: var(--moneva-teal); }
+.text-teal { color: var(--moneva-figure-income); }
+
+.icon-coral { color: var(--moneva-coral); }
+.text-coral { color: var(--moneva-figure-expense); }

@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
-import logoMark from '../assets/logo/MONEVA_Logo_Mark_FullColor.png';
+import { Logo } from '../components/ui/Logo';
 import { FormField } from '../components/ui/FormField';
 import { Button } from '../components/ui/Button';
 import { useAuthStore } from '../stores/useAuthStore';
@@ -86,7 +86,7 @@ export const LoginPage: React.FC = () => {
     <div className="auth-viewport">
       <div className="auth-card">
         <div className="auth-header">
-          <img src={logoMark} alt="MONEVA" className="auth-logo" />
+          <Logo tile className="auth-logo" />
           <h1 className="heading-lg">{challengeToken ? 'Two-Factor Verification' : 'Welcome Back'}</h1>
           <p className="text-body">
             {challengeToken ? 'One more step to protect your account' : 'Sign in to your MONEVA account'}

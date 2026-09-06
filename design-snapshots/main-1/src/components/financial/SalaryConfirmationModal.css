@@ -1,0 +1,158 @@
+.salary-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.salary-preview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
+  border: 1px solid var(--moneva-blue);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.preview-tag {
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.salary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.salary-confirmed-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.confirmed-icon-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--moneva-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmed-amount-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 16px;
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  gap: 4px;
+}
+
+.confirmed-plan-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-top: 4px;
+}
+
+.cta-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ---------- repeat toggle ---------- */
+.salary-repeat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  background-color: var(--moneva-surface);
+  cursor: pointer;
+}
+
+.salary-repeat-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* ---------- saved streams ---------- */
+.salary-streams {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.salary-stream-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tapping a stream fills the form from it, so last month is one tap away. */
+.stream-use {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  background-color: var(--moneva-surface);
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.14s ease;
+}
+
+.stream-use:active {
+  transform: scale(0.99);
+  border-color: var(--moneva-blue);
+}
+
+.stream-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+}
+
+.stream-amount {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--moneva-figure-income);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stream-use:active { transform: none; }
+}

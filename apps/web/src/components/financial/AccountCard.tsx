@@ -2,7 +2,7 @@ import React from 'react';
 import { CreditCard, Landmark } from 'lucide-react';
 import { Card } from '../ui/Card';
 import type { Account } from '../../types/api';
-import { formatMonetaryValue } from '../../utils/money';
+import { Money } from '../ui/Money';
 import './AccountCard.css';
 
 interface AccountCardProps {
@@ -30,7 +30,8 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onClick }) =>
         {/* A debt carries its sign. Shown bare, a credit-card balance read as
             money held, while net worth was subtracting the very same figure. */}
         <span className={`number-lg ${isLiability ? 'text-coral' : 'text-main'}`}>
-          {isLiability ? `- ${formatMonetaryValue(balance, account.currency)}` : formatMonetaryValue(balance, account.currency)}
+          {isLiability && '- '}
+          <Money amount={balance} currency={account.currency} />
         </span>
       </div>
     </Card>

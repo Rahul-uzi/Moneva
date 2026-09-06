@@ -1,0 +1,93 @@
+/**
+ * One entry point that makes notifications actually happen.
+ *
+ * Runs on launch, on return to the foreground, and after anything that can
+ * change a due date. It asks the server to generate any reminders that are
+ * due right now, posts the unread ones to the system tray, then re-plans the
+ * device-side alarms for what is coming - so the next reminder fires with the
+ * app closed, which nothing in the old pipeline could do.
+ *
+ * Every step is best-effort: a failed request must never take the app down.
+ */
+import { Capacitor } from '@capacitor/core';
+import { apiClient } from './apiClient';
+import { nativeNotificationService, type UserNotifPreferences } from './notificationService';
+import { shouldSync, syncDeviceReminders } from './reminderScheduler';
+import type { Bill, NotificationRecord, RecurringIncome } from '../types/api';
+
+const DEFAULT_PREFS: UserNotifPreferences = {
+  notif_bills: true,
+  notif_budgets: true,
+  notif_goals: true,
+  notif_salary: true,
+};
+
+const settled = async <T>(p: Promise<{ data: T }>, fallback: T): Promise<T> => {
+  try {
+    return (await p).data;
+  } catch {
+    return fallback;
+  }
+};
+
+export interface SyncResult {
+  skipped: boolean;
+  permission: string;
+  deliveredNow: number;
+  scheduled: number;
+}
+
+export const runNotificationSync = async (opts: { force?: boolean } = {}): Promise<SyncResult> => {
+  const result: SyncResult = { skipped: true, permission: 'n/a', deliveredNow: 0, scheduled: 0 };
+  if (!Capacitor.isNativePlatform()) return result;
+
+  const now = new Date();
+  if (!shouldSync(now, opts.force)) return result;
+  result.skipped = false;
+
+  result.permission = await nativeNotificationService.ensurePermission();
+  if (result.permission !== 'granted') return result;
+
+  // Let the server materialise anything that has become due since last time.
+  try {
+    await apiClient.post('/notifications/generate');
+  } catch {
+    /* offline or cold backend - the device plan below still runs */
+  }
+
+  const [notifs, prefs, bills, streams] = await Promise.all([
+    settled(apiClient.get<NotificationRecord[]>('/notifications'), [] as NotificationRecord[]),
+    settled(apiClient.get<UserNotifPreferences>('/notifications/preferences'), DEFAULT_PREFS),
+    settled(apiClient.get<Bill[]>('/bills'), [] as Bill[]),
+    settled(apiClient.get<RecurringIncome[]>('/income/recurring'), [] as RecurringIncome[]),
+  ]);
+
+  for (const n of notifs.filter((x) => !x.is_read)) {
+    if (await nativeNotificationService.deliverNativeNotification(n, prefs)) result.deliveredNow += 1;
+  }
+
+  try {
+    result.scheduled = await syncDeviceReminders({
+      bills: bills.map((b) => ({
+        id: b.id,
+        name: b.name,
+        amount_minor: b.amount_minor,
+        due_date: b.due_date,
+        status: b.status,
+      })),
+      salaryStreams: streams.map((s) => ({
+        id: s.id,
+        source: s.source,
+        amount_minor: s.amount_minor,
+        next_occurrence: s.next_occurrence,
+        active: s.active,
+      })),
+      prefs: { notif_bills: prefs.notif_bills, notif_salary: prefs.notif_salary },
+      now,
+    });
+  } catch {
+    /* scheduling is best-effort */
+  }
+
+  return result;
+};

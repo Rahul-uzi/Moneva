@@ -1,0 +1,131 @@
+.budget-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.budget-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--moneva-card-gradient);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.status-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-healthy {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--moneva-teal);
+  border: 1px solid var(--moneva-teal);
+}
+
+.status-normal {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: var(--moneva-blue);
+  border: 1px solid var(--moneva-blue);
+}
+
+.status-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--moneva-orange);
+  border: 1px solid var(--moneva-orange);
+}
+
+.status-over {
+  background-color: rgba(255, 107, 107, 0.15);
+  color: var(--moneva-coral);
+  border: 1px solid var(--moneva-coral);
+}
+
+.metric-primary-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.metric-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progress-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.detail-progress-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background-color: var(--moneva-overlay-strong);
+  overflow: hidden;
+}
+
+.detail-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.detail-progress-fill.status-healthy { background-color: var(--moneva-teal); }
+.detail-progress-fill.status-normal { background-color: var(--moneva-blue); }
+.detail-progress-fill.status-warning { background-color: var(--moneva-orange); }
+.detail-progress-fill.status-over { background-color: var(--moneva-coral); }
+
+.budget-transactions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.empty-tx-box {
+  background-color: var(--moneva-surface);
+  border: 1px dashed var(--moneva-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.budget-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}

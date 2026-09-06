@@ -31,15 +31,15 @@
   color: var(--moneva-text-main);
 }
 
-.tab-expense { background-color: rgba(255, 107, 107, 0.2); color: var(--moneva-coral); }
-.tab-income { background-color: rgba(16, 185, 129, 0.2); color: var(--moneva-teal); }
-.tab-transfer { background-color: rgba(37, 99, 235, 0.2); color: var(--moneva-blue); }
+.tab-expense { background-color: rgba(255, 107, 74, 0.2); color: var(--moneva-coral); }
+.tab-income { background-color: rgba(205, 255, 74, 0.2); color: var(--moneva-teal); }
+.tab-transfer { background-color: var(--moneva-overlay); color: var(--moneva-text-secondary); }
 
 .income-salary-shortcut {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
+  background: linear-gradient(135deg, rgba(205, 255, 74, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
   border: 1px solid var(--moneva-blue);
   border-radius: var(--radius-md);
   padding: 10px 12px;
@@ -90,7 +90,7 @@
 }
 
 .form-error-banner {
-  background-color: rgba(255, 107, 107, 0.15);
+  background-color: rgba(255, 107, 74, 0.15);
   border: 1px solid var(--moneva-coral);
   color: var(--moneva-text-on-danger);
   padding: 8px 12px;

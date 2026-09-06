@@ -19,8 +19,8 @@
 }
 
 .icon-empty { background-color: rgba(148, 163, 184, 0.1); color: var(--moneva-text-secondary); }
-.icon-error { background-color: rgba(255, 107, 107, 0.15); color: var(--moneva-coral); }
-.icon-success { background-color: rgba(16, 185, 129, 0.15); color: var(--moneva-teal); }
+.icon-error { background-color: rgba(255, 107, 74, 0.15); color: var(--moneva-coral); }
+.icon-success { background-color: rgba(205, 255, 74, 0.15); color: var(--moneva-teal); }
 
 .state-spinner {
   width: 32px;
@@ -33,7 +33,7 @@
 
 .offline-banner {
   background-color: var(--moneva-orange);
-  color: #000000;
+  color: var(--moneva-on-brand);
   font-weight: 600;
   font-size: 12px;
   padding: 6px 12px;

@@ -1,44 +1,95 @@
-.bottom-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  /* Keep the tab bar above the gesture bar on devices that have one. */
-  height: calc(64px + env(safe-area-inset-bottom, 0px));
-  box-sizing: border-box;
-  background-color: var(--moneva-surface);
-  border-top: 1px solid var(--moneva-border);
-  position: sticky;
+/* The dock. A floating pill that content scrolls under; .app-content carries
+   matching bottom padding so the last card clears it. */
+.dock {
+  /* Positioned against .app-viewport, so on a wide screen it stays inside the
+     phone-width shell instead of spanning the whole window. */
+  position: absolute;
+  left: 0;
+  right: 0;
   bottom: 0;
   z-index: 100;
-  /* Shorthand must carry the inset - a longhand above would be reset here. */
-  padding: 0 4px env(safe-area-inset-bottom, 0px);
+  margin: 0 14px calc(10px + env(safe-area-inset-bottom, 0px));
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  padding: 8px;
+  box-sizing: border-box;
+  border-radius: var(--radius-full);
+
+  background-color: var(--moneva-card);
+  border: 1px solid var(--moneva-border);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
 }
 
-.nav-item {
+:root[data-theme='light'] .dock {
+  box-shadow: 0 8px 24px rgba(10, 11, 13, 0.12);
+}
+
+.dock-tab {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: 8px;
+  min-height: 46px;
+  /* Tight enough that four tabs, the open one's label and the button all fit
+     inside the pill on a 360px screen without anything having to shrink. */
+  padding: 0 9px;
+  /* If it ever does overflow, the label gives way - it already clips - rather
+     than the icon squashing. */
+  min-width: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
   color: var(--moneva-text-muted);
-  text-decoration: none;
-  font-size: 11px;
-  font-weight: 500;
-  width: 56px;
-  transition: var(--transition-fast);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  cursor: pointer;
+  /* `transform` is deliberately not in this list: the shared press rule scales
+     buttons, and animating it here would fight that. */
+  transition:
+    background-color var(--dur-base) var(--ease-soft),
+    color var(--dur-fast) ease,
+    padding var(--dur-base) var(--ease-soft);
 }
 
-.nav-active {
-  color: var(--moneva-blue);
+/* The label is present for assistive tech on every tab; only the open one
+   takes up any width. */
+.dock-label {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width var(--dur-base) var(--ease-soft),
+    opacity var(--dur-fast) ease;
 }
 
-.nav-item:hover {
-  color: var(--moneva-text-secondary);
+.dock-tab.is-active {
+  background-color: var(--moneva-blue);
+  color: var(--moneva-on-brand);
+  padding-right: 13px;
 }
 
-.nav-quick-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
+.dock-tab svg {
+  flex: none;
+}
+
+.dock-tab.is-active .dock-label {
+  max-width: 90px;
+  opacity: 1;
+}
+
+.dock-tab:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-tab,
+  .dock-label {
+    transition: none;
+  }
 }

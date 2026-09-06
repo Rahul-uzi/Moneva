@@ -169,6 +169,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
             <LoadingState message="Fetching notifications..." />
           ) : notifications.length === 0 ? (
             <EmptyState
+              art="bell"
               title="No Notifications Yet"
               description="You are all caught up! New reminders for bills, budget alerts, and savings milestones will appear here."
             />

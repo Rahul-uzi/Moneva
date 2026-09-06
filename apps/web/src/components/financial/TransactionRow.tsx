@@ -7,6 +7,8 @@ import './TransactionRow.css';
 import { parseApiDate } from '../../utils/datetime';
 interface TransactionRowProps {
   transaction: Transaction;
+  /** Arrived since this device last had the app open. */
+  isNew?: boolean;
   onClick?: () => void;
   /** Long-press (or right-click on a pointer device). */
   onLongPress?: () => void;
@@ -14,6 +16,7 @@ interface TransactionRowProps {
 
 export const TransactionRow: React.FC<TransactionRowProps> = ({
   transaction,
+  isNew = false,
   onClick,
   onLongPress,
 }) => {
@@ -77,7 +80,10 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
       </div>
       <div className="tx-info">
         <span className="tx-title">{transaction.description || (isTransfer ? 'Transfer' : isIncome ? 'Income' : 'Expense')}</span>
-        <span className="tx-date">{dateFormatted}</span>
+        <span className="tx-date">
+          {isNew && <span className="tx-new">New</span>}
+          {dateFormatted}
+        </span>
       </div>
       <div className={`tx-amount ${isIncome ? 'amount-income' : isExpense ? 'amount-expense' : 'amount-transfer'}`}>
         {isIncome ? '+' : isExpense ? '-' : ''}

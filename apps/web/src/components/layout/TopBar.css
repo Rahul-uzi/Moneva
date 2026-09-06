@@ -20,8 +20,7 @@
 
 .topbar-logo {
   height: 28px;
-  width: auto;
-  object-fit: contain;
+  width: 28px;
 }
 
 .topbar-title {
@@ -48,14 +47,13 @@
   top: -2px;
   right: -2px;
   background-color: var(--moneva-coral);
-  color: var(--moneva-white);
+  color: var(--moneva-on-brand);
   font-size: 10px;
   font-weight: 700;
   border-radius: 10px;
   padding: 1px 5px;
   line-height: 1;
   pointer-events: none;
-  box-shadow: 0 0 6px rgba(255, 107, 107, 0.5);
 }
 
 .topbar-user-btn {
@@ -66,7 +64,7 @@
   padding: 5px;
   background-clip: content-box;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--moneva-blue), var(--moneva-violet));
+  background: var(--moneva-blue);
   border: none;
   color: var(--moneva-white);
   display: flex;
