@@ -104,10 +104,17 @@ app.include_router(ai.router, prefix=settings.API_PREFIX)
 @app.get("/api/health", tags=["Health"])
 async def health_check():
     """API health status endpoint."""
+    from app.services.mailer import delivery_status
+
     return {
         "status": "healthy",
         "service": settings.PROJECT_NAME,
-        "version": settings.VERSION
+        "version": settings.VERSION,
+        # Which mail settings are present, never their values - see
+        # delivery_status(). Password resets fail silently by design, so
+        # without this a broken mail config can only be found by noticing
+        # that no email ever arrives.
+        "email": delivery_status(),
     }
 
 if __name__ == "__main__":

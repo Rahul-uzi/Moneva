@@ -12,6 +12,7 @@ email went out. It must never be the configuration in production, so
 """
 import logging
 import os
+import re
 from typing import Optional
 
 import httpx
@@ -25,11 +26,29 @@ RESEND_ENDPOINT = "https://api.resend.com/emails"
 DEFAULT_FROM = "MONEVA <onboarding@resend.dev>"
 
 
+# Google shows an app password as four groups of four - "abcd efgh ijkl mnop" -
+# and that is exactly what gets pasted into a settings field. The spaces are
+# presentation only; the secret is the sixteen letters, and Gmail refuses the
+# spaced form. The resulting failure is invisible from outside, because the
+# reset endpoint answers identically whether the mail was sent or the login was
+# refused, so this cost a long afternoon of guessing.
+#
+# Deliberately narrow: ONLY a value that is exactly four groups of four letters
+# is touched. A password that merely happens to contain a space is left alone -
+# for a provider that is not Google, that space may be part of the secret.
+_APP_PASSWORD_SHAPE = re.compile(r"^[A-Za-z]{4}(?: [A-Za-z]{4}){3}$")
+
+
+def _normalise_app_password(password: str) -> str:
+    """An app password pasted in Google's display format, made usable."""
+    return password.replace(" ", "") if _APP_PASSWORD_SHAPE.match(password) else password
+
+
 def _smtp_settings() -> Optional[dict]:
     """SMTP configuration, or None when it is not fully set."""
     host = (os.getenv("SMTP_HOST") or "").strip()
     user = (os.getenv("SMTP_USER") or "").strip()
-    password = (os.getenv("SMTP_PASSWORD") or "").strip()
+    password = _normalise_app_password((os.getenv("SMTP_PASSWORD") or "").strip())
     if not (host and user and password):
         return None
     return {
@@ -44,6 +63,53 @@ def _smtp_settings() -> Optional[dict]:
 def delivery_configured() -> bool:
     """True when a real email can actually be sent, by either route."""
     return _smtp_settings() is not None or bool((os.getenv("RESEND_API_KEY") or "").strip())
+
+
+def delivery_status() -> dict:
+    """
+    Which mail settings are present. Never what they contain.
+
+    A broken mail setup is otherwise undiagnosable from outside. The reset
+    endpoint answers identically whether the code was sent or the login was
+    refused - deliberately, because "delivery failed for this address" would
+    confirm the address has an account - and in production a failed send does
+    not write the code to the log either. Correct, and it leaves whoever is
+    trying to fix the deployment with nothing whatsoever to look at.
+
+    So this publishes the small set of facts that are safe: which variables
+    are set, whether the sender agrees with the authenticated user, and
+    whether the password is even shaped like an app password. No values, no
+    lengths - enough to name the wrong variable, not enough to help anyone
+    guess it.
+    """
+    host = (os.getenv("SMTP_HOST") or "").strip()
+    user = (os.getenv("SMTP_USER") or "").strip()
+    raw_password = (os.getenv("SMTP_PASSWORD") or "").strip()
+    password = _normalise_app_password(raw_password)
+    sender = (os.getenv("RESET_EMAIL_FROM") or "").strip()
+
+    if _smtp_settings():
+        route = "smtp"
+    elif (os.getenv("RESEND_API_KEY") or "").strip():
+        route = "resend"
+    else:
+        route = "none"
+
+    return {
+        "configured": delivery_configured(),
+        "route": route,
+        "smtp_host_set": bool(host),
+        "smtp_user_set": bool(user),
+        "smtp_password_set": bool(password),
+        # A Google app password is sixteen letters. Anything else here is
+        # usually a placeholder that got pasted in by mistake.
+        "smtp_password_looks_like_app_password": bool(
+            password and len(password) == 16 and password.isalpha()
+        ),
+        # Gmail refuses to send as an address it does not own, so a From that
+        # disagrees with the authenticated user fails every time.
+        "from_matches_user": (user.lower() in sender.lower()) if (user and sender) else None,
+    }
 
 
 def _send_over_smtp(settings: dict, to_email: str, text: str, html: str) -> bool:
