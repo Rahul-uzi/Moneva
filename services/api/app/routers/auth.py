@@ -27,6 +27,8 @@ from app.core.ratelimit import (
     LOGIN_BY_ACCOUNT,
     LOGIN_BY_IP,
     RESET_BY_IP,
+    TOTP_BY_ACCOUNT,
+    TOTP_BY_IP,
     client_ip,
     enforce,
 )
@@ -159,10 +161,6 @@ async def login_user(request: Request, payload: UserLogin, db: AsyncSession = De
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    # Signing in clears the count, so somebody who mistyped twice and then got
-    # it right is not left throttled.
-    LOGIN_BY_ACCOUNT.reset(email)
-
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -170,10 +168,21 @@ async def login_user(request: Request, payload: UserLogin, db: AsyncSession = De
         )
 
     # Password was correct. If TOTP is on, stop here and demand the second factor.
+    #
+    # The throttle is deliberately NOT cleared on this branch. It used to be -
+    # reset as soon as the password verified, before this check - which meant a
+    # correct password alone cleared its own limit and could mint an unbounded
+    # supply of five-minute challenge tokens. That is the difference between
+    # brute-forcing the second factor being rate limited and being free.
+    # /auth/2fa/verify clears it once the login is actually finished.
     if user.totp_enabled:
         return TwoFactorChallengeResponse(
             challenge_token=create_2fa_challenge_token({"sub": str(user.id), "tv": user.token_version or 0})
         )
+
+    # A complete login. Somebody who mistyped twice and then got it right is
+    # not left throttled.
+    LOGIN_BY_ACCOUNT.reset(email)
 
     access_token = create_access_token(data={"sub": str(user.id), "tv": user.token_version or 0})
     refresh_token = create_refresh_token(data={"sub": str(user.id), "tv": user.token_version or 0})
@@ -313,8 +322,10 @@ async def reset_password(
     Finishes a reset, with either the emailed code or a 2FA recovery code.
 
     The recovery-code path matters for the case the email path cannot serve:
-    somebody locked out of their inbox. It reuses `_consume_second_factor`,
-    which already burns a recovery code on use, so a code cannot be replayed.
+    somebody locked out of their inbox. It takes a RECOVERY code only, never a
+    live TOTP code: a recovery code is burned on use and cannot be replayed,
+    while a TOTP code is replayable for its whole step and is meant to be the
+    second of two factors rather than a credential in its own right.
     """
     email = payload.email.lower().strip()
     submitted = payload.code.strip().replace(" ", "")
@@ -362,8 +373,14 @@ async def reset_password(
             await db.commit()
 
     # 2. A 2FA recovery code, for someone who cannot reach their email.
+    #
+    # _consume_RECOVERY_code, not _consume_second_factor. The latter tries TOTP
+    # first and returns true on a live authenticator code without burning it,
+    # which made possession of the TOTP secret alone enough to take the account
+    # over - no password, no inbox. A recovery code is a written-down one-time
+    # secret and is destroyed on use; that is what belongs on this path.
     if not accepted and user.totp_recovery_codes:
-        if _consume_second_factor(user, submitted):
+        if _consume_recovery_code(user, submitted):
             accepted = True
 
     if not accepted:
@@ -501,32 +518,64 @@ async def totp_disable(
     return {"message": "Two-factor authentication disabled.", "totp_enabled": False}
 
 
+def _consume_recovery_code(user: User, code: str) -> bool:
+    """
+    An unused recovery code, burned on use. TOTP is NOT accepted here.
+
+    The distinction is the whole point. A TOTP code proves possession of the
+    authenticator and is designed to be the SECOND of two factors - it is not
+    burned, and it is replayable for its whole thirty-second step. A recovery
+    code is a one-time secret the person wrote down, and using it destroys it.
+
+    Password reset must only ever take this one. Accepting a live TOTP there
+    promoted a second factor into a complete credential: whoever could read the
+    authenticator - a photographed enrolment QR, malware with the seed - could
+    set a new password with no password and no access to the inbox, and the
+    session invalidation that follows would sign the real owner out of every
+    device while the attacker signed in.
+    """
+    cleaned = code.strip().replace(" ", "").upper()
+    if not user.totp_recovery_codes:
+        return False
+
+    remaining = json.loads(user.totp_recovery_codes)
+    for hashed in remaining:
+        if verify_password(cleaned, hashed):
+            remaining.remove(hashed)
+            user.totp_recovery_codes = json.dumps(remaining)
+            return True
+    return False
+
+
 def _consume_second_factor(user: User, code: str) -> bool:
     """
     Accepts either a live TOTP code or an unused recovery code.
-    A recovery code is burned on use so it can never be replayed.
+
+    Correct for SIGNING IN, where the password has already been checked and
+    this is genuinely the second of two factors. Never for password reset -
+    see _consume_recovery_code.
     """
     cleaned = code.strip().replace(" ", "").upper()
 
     if user.totp_secret and pyotp.TOTP(user.totp_secret).verify(cleaned.replace("-", ""), valid_window=1):
         return True
 
-    if user.totp_recovery_codes:
-        remaining = json.loads(user.totp_recovery_codes)
-        for hashed in remaining:
-            if verify_password(cleaned, hashed):
-                remaining.remove(hashed)
-                user.totp_recovery_codes = json.dumps(remaining)
-                return True
-    return False
+    return _consume_recovery_code(user, code)
 
 
 @router.post("/2fa/verify", response_model=TokenResponse)
 async def totp_verify(
+    request: Request,
     payload: TotpVerifyRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """Exchanges a login challenge plus a second factor for real session tokens."""
+    # Throttled like every other route that checks a credential. Without this
+    # the second factor was six digits with unlimited guesses: three codes are
+    # live at once (valid_window=1), nothing counted a miss, and a fresh
+    # challenge token was one /auth/login away for anyone holding the password.
+    enforce(TOTP_BY_IP, client_ip(request))
+
     decoded = decode_token(payload.challenge_token)
     if decoded.get("type") != "2fa_challenge":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid challenge token.")
@@ -541,8 +590,16 @@ async def totp_verify(
     if not user or not user.is_active or not user.totp_enabled:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Challenge is no longer valid.")
 
+    # Per-account as well as per-IP: one address working through many sources
+    # is the attack the IP window alone does not stop.
+    enforce(TOTP_BY_ACCOUNT, str(user.id))
+
     if not _consume_second_factor(user, payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid authentication code.")
+
+    # The login is only now complete, so this is where the counters clear.
+    TOTP_BY_ACCOUNT.reset(str(user.id))
+    LOGIN_BY_ACCOUNT.reset(user.email)
 
     await db.commit()
     return _issue_token_pair(user)

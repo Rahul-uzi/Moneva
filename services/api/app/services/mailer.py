@@ -60,6 +60,29 @@ def _smtp_settings() -> Optional[dict]:
     }
 
 
+def _scrub(text: str, *addresses: Optional[str]) -> str:
+    """
+    Text from outside, with any address we know about replaced by its mask.
+
+    Written for exception messages. A library is under no obligation to keep a
+    recipient out of the string it raises, and smtplib does not: it puts the
+    whole envelope in there. Masking the address in one log argument achieves
+    nothing if the next argument spells it out.
+
+    Belt and braces: the local part is replaced on its own too, so a message
+    that quotes only "victim" rather than the full address is caught as well.
+    """
+    cleaned = text
+    for address in addresses:
+        if not address:
+            continue
+        cleaned = cleaned.replace(address, masked(address))
+        local = address.partition("@")[0]
+        if len(local) > 2:
+            cleaned = cleaned.replace(local, f"{local[0]}{'*' * (len(local) - 2)}{local[-1]}")
+    return cleaned
+
+
 def _relay_settings() -> Optional[dict]:
     """A self-hosted HTTPS relay, or None when it is not set."""
     url = (os.getenv("MAIL_RELAY_URL") or "").strip()
@@ -140,11 +163,21 @@ def delivery_status() -> dict:
     else:
         route = "none"
 
+    # NOT published here: delivery_working() and _last_send_succeeded.
+    #
+    # They were, and it recreated the very oracle that was just removed from
+    # /auth/forgot-password. Both move only when send_password_reset runs, and
+    # that is queued only after the endpoint confirms the address has an active
+    # account. /api/health needs no authentication and is not rate limited, so:
+    # read health, probe an address, read health again - a changed value says
+    # the account exists. Relocating a leak from one unauthenticated endpoint to
+    # another is not a fix.
+    #
+    # Everything below depends on CONFIGURATION only, which no attacker-supplied
+    # address can influence. Whether a send actually worked is answerable from
+    # the service log, which is not public.
     return {
         "configured": delivery_configured(),
-        # Configured is not the same as working - see delivery_working().
-        "working": delivery_working(),
-        "last_send_succeeded": _last_send_succeeded,
         "relay_set": _relay_settings() is not None,
         "route": route,
         "smtp_host_set": bool(host),
@@ -340,10 +373,17 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             _remember_send(True)
             return True
         except Exception as exc:  # noqa: BLE001 - delivery must not break the request
-            # Type and message only. An SMTP error can quote the envelope but
-            # never the password, and the password is never interpolated here.
+            # The message is scrubbed, not merely truncated. The old comment
+            # here reasoned only about the password - "an SMTP error can quote
+            # the envelope but never the password" - and the envelope was the
+            # problem. smtplib puts the recipient IN the exception:
+            #   str(SMTPRecipientsRefused({'victim@example.com': (550, ...)}))
+            #     == "{'victim@example.com': (550, b'No such user')}"
+            # so the address the same log line carefully masked came straight
+            # back on the next argument, on the path most likely to fire.
             logger.error("Reset email over SMTP failed for %s: %s: %s",
-                         masked(to_email), type(exc).__name__, str(exc)[:160])
+                         masked(to_email), type(exc).__name__,
+                         _scrub(str(exc), to_email)[:160])
             # Fall through to the HTTP provider rather than giving up here.
             # Many hosts - Render among them - block outbound SMTP ports to
             # deter spam, so a correct username and a correct password still

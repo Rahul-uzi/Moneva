@@ -86,8 +86,9 @@ class TestDeliveryStatus:
         # they conclude.
         assert status == {
             "configured": True,
-            "working": True,
-            "last_send_succeeded": None,
+            # No "working"/"last_send_succeeded" here on purpose: both move only
+            # for an address that HAS an account, and this payload is served
+            # unauthenticated. See TestHealthDoesNotLeakWhoHasAnAccount.
             "relay_set": False,
             "route": "smtp",
             "smtp_host_set": True,
@@ -513,3 +514,87 @@ class TestAResetCodeNeverReachesAProductionLog:
         with caplog.at_level("WARNING"):
             await mailer.send_password_reset("dev@example.com", "112233")
         assert "112233" in caplog.text
+
+
+class TestHealthDoesNotLeakWhoHasAnAccount:
+    """The oracle that was removed from forgot-password, then recreated here.
+
+    delivery_working() and _last_send_succeeded move ONLY when a send is
+    attempted, and a send is attempted only for an address with an active
+    account. Publishing them on an unauthenticated, unthrottled /api/health
+    meant: read health, probe an address, read health again - a changed value
+    says the account exists. Moving a leak between two public endpoints is not
+    a fix, so the payload carries configuration facts only.
+    """
+
+    def test_the_payload_carries_no_per_send_state(self, env):
+        env(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com",
+            SMTP_PASSWORD="abcdefghijklmnop")
+        keys = set(delivery_status())
+        assert "working" not in keys
+        assert "last_send_succeeded" not in keys
+
+    def test_the_payload_does_not_move_when_a_send_fails(self, env):
+        from app.services import mailer
+
+        env(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com",
+            SMTP_PASSWORD="abcdefghijklmnop")
+        before = delivery_status()
+        mailer._remember_send(False)          # as if a real account was probed
+        after = delivery_status()
+        assert before == after, (
+            "health changed after a send attempt - that is the enumeration oracle")
+
+    @pytest.mark.asyncio
+    async def test_the_health_endpoint_itself_does_not_move(self, env):
+        from httpx import ASGITransport, AsyncClient
+
+        from app.services import mailer
+        from main import app
+
+        env(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com",
+            SMTP_PASSWORD="abcdefghijklmnop")
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            first = (await c.get("/api/health")).json()
+            mailer._remember_send(True)
+            second = (await c.get("/api/health")).json()
+        assert first == second
+
+
+class TestAnSmtpErrorCannotReinstateTheAddress:
+    """masked() on one argument is worthless if the next one spells it out."""
+
+    def test_smtplib_really_does_quote_the_recipient(self):
+        import smtplib
+        raised = smtplib.SMTPRecipientsRefused({"victim@example.com": (550, b"No such user")})
+        assert "victim@example.com" in str(raised)   # the premise, not an assumption
+
+    def test_the_scrubber_removes_it(self):
+        from app.services.mailer import _scrub
+        text = "{'victim@example.com': (550, b'No such user')}"
+        cleaned = _scrub(text, "victim@example.com")
+        assert "victim@example.com" not in cleaned
+        assert "v" in cleaned and "*" in cleaned
+
+    def test_it_also_catches_a_bare_local_part(self):
+        from app.services.mailer import _scrub
+        assert "victim" not in _scrub("mailbox victim is full", "victim@example.com")
+
+    @pytest.mark.asyncio
+    async def test_a_refused_recipient_is_not_logged_in_full(self, env, monkeypatch, caplog):
+        import smtplib
+
+        from app.services import mailer
+
+        env(SMTP_HOST="smtp.example", SMTP_USER="a@example.com",
+            SMTP_PASSWORD="abcdefghijklmnop")
+        monkeypatch.setenv("ENVIRONMENT", "production")
+
+        def _refused(*_a, **_k):
+            raise smtplib.SMTPRecipientsRefused({"victim@example.com": (550, b"No such user")})
+
+        monkeypatch.setattr(mailer, "_send_over_smtp", _refused)
+        with caplog.at_level("ERROR"):
+            await mailer.send_password_reset("victim@example.com", "123456")
+        assert "victim@example.com" not in caplog.text
+        assert "123456" not in caplog.text

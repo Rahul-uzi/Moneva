@@ -77,6 +77,19 @@ FORGOT_BY_ACCOUNT = SlidingWindow(limit=4, window_seconds=3600, name="forgot-acc
 # real defence; this stops the noise before it reaches the database at all.
 RESET_BY_IP = SlidingWindow(limit=20, window_seconds=900, name="reset-ip")
 
+# The second factor. This was the ONE credential-checking route in the router
+# with no limiter at all, which made a six-digit code brute-forceable: pyotp is
+# asked with valid_window=1, so three codes are live at any instant, and nothing
+# counted or capped a wrong guess. An attacker holding only the password could
+# mint a fresh challenge token from /auth/login whenever the last one expired
+# and simply keep going.
+#
+# Tighter than login, because a person reads six digits off a screen and types
+# them. Ten tries per account in fifteen minutes is generous for that and
+# nowhere near a million.
+TOTP_BY_IP = SlidingWindow(limit=30, window_seconds=900, name="totp-ip")
+TOTP_BY_ACCOUNT = SlidingWindow(limit=10, window_seconds=900, name="totp-account")
+
 
 def client_ip(request: Request) -> str:
     """
