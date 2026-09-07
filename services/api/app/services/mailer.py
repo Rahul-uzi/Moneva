@@ -359,7 +359,16 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
     relay = _relay_settings()
     if relay:
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            # follow_redirects is NOT optional here. A Google Apps Script /exec
+            # endpoint answers every POST with a 302 to a one-time
+            # script.googleusercontent.com URL and does the work there; httpx
+            # does not follow redirects by default, so without this the relay
+            # returns a bodiless 302 and every send is recorded as refused.
+            #
+            # This is exactly how it shipped broken: the local check that
+            # "proved" the relay worked passed follow_redirects=True, and the
+            # server code did not. Verify with the client you deploy.
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
                 res = await client.post(relay["url"], json={
                     "token": relay["token"],
                     "to": to_email,
@@ -384,22 +393,32 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
     api_key = (os.getenv("RESEND_API_KEY") or "").strip()
 
     if not api_key:
-        if smtp:
-            # SMTP was configured, was attempted, and failed. Say so plainly -
-            # the generic "not set" warning below would be a lie here.
+        if smtp or relay:
+            # A route WAS configured, was attempted, and failed. The generic
+            # "not set" warning below would be a lie here - and, worse, it
+            # writes the code and the full address into the log in clear.
+            #
+            # `relay` belongs in this test as much as `smtp` does. Without it a
+            # failing relay fell through to that warning and put a live reset
+            # code in a production log, which is the one thing
+            # _log_code_if_stranded exists to prevent.
             logger.error(
-                "Reset email could not be delivered for %s: SMTP failed and no "
-                "HTTPS mail provider is configured as a fallback.", masked(to_email),
+                "Reset email could not be delivered for %s: every configured "
+                "route failed and no HTTPS mail provider remains as a fallback.",
+                masked(to_email),
             )
             _log_code_if_stranded(to_email, code)
             _remember_send(False)
             return False
-        # The code is logged, not sent. Fine for development, and the warning
-        # is deliberately loud so this cannot be mistaken for working delivery.
-        logger.warning(
-            "RESEND_API_KEY is not set - no email sent. Password reset code for %s: %s",
-            to_email, code,
-        )
+        # Nothing at all is configured. The code goes to the log so the flow can
+        # be exercised before anyone signs up for a provider - but through
+        # _log_code_if_stranded, which refuses to do that in production. Writing
+        # it directly here meant a misconfigured production deployment printed
+        # live reset codes next to full email addresses.
+        logger.warning("No mail route is configured - nothing was sent for %s.",
+                       masked(to_email))
+        _log_code_if_stranded(to_email, code)
+        _remember_send(False)
         return False
 
     try:
@@ -419,10 +438,15 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             # The body can name the cause (unverified domain, bad key). It does
             # not contain the key, but it is truncated regardless.
             logger.error("Reset email rejected: %s %s", res.status_code, res.text[:200])
+            _log_code_if_stranded(to_email, code)
+            _remember_send(False)
             return False
+        _remember_send(True)
         return True
     except Exception as exc:  # noqa: BLE001 - delivery must never break the request
         logger.error("Reset email could not be sent: %s", type(exc).__name__)
+        _log_code_if_stranded(to_email, code)
+        _remember_send(False)
         return False
 
 

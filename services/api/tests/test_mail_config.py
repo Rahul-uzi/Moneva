@@ -393,3 +393,123 @@ class TestARelayMustConfirmTheSend:
 
         monkeypatch.setattr(mailer.httpx, "AsyncClient", _FakeClient)
         assert await mailer.send_password_reset("b@example.com", "123456") is expected
+
+
+class TestTheRelayClientFollowsRedirects:
+    """A Google Apps Script /exec answers every POST with a 302.
+
+    It redirects to a one-time script.googleusercontent.com URL and does the
+    work there. httpx does NOT follow redirects by default, so without the flag
+    the relay returns a bodiless 302 and every send is logged as refused - which
+    is precisely how this shipped broken. The local check that "proved" the
+    relay worked passed follow_redirects=True; the server code did not.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_client_is_built_to_follow_them(self, env, monkeypatch):
+        import httpx as _httpx
+
+        from app.services import mailer
+
+        mailer._remember_send.__globals__["_last_send_succeeded"] = None
+        monkeypatch.setenv("MAIL_RELAY_URL", "https://relay.example/exec")
+
+        seen = {}
+
+        class _FakeClient:
+            def __init__(self, *a, **kw):
+                seen["kwargs"] = kw
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+            async def post(self, url, json=None, **k):
+                return _httpx.Response(200, text="OK sent")
+
+        monkeypatch.setattr(mailer.httpx, "AsyncClient", _FakeClient)
+        assert await mailer.send_password_reset("b@example.com", "123456") is True
+        assert seen["kwargs"].get("follow_redirects") is True, (
+            "the relay client must follow redirects - Apps Script always 302s")
+
+    @pytest.mark.asyncio
+    async def test_a_bare_302_is_not_mistaken_for_success(self, env, monkeypatch):
+        import httpx as _httpx
+
+        from app.services import mailer
+
+        mailer._remember_send.__globals__["_last_send_succeeded"] = None
+        monkeypatch.setenv("MAIL_RELAY_URL", "https://relay.example/exec")
+
+        class _Redirects:
+            def __init__(self, *a, **kw): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+            async def post(self, url, json=None, **k):
+                # What the server actually saw: a redirect, and no body.
+                return _httpx.Response(302, text="")
+
+        monkeypatch.setattr(mailer.httpx, "AsyncClient", _Redirects)
+        assert await mailer.send_password_reset("b@example.com", "123456") is False
+        assert mailer.delivery_working() is False
+
+
+class TestAResetCodeNeverReachesAProductionLog:
+    """The log line that leaked one, and the branch that made it reachable.
+
+    Observed in production:
+
+        Mail relay did not confirm the send: 302
+        RESEND_API_KEY is not set - no email sent.
+            Password reset code for rahuldhiman2080@gmail.com: 470427
+
+    A live code and a full address, in clear. The relay failing fell through to
+    a branch written for development, which logged both unconditionally.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_failed_relay_does_not_print_the_code_in_production(
+            self, env, monkeypatch, caplog):
+        import httpx as _httpx
+
+        from app.services import mailer
+
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        monkeypatch.setenv("MAIL_RELAY_URL", "https://relay.example/exec")
+        monkeypatch.delenv("RESET_LOG_CODE_ON_FAILURE", raising=False)
+
+        class _Refuses:
+            def __init__(self, *a, **kw): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+            async def post(self, url, json=None, **k):
+                return _httpx.Response(200, text="FORBIDDEN bad token")
+
+        monkeypatch.setattr(mailer.httpx, "AsyncClient", _Refuses)
+
+        with caplog.at_level("WARNING"):
+            assert await mailer.send_password_reset("victim@example.com", "470427") is False
+
+        logged = caplog.text
+        assert "470427" not in logged, "a live reset code was written to the log"
+        assert "victim@example.com" not in logged, "a full address was written to the log"
+        assert "v" in logged and "*" in logged, "the address should still appear, masked"
+
+    @pytest.mark.asyncio
+    async def test_with_nothing_configured_it_still_refuses_in_production(
+            self, env, monkeypatch, caplog):
+        from app.services import mailer
+
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        with caplog.at_level("WARNING"):
+            assert await mailer.send_password_reset("victim@example.com", "998877") is False
+        assert "998877" not in caplog.text
+        assert "victim@example.com" not in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_development_still_gets_the_code(self, env, monkeypatch, caplog):
+        from app.services import mailer
+
+        # The point of logging it at all: the flow stays testable with no
+        # provider set up. That must keep working OUTSIDE production.
+        monkeypatch.setenv("ENVIRONMENT", "development")
+        with caplog.at_level("WARNING"):
+            await mailer.send_password_reset("dev@example.com", "112233")
+        assert "112233" in caplog.text

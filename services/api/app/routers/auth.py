@@ -31,7 +31,7 @@ from app.core.ratelimit import (
     enforce,
 )
 from app.db.database import get_db
-from app.services.mailer import delivery_working, masked, send_password_reset
+from app.services.mailer import delivery_configured, masked, send_password_reset
 from app.models.models import User, Category
 from app.schemas.schemas import (
     UserCreate,
@@ -259,9 +259,22 @@ async def forgot_password(
     enforce(FORGOT_BY_IP, client_ip(request))
     enforce(FORGOT_BY_ACCOUNT, email)
 
+    # delivery_configured(), NOT delivery_working(). The difference is a
+    # security one and it is easy to get wrong - it was, briefly.
+    #
+    # `working` turns false only AFTER a send has failed, and a send is only
+    # attempted for an address that HAS an account. That makes it an
+    # enumeration oracle: probe an unknown address, probe the target, probe the
+    # unknown one again, and a changed answer says the target exists. Every
+    # other branch here is careful to answer identically; this field must be
+    # too, so it may only depend on configuration, never on what happened to
+    # one address.
+    #
+    # The honest "is mail actually working" signal lives on /api/health, which
+    # is not scoped to an address and therefore gives nothing away.
     same_answer = ForgotPasswordResponse(
         message="If that email has an account, a reset code is on its way.",
-        delivery_configured=delivery_working(),
+        delivery_configured=delivery_configured(),
     )
 
     res = await db.execute(select(User).where(User.email == email))
