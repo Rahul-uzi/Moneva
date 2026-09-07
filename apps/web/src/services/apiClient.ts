@@ -170,6 +170,55 @@ const RETRY_BACKOFF_MS = [1200, 3500];
 /** Sending these again is safe: they change nothing on the server. */
 const REPEATABLE_METHODS = new Set(['get', 'head', 'options']);
 
+/**
+ * The two POSTs that are also safe to send again.
+ *
+ * Writes are excluded above because repeating one can double it. These two are
+ * the exception, and they matter: they are the FIRST requests anybody makes,
+ * so they are the ones that meet a server which has gone to sleep - and until
+ * now they were the only ones that could not wait for it. A person tapping
+ * "Send reset code" on a cold instance was told the server could not be
+ * reached, thirty seconds before it finished waking.
+ *
+ * Neither is spoiled by a second send: a login is a login, and asking for a
+ * reset code again simply replaces the code.
+ *
+ * /auth/reset-password is deliberately NOT here. A request that timed out may
+ * already have been counted against the five-guess budget, and sending it
+ * again would spend another one.
+ */
+const REPEATABLE_POSTS = ['/auth/login', '/auth/forgot-password'];
+
+/**
+ * One retry for a write, against two for a read.
+ *
+ * A read costs nothing to repeat. `forgot-password` is rationed to four an
+ * hour per account, so a storm of retries could lock somebody out of the very
+ * thing they are trying to use.
+ */
+const MAX_WRITE_RETRIES = 1;
+
+/**
+ * Should a request that came back with nothing be sent again?
+ *
+ * Pulled out of the interceptor so it can be tested. Inside a closure it was
+ * reachable only by making a real request time out, which is why the rule that
+ * excluded every POST went unnoticed until somebody watched a reset code fail
+ * on a sleeping server.
+ */
+export const shouldRetryTransient = (
+  method: string,
+  url: string | undefined,
+  attempt: number,
+): boolean => {
+  const verb = (method || 'get').toLowerCase();
+  const isRead = REPEATABLE_METHODS.has(verb);
+  const isRepeatableWrite = !isRead
+    && REPEATABLE_POSTS.some((path) => (url ?? '').includes(path));
+  if (!isRead && !isRepeatableWrite) return false;
+  return attempt < (isRead ? MAX_TRANSIENT_RETRIES : MAX_WRITE_RETRIES);
+};
+
 export const API_WAKING_EVENT = 'moneva:api-waking';
 export const API_AWAKE_EVENT = 'moneva:api-awake';
 
@@ -198,6 +247,28 @@ const announceAwake = () => {
   if (!waking) return;
   waking = false;
   announce(API_AWAKE_EVENT);
+};
+
+/**
+ * Start the server waking while the first screen is still painting.
+ *
+ * The instance suspends after a spell of inactivity and takes around half a
+ * minute to come back - the deploy log shows roughly 28 seconds from process
+ * start to "Application startup complete". Nothing on the sign-in or reset
+ * screens talks to the API until the person presses a button, so the wake-up
+ * only began at the exact moment they were waiting on it.
+ *
+ * This moves that wait to app launch, where it costs nobody anything: by the
+ * time an email address has been typed, the server is usually up. It is a GET,
+ * so the retry logic above already covers it, and it is fire-and-forget -
+ * failure here is not worth reporting, because the real request will report it.
+ */
+export const warmUpApi = (): void => {
+  void apiClient
+    .get('/health', { timeout: COLD_START_TIMEOUT_MS })
+    .catch(() => {
+      /* the server is unreachable or asleep; the next real request will say so */
+    });
 };
 
 /**
@@ -325,7 +396,7 @@ apiClient.interceptors.response.use(
     if (originalRequest && isTransientError(error)) {
       const method = (originalRequest.method ?? 'get').toLowerCase();
       const attempt = originalRequest._transientAttempt ?? 0;
-      if (REPEATABLE_METHODS.has(method) && attempt < MAX_TRANSIENT_RETRIES) {
+      if (shouldRetryTransient(method, originalRequest.url, attempt)) {
         originalRequest._transientAttempt = attempt + 1;
         announceWaking();
         originalRequest.timeout = COLD_START_TIMEOUT_MS;
