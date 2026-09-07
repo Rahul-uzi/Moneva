@@ -112,6 +112,55 @@ def delivery_status() -> dict:
     }
 
 
+# Gmail answers on both of these. A host that blocks outbound mail usually
+# blocks every well-known SMTP port, but not always - and finding out costs one
+# connection attempt, against an afternoon of not knowing.
+SMTP_PORTS_TO_TRY = (587, 465)
+
+# Shorter than the old 20s. A blocked port does not refuse, it hangs until the
+# socket gives up, and two attempts at 20s each is a worker thread tied up for
+# most of a minute for a message that was never going to leave.
+SMTP_TIMEOUT_SECONDS = 12
+
+
+def probe_smtp_ports(host: Optional[str] = None, timeout: float = 4.0) -> dict:
+    """
+    Which SMTP ports this machine can actually open a socket to.
+
+    Written because the failure it diagnoses is completely silent. A blocked
+    outbound port does not refuse the connection - nothing answers, the socket
+    times out, and the log says only that the send failed. The same
+    credentials work in two seconds from a laptop, so every visible signal
+    points at the credentials, which are fine.
+
+    A bare TCP connect, not a login: it answers "can this host reach Gmail's
+    mail ports at all", which is the question, and it involves no secret.
+    """
+    import socket
+    import time as _time
+
+    target = host or (os.getenv("SMTP_HOST") or "smtp.gmail.com").strip()
+    results = {}
+    # Only ports Gmail actually serves. 2525 was here briefly and cost ten
+    # seconds of timeout every call to prove something nobody asked.
+    for port in (587, 465, 25):
+        started = _time.perf_counter()
+        try:
+            with socket.create_connection((target, port), timeout=timeout):
+                results[str(port)] = {
+                    "open": True,
+                    "ms": round((_time.perf_counter() - started) * 1000),
+                }
+        except Exception as exc:  # noqa: BLE001 - every failure is a datapoint
+            results[str(port)] = {
+                "open": False,
+                "error": type(exc).__name__,
+                "ms": round((_time.perf_counter() - started) * 1000),
+            }
+    return {"host": target, "ports": results,
+            "any_open": any(v["open"] for v in results.values())}
+
+
 def _send_over_smtp(settings: dict, to_email: str, text: str, html: str) -> bool:
     """
     Blocking send. Called from a worker thread - see send_password_reset.
@@ -119,6 +168,10 @@ def _send_over_smtp(settings: dict, to_email: str, text: str, html: str) -> bool
     stdlib smtplib rather than an async SMTP library: this is one short email
     on a path that already waits on a database, and it keeps the deployment to
     the packages already in requirements.txt.
+
+    Tries the configured port first, then the other one Gmail speaks. Hosts
+    that block outbound mail do not always block both, and the alternative to
+    trying is a reset feature that silently never works.
     """
     import smtplib
     from email.message import EmailMessage
@@ -130,19 +183,42 @@ def _send_over_smtp(settings: dict, to_email: str, text: str, html: str) -> bool
     message.set_content(text)
     message.add_alternative(html, subtype="html")
 
-    # 465 is implicit TLS; anything else (587) starts plain and upgrades.
-    if settings["port"] == 465:
-        with smtplib.SMTP_SSL(settings["host"], settings["port"], timeout=20) as server:
-            server.login(settings["user"], settings["password"])
-            server.send_message(message)
-    else:
-        with smtplib.SMTP(settings["host"], settings["port"], timeout=20) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(settings["user"], settings["password"])
-            server.send_message(message)
-    return True
+    configured = settings["port"]
+    ports = [configured] + [p for p in SMTP_PORTS_TO_TRY if p != configured]
+
+    last_error: Optional[Exception] = None
+    for port in ports:
+        try:
+            # 465 is implicit TLS; anything else (587) starts plain and upgrades.
+            if port == 465:
+                with smtplib.SMTP_SSL(settings["host"], port,
+                                      timeout=SMTP_TIMEOUT_SECONDS) as server:
+                    server.login(settings["user"], settings["password"])
+                    server.send_message(message)
+            else:
+                with smtplib.SMTP(settings["host"], port,
+                                  timeout=SMTP_TIMEOUT_SECONDS) as server:
+                    server.ehlo()
+                    server.starttls()
+                    server.ehlo()
+                    server.login(settings["user"], settings["password"])
+                    server.send_message(message)
+            if port != configured:
+                logger.warning(
+                    "Reset email went out on port %s; the configured port %s did "
+                    "not work. Set SMTP_PORT=%s to stop paying for that attempt.",
+                    port, configured, port,
+                )
+            return True
+        except smtplib.SMTPAuthenticationError:
+            # The credentials are wrong. Another port will not help, and
+            # hammering a second one only delays saying so.
+            raise
+        except Exception as exc:  # noqa: BLE001 - try the next port
+            last_error = exc
+            logger.info("SMTP port %s did not work: %s", port, type(exc).__name__)
+
+    raise last_error if last_error else RuntimeError("no SMTP port was attempted")
 
 
 def _body(code: str, minutes: int) -> tuple[str, str]:
@@ -218,12 +294,26 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             # never the password, and the password is never interpolated here.
             logger.error("Reset email over SMTP failed for %s: %s: %s",
                          masked(to_email), type(exc).__name__, str(exc)[:160])
-            _log_code_if_stranded(to_email, code)
-            return False
+            # Fall through to the HTTP provider rather than giving up here.
+            # Many hosts - Render among them - block outbound SMTP ports to
+            # deter spam, so a correct username and a correct password still
+            # produce a connection that simply times out. When that host also
+            # has an HTTPS mail provider configured, that route is not blocked
+            # and is the one that will actually deliver. Returning False here
+            # meant a working provider was never even tried.
 
     api_key = (os.getenv("RESEND_API_KEY") or "").strip()
 
     if not api_key:
+        if smtp:
+            # SMTP was configured, was attempted, and failed. Say so plainly -
+            # the generic "not set" warning below would be a lie here.
+            logger.error(
+                "Reset email could not be delivered for %s: SMTP failed and no "
+                "HTTPS mail provider is configured as a fallback.", masked(to_email),
+            )
+            _log_code_if_stranded(to_email, code)
+            return False
         # The code is logged, not sent. Fine for development, and the warning
         # is deliberately loud so this cannot be mistaken for working delivery.
         logger.warning(

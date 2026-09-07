@@ -144,3 +144,108 @@ async def test_health_endpoint_carries_the_mail_status(env):
     assert body["email"]["configured"] is True
     assert body["email"]["smtp_password_looks_like_app_password"] is False
     assert "not-an-app-password" not in res.text
+
+
+class TestSmtpPortFallback:
+    """A blocked port hangs; it does not refuse. So try the other one.
+
+    Measured on the real deployment: correct Gmail credentials that log in
+    from a laptop in 2.02s produced a connection from the host that sat there
+    until the socket timed out ~20s later, and no mail was ever sent. Nothing
+    in any log said "blocked" - there is no such signal.
+    """
+
+    def _settings(self, port):
+        return {"host": "smtp.example", "port": port, "user": "a@example.com",
+                "password": "abcdefghijklmnop", "from": "MONEVA <a@example.com>"}
+
+    def test_it_falls_back_to_the_other_port(self, monkeypatch):
+        import smtplib
+
+        from app.services import mailer
+
+        attempted = []
+
+        class _Blocked:
+            def __init__(self, host, port, timeout=None):
+                attempted.append(port)
+                raise TimeoutError("no answer")
+
+        class _Works:
+            def __init__(self, host, port, timeout=None):
+                attempted.append(port)
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def login(self, *a): pass
+            def send_message(self, *a): pass
+
+        monkeypatch.setattr(smtplib, "SMTP", _Blocked)       # 587 blocked
+        monkeypatch.setattr(smtplib, "SMTP_SSL", _Works)     # 465 open
+
+        assert mailer._send_over_smtp(self._settings(587), "b@example.com", "t", "<p>t</p>")
+        assert attempted == [587, 465], attempted
+
+    def test_bad_credentials_do_not_retry_on_another_port(self, monkeypatch):
+        import smtplib
+
+        from app.services import mailer
+
+        attempted = []
+
+        class _Refuses:
+            def __init__(self, host, port, timeout=None):
+                attempted.append(port)
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def ehlo(self): pass
+            def starttls(self): pass
+            def login(self, *a):
+                raise smtplib.SMTPAuthenticationError(535, b"Username and Password not accepted")
+            def send_message(self, *a): pass
+
+        monkeypatch.setattr(smtplib, "SMTP", _Refuses)
+
+        with pytest.raises(smtplib.SMTPAuthenticationError):
+            mailer._send_over_smtp(self._settings(587), "b@example.com", "t", "<p>t</p>")
+        # A rejected password is rejected everywhere. Trying a second port
+        # would only delay saying so, and looks like a login attempt storm.
+        assert attempted == [587], attempted
+
+    def test_every_port_failing_raises_the_last_error(self, monkeypatch):
+        import smtplib
+
+        from app.services import mailer
+
+        class _Blocked:
+            def __init__(self, host, port, timeout=None):
+                raise TimeoutError("no answer")
+
+        monkeypatch.setattr(smtplib, "SMTP", _Blocked)
+        monkeypatch.setattr(smtplib, "SMTP_SSL", _Blocked)
+
+        with pytest.raises(TimeoutError):
+            mailer._send_over_smtp(self._settings(587), "b@example.com", "t", "<p>t</p>")
+
+
+class TestPortProbe:
+    def test_it_reports_a_blocked_port_without_raising(self, monkeypatch):
+        import socket
+
+        from app.services import mailer
+
+        def _blocked(address, timeout=None):
+            raise TimeoutError("nothing there")
+
+        monkeypatch.setattr(socket, "create_connection", _blocked)
+        result = mailer.probe_smtp_ports("smtp.example")
+        assert result["any_open"] is False
+        assert result["ports"]["587"]["open"] is False
+        assert result["ports"]["587"]["error"] == "TimeoutError"
+
+    def test_it_never_touches_a_credential(self, monkeypatch):
+        # A bare TCP connect. If this ever grew a login, the probe would become
+        # something you could not safely expose.
+        from app.services import mailer
+
+        monkeypatch.setenv("SMTP_PASSWORD", "abcdefghijklmnop")
+        assert "abcdefghijklmnop" not in repr(mailer.probe_smtp_ports("smtp.example"))

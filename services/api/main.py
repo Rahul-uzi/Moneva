@@ -117,5 +117,24 @@ async def health_check():
         "email": delivery_status(),
     }
 
+
+@app.get("/api/health/mail-probe", tags=["Health"])
+async def mail_probe():
+    """
+    Which SMTP ports this deployment can actually open a socket to.
+
+    Deliberately a separate route: it makes four outbound connections and can
+    take several seconds, which has no place in the health check a platform
+    polls. Nothing here touches a credential - it is a bare TCP connect to
+    Gmail's published mail ports, so the answer is "can this host send mail at
+    all", which is the one thing nothing else in the system will tell you.
+    """
+    import asyncio
+
+    from app.services.mailer import probe_smtp_ports
+
+    # Blocking sockets, so keep them off the event loop.
+    return await asyncio.to_thread(probe_smtp_ports)
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
