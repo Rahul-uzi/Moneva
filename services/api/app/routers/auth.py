@@ -31,7 +31,7 @@ from app.core.ratelimit import (
     enforce,
 )
 from app.db.database import get_db
-from app.services.mailer import delivery_configured, masked, send_password_reset
+from app.services.mailer import delivery_working, masked, send_password_reset
 from app.models.models import User, Category
 from app.schemas.schemas import (
     UserCreate,
@@ -261,7 +261,7 @@ async def forgot_password(
 
     same_answer = ForgotPasswordResponse(
         message="If that email has an account, a reset code is on its way.",
-        delivery_configured=delivery_configured(),
+        delivery_configured=delivery_working(),
     )
 
     res = await db.execute(select(User).where(User.email == email))

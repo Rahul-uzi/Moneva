@@ -60,9 +60,52 @@ def _smtp_settings() -> Optional[dict]:
     }
 
 
+def _relay_settings() -> Optional[dict]:
+    """A self-hosted HTTPS relay, or None when it is not set."""
+    url = (os.getenv("MAIL_RELAY_URL") or "").strip()
+    if not url.startswith("https://"):
+        # Plain HTTP would put the reset code on the wire in clear.
+        return None
+    return {"url": url, "token": (os.getenv("MAIL_RELAY_TOKEN") or "").strip()}
+
+
+# Whether the last attempt actually delivered. None until one is tried.
+#
+# `delivery_configured()` answers "is a route set up", which is what the health
+# check wants. It is the wrong question to put to a person: on a host that
+# blocks SMTP, every variable is set, so the app told them "a reset code is on
+# its way" for a code that could never leave. This remembers what happened last
+# time, so the screen can say something true.
+_last_send_succeeded: Optional[bool] = None
+
+
+def _remember_send(succeeded: bool) -> None:
+    global _last_send_succeeded
+    _last_send_succeeded = succeeded
+
+
 def delivery_configured() -> bool:
-    """True when a real email can actually be sent, by either route."""
-    return _smtp_settings() is not None or bool((os.getenv("RESEND_API_KEY") or "").strip())
+    """True when a real email can actually be sent, by any route."""
+    return (
+        _smtp_settings() is not None
+        or _relay_settings() is not None
+        or bool((os.getenv("RESEND_API_KEY") or "").strip())
+    )
+
+
+def delivery_working() -> bool:
+    """
+    What to tell the person waiting on the screen.
+
+    Configured AND not known to be broken. Before a first attempt there is
+    nothing to go on, so a configured route is taken at its word; once one has
+    failed, the app stops promising an email that is not coming, and says
+    plainly that mail is not switched on here. It flips back on its own the
+    moment a send succeeds.
+    """
+    if not delivery_configured():
+        return False
+    return _last_send_succeeded is not False
 
 
 def delivery_status() -> dict:
@@ -90,6 +133,8 @@ def delivery_status() -> dict:
 
     if _smtp_settings():
         route = "smtp"
+    elif _relay_settings():
+        route = "relay"
     elif (os.getenv("RESEND_API_KEY") or "").strip():
         route = "resend"
     else:
@@ -97,6 +142,10 @@ def delivery_status() -> dict:
 
     return {
         "configured": delivery_configured(),
+        # Configured is not the same as working - see delivery_working().
+        "working": delivery_working(),
+        "last_send_succeeded": _last_send_succeeded,
+        "relay_set": _relay_settings() is not None,
         "route": route,
         "smtp_host_set": bool(host),
         "smtp_user_set": bool(user),
@@ -288,6 +337,7 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             # smtplib blocks, and blocking here would stall the whole event
             # loop for the length of an SMTP conversation.
             await asyncio.to_thread(_send_over_smtp, smtp, to_email, text, html)
+            _remember_send(True)
             return True
         except Exception as exc:  # noqa: BLE001 - delivery must not break the request
             # Type and message only. An SMTP error can quote the envelope but
@@ -302,6 +352,35 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             # and is the one that will actually deliver. Returning False here
             # meant a working provider was never even tried.
 
+    # An HTTPS relay you host yourself. Port 443 is not blocked anywhere, and
+    # unlike a mail provider this needs no account with anyone: a Google Apps
+    # Script web app calling GmailApp.sendEmail is about ten lines, runs under
+    # the Gmail account you already have, and is reached by one POST.
+    relay = _relay_settings()
+    if relay:
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                res = await client.post(relay["url"], json={
+                    "token": relay["token"],
+                    "to": to_email,
+                    "subject": "Your MONEVA password reset code",
+                    "text": text,
+                    "html": html,
+                })
+            # The status code is NOT enough. Google Apps Script answers 200 to
+            # everything, including a request it rejected, so a wrong shared
+            # token would read as a successful send and we would be back to
+            # mail silently not arriving. The relay must SAY it sent.
+            body = (res.text or "").strip()
+            if res.status_code >= 400 or not body.upper().startswith("OK"):
+                logger.error("Mail relay did not confirm the send: %s %s",
+                             res.status_code, body[:200])
+            else:
+                _remember_send(True)
+                return True
+        except Exception as exc:  # noqa: BLE001 - delivery must not break the request
+            logger.error("Mail relay failed for %s: %s", masked(to_email), type(exc).__name__)
+
     api_key = (os.getenv("RESEND_API_KEY") or "").strip()
 
     if not api_key:
@@ -313,6 +392,7 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
                 "HTTPS mail provider is configured as a fallback.", masked(to_email),
             )
             _log_code_if_stranded(to_email, code)
+            _remember_send(False)
             return False
         # The code is logged, not sent. Fine for development, and the warning
         # is deliberately loud so this cannot be mistaken for working delivery.

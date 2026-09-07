@@ -64,8 +64,18 @@ services:
       # it when SMTP fails. In that case RESET_EMAIL_FROM must be an address
       # that provider may send as - "MONEVA <onboarding@resend.dev>" works on
       # a fresh account - because a gmail.com sender will be rejected there.
+      # THE ROUTE THAT WORKS FROM HERE. An HTTPS relay you host yourself -
+      # services/api/docs/gmail-relay.gs is the ten lines to paste into
+      # script.google.com. Sends from your own Gmail, needs no account with
+      # any third party, and travels over 443 rather than a blocked SMTP port.
+      # Set both of these and leave the SMTP values below empty.
+      - key: MAIL_RELAY_URL
+        sync: false        # https://script.google.com/macros/s/..../exec
+      - key: MAIL_RELAY_TOKEN
+        sync: false        # the same secret as SHARED_SECRET in that script
+
       - key: SMTP_HOST
-        sync: false        # smtp.gmail.com
+        sync: false        # smtp.gmail.com - BLOCKED on Render, see above
       - key: SMTP_PORT
         sync: false        # 587
       - key: SMTP_USER

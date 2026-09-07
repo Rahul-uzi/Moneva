@@ -77,9 +77,18 @@ class TestDeliveryStatus:
         env(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com",
             SMTP_PASSWORD="abcdefghijklmnop",
             RESET_EMAIL_FROM="MONEVA <a@example.com>")
+        from app.services import mailer
+        mailer._remember_send.__globals__["_last_send_succeeded"] = None
+
         status = delivery_status()
+        # Pinned whole rather than key by key: this payload is read by a human
+        # under pressure, and a key quietly appearing or vanishing changes what
+        # they conclude.
         assert status == {
             "configured": True,
+            "working": True,
+            "last_send_succeeded": None,
+            "relay_set": False,
             "route": "smtp",
             "smtp_host_set": True,
             "smtp_user_set": True,
@@ -249,3 +258,138 @@ class TestPortProbe:
 
         monkeypatch.setenv("SMTP_PASSWORD", "abcdefghijklmnop")
         assert "abcdefghijklmnop" not in repr(mailer.probe_smtp_ports("smtp.example"))
+
+
+class TestTheScreenIsNotToldALie:
+    """`configured` and `working` are different questions.
+
+    On a host that blocks SMTP every variable is set, so `configured` is true
+    and the app told the person "a reset code is on its way" for a code that
+    could never leave. `working` is what the screen should be shown.
+    """
+
+    def setup_method(self):
+        from app.services import mailer
+        mailer._remember_send.__globals__["_last_send_succeeded"] = None
+
+    def test_a_configured_route_is_taken_at_its_word_at_first(self, env):
+        from app.services import mailer
+        env(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com",
+            SMTP_PASSWORD="abcdefghijklmnop")
+        assert mailer.delivery_working() is True
+
+    def test_after_a_failure_it_stops_promising(self, env):
+        from app.services import mailer
+        env(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com",
+            SMTP_PASSWORD="abcdefghijklmnop")
+        mailer._remember_send(False)
+        assert mailer.delivery_configured() is True   # the variables are fine
+        assert mailer.delivery_working() is False     # the mail is not
+
+    def test_it_recovers_on_the_next_success(self, env):
+        from app.services import mailer
+        env(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com",
+            SMTP_PASSWORD="abcdefghijklmnop")
+        mailer._remember_send(False)
+        mailer._remember_send(True)
+        assert mailer.delivery_working() is True
+
+    def test_nothing_configured_is_never_working(self, env):
+        from app.services import mailer
+        mailer._remember_send(True)
+        assert mailer.delivery_working() is False
+
+
+class TestHttpsRelay:
+    """A relay you host yourself, because port 443 is never blocked."""
+
+    def test_https_is_required(self, env, monkeypatch):
+        from app.services import mailer
+        monkeypatch.setenv("MAIL_RELAY_URL", "http://example.com/mail")
+        # Plain HTTP would put a live reset code on the wire in clear.
+        assert mailer._relay_settings() is None
+
+    def test_an_https_url_configures_it(self, env, monkeypatch):
+        from app.services import mailer
+        monkeypatch.setenv("MAIL_RELAY_URL", "https://script.google.com/macros/s/abc/exec")
+        monkeypatch.setenv("MAIL_RELAY_TOKEN", "shared-secret")
+        settings = mailer._relay_settings()
+        assert settings["url"].startswith("https://")
+        assert settings["token"] == "shared-secret"
+        assert mailer.delivery_configured() is True
+        assert mailer.delivery_status()["route"] == "relay"
+        assert mailer.delivery_status()["relay_set"] is True
+
+    @pytest.mark.asyncio
+    async def test_the_relay_is_used_when_smtp_is_blocked(self, env, monkeypatch):
+        import httpx as _httpx
+
+        from app.services import mailer
+
+        env(SMTP_HOST="smtp.gmail.com", SMTP_USER="a@example.com",
+            SMTP_PASSWORD="abcdefghijklmnop")
+        monkeypatch.setenv("MAIL_RELAY_URL", "https://relay.example/exec")
+        monkeypatch.setenv("MAIL_RELAY_TOKEN", "s3cret")
+
+        # Exactly what Render does: the kernel refuses the outbound socket.
+        def _blocked(*_a, **_k):
+            raise OSError(101, "Network is unreachable")
+
+        monkeypatch.setattr(mailer, "_send_over_smtp", _blocked)
+
+        posted = {}
+
+        class _FakeClient:
+            def __init__(self, *a, **k): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+            async def post(self, url, json=None, **k):
+                posted["url"] = url
+                posted["json"] = json
+                return _httpx.Response(200, text="OK")
+
+        monkeypatch.setattr(mailer.httpx, "AsyncClient", _FakeClient)
+
+        assert await mailer.send_password_reset("b@example.com", "123456") is True
+        assert posted["url"] == "https://relay.example/exec"
+        assert posted["json"]["to"] == "b@example.com"
+        assert posted["json"]["token"] == "s3cret"
+        assert "123456" in posted["json"]["text"]
+        # A send that worked must clear the "do not promise mail" state.
+        assert mailer.delivery_working() is True
+
+
+class TestARelayMustConfirmTheSend:
+    """Apps Script answers 200 to everything, including what it refused.
+
+    Trusting the status code here would have recreated the exact failure this
+    whole exercise was about: a send that reports success and never arrives.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("body,expected", [
+        ("OK", True),
+        ("ok", True),
+        ("OK sent", True),
+        ("forbidden", False),          # wrong shared token
+        ("error: Invalid email", False),
+        ("", False),
+        ("<!DOCTYPE html><html>Google sign-in</html>", False),  # deploy not public
+    ])
+    async def test_only_an_explicit_ok_counts(self, env, monkeypatch, body, expected):
+        import httpx as _httpx
+
+        from app.services import mailer
+
+        mailer._remember_send.__globals__["_last_send_succeeded"] = None
+        monkeypatch.setenv("MAIL_RELAY_URL", "https://relay.example/exec")
+
+        class _FakeClient:
+            def __init__(self, *a, **k): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+            async def post(self, url, json=None, **k):
+                return _httpx.Response(200, text=body)
+
+        monkeypatch.setattr(mailer.httpx, "AsyncClient", _FakeClient)
+        assert await mailer.send_password_reset("b@example.com", "123456") is expected
