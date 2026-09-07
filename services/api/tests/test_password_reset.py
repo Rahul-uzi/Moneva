@@ -256,3 +256,76 @@ class TestLoginThrottling:
         assert (await client.post("/api/auth/login",
                                   json={"email": EMAIL, "password": PASSWORD})).status_code == 200
         assert ratelimit.LOGIN_BY_ACCOUNT.check(EMAIL)[0] is True
+
+
+class TestTheCallerIsNotMadeToWaitForMail:
+    """Sending must not hold the response open.
+
+    Measured against the real deployment: the request took 20.4 seconds while
+    an SMTP connection the host silently blocks sat there until its socket
+    timed out. The app gives up at 15 seconds, so a person tapping "Send reset
+    code" was told "Could not reach the server" about a request that was alive
+    and would go on to finish.
+
+    The answer is byte-identical whether the send works or not - that is the
+    anti-enumeration design - so there was never anything to wait for.
+    """
+
+    async def test_the_send_is_queued_rather_than_awaited(self, api_context, monkeypatch):
+        """The send is handed to BackgroundTasks, not awaited in the handler.
+
+        The obvious test - post, and assert the response came back before a
+        slow send finished - cannot be written here. httpx's ASGITransport
+        drives the app in-process and does not return until the whole ASGI
+        cycle is done, background tasks included, so it reports the send's
+        duration no matter which way the handler is written. It measures the
+        harness, not the code.
+
+        The wall-clock behaviour was measured against a real uvicorn instead
+        (see the class docstring). What this asserts is the mechanism that
+        produces it: the response object carries the send as a pending task.
+        """
+        from starlette.background import BackgroundTask, BackgroundTasks
+
+        captured = {}
+        real_init = BackgroundTasks.add_task
+
+        def _spy(self, func, *args, **kwargs):
+            captured["func"] = getattr(func, "__name__", repr(func))
+            captured["args"] = args
+            return real_init(self, func, *args, **kwargs)
+
+        monkeypatch.setattr(BackgroundTasks, "add_task", _spy)
+
+        client, _ = api_context
+        res = await client.post("/api/auth/forgot-password", json={"email": EMAIL})
+
+        assert res.status_code == 200
+        assert captured.get("func") == "send_password_reset", (
+            "the mailer is being awaited in the handler again - a blocked SMTP "
+            "port will hang the request past the client's timeout")
+        assert captured["args"][0] == EMAIL
+        assert BackgroundTask  # imported for the reader; the spy is on the plural form
+
+    async def test_the_send_still_happens(self, api_context, monkeypatch):
+        import asyncio
+
+        from app.routers import auth as auth_router
+
+        seen = {}
+
+        async def _record(to_email, code, minutes=30):
+            seen["to"] = to_email
+            seen["code"] = code
+            return True
+
+        monkeypatch.setattr(auth_router, "send_password_reset", _record)
+
+        client, _ = api_context
+        await client.post("/api/auth/forgot-password", json={"email": EMAIL})
+        await asyncio.sleep(0.1)   # let the background task run
+
+        # Queued, not dropped: the whole change would be worthless if moving
+        # the send off the request path quietly stopped it happening.
+        assert seen.get("to") == EMAIL
+        assert seen.get("code", "").isdigit() and len(seen["code"]) == 6

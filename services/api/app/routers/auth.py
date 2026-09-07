@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pyotp
 import qrcode
 import qrcode.image.svg
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -242,6 +242,7 @@ async def refresh_tokens(payload: RefreshTokenRequest, db: AsyncSession = Depend
 async def forgot_password(
     request: Request,
     payload: ForgotPasswordRequest,
+    background: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -277,7 +278,15 @@ async def forgot_password(
 
     # Committed before sending: an email that arrives with a code the database
     # does not know about is worse than one that never arrives.
-    await send_password_reset(user.email, code, RESET_CODE_TTL_MINUTES)
+    #
+    # Queued rather than awaited. The answer above is identical whether the
+    # send succeeds or fails - that is the whole anti-enumeration design - so
+    # nothing is gained by making the caller wait for it, and something real
+    # is lost: an SMTP connection that a host silently blocks does not fail
+    # fast, it hangs until the socket times out. Measured at ~20s against a
+    # 15s client timeout, which the app reported to the user as "could not
+    # reach the server" while the request was still perfectly alive.
+    background.add_task(send_password_reset, user.email, code, RESET_CODE_TTL_MINUTES)
     return same_answer
 
 

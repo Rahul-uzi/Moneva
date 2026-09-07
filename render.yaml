@@ -43,6 +43,27 @@ services:
       # Without these the reset endpoint still works: it writes the code to the
       # service log instead of sending it. That is fine for a smoke test and
       # useless for a real user, so set them before anyone else signs up.
+      #
+      # SMTP ON PORT 587 DOES NOT WORK FROM HERE. Measured, not assumed:
+      # correct Gmail credentials that authenticate in 2 seconds from a laptop
+      # produce a connection from this service that hangs until the socket
+      # times out ~20 seconds later, and no mail is ever sent. Hosts commonly
+      # block outbound SMTP to deter spam. Nothing in the logs says so,
+      # because a blocked port does not refuse - it simply never answers.
+      #
+      # Before assuming every port is blocked, ASK:
+      #     GET /api/health/mail-probe
+      # It opens a bare socket to Gmail's 587, 465 and 25 and reports which
+      # answer. No credentials involved. If 465 is open, set SMTP_PORT=465 and
+      # mail works with the Gmail account already configured - the sender code
+      # also falls back to the other port on its own.
+      #
+      # If NO port is open, SMTP is impossible from this host and the reset
+      # email needs an HTTPS provider. Set RESEND_API_KEY below and clear the
+      # SMTP values (443 is not blocked); the sender already falls through to
+      # it when SMTP fails. In that case RESET_EMAIL_FROM must be an address
+      # that provider may send as - "MONEVA <onboarding@resend.dev>" works on
+      # a fresh account - because a gmail.com sender will be rejected there.
       - key: SMTP_HOST
         sync: false        # smtp.gmail.com
       - key: SMTP_PORT
