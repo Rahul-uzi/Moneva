@@ -63,17 +63,58 @@ const REFUSE: Array<{ id: string; test: RegExp; unless?: RegExp }> = [
   { id: 'upcoming', test: /\b(will be debited|due on|scheduled for|is due)\b/i },
 ];
 
-/** Ordered: the first rule that matches wins, so put the specific ones first. */
+/**
+ * Ordered: the first rule that matches wins, so put the specific ones first.
+ *
+ * The verbs further down are written from the BANK's point of view and say
+ * nothing about which end of the payment you are on. "Rahul paid you Rs.80"
+ * contains "paid", and read by the generic rule it became an expense - money
+ * arriving was subtracted from the balance instead of added to it. So the
+ * rules that identify WHO received the money are settled first, before any
+ * bare verb is consulted.
+ */
 const DIRECTION: Array<{ id: string; kind: SmsKind; test: RegExp }> = [
+  // Someone paid YOU. This has to outrank `spent` below, which owns "paid".
+  { id: 'paid-you', kind: 'credit', test: /\b(?:paid|sent|transferred)\s+(?:it\s+)?(?:to\s+)?you\b/i },
+  // A refund is money coming back, and its message nearly always names the
+  // debit it reverses - which `debited` would otherwise win on.
+  // The gap is bounded by distance, not by "no full stop between them": an
+  // amount is written "Rs.999", so a sentence-bounded gap could never reach
+  // across one and this rule silently never fired.
+  { id: 'refund', kind: 'credit', test: /\brefund(?:ed)?\b[\s\S]{0,60}\bcredited\b/i },
+
   { id: 'debited', kind: 'debit', test: /\bdebited\b/i },
   { id: 'credited', kind: 'credit', test: /\bcredited\b/i },
-  { id: 'spent', kind: 'debit', test: /\b(spent|paid|withdrawn|purchase of)\b/i },
-  { id: 'sent', kind: 'debit', test: /\b(sent to|transferred to|payment of)\b/i },
+  // "used for" is how a card alert says it was spent.
+  { id: 'spent', kind: 'debit', test: /\b(spent|paid|withdrawn|purchase of|used for)\b/i },
+  // "Sent Rs.250.00 From A/C x1234 To SWIGGY" - the verb and its preposition
+  // are separated by the amount, so "sent to" as one phrase never matched it.
+  { id: 'sent', kind: 'debit', test: /\b(?:sent|transferred)\s+(?:rs\.?|inr|₹)?[\s0-9.,]*(?:from|to)\b/i },
   { id: 'received', kind: 'credit', test: /\b(received|deposited)\b/i },
+  // Last, so "Payment of Rs.80 received from Rahul" is read by `received`.
+  { id: 'payment-of', kind: 'debit', test: /\bpayment of\b/i },
 ];
 
-/** `Rs.1,234.56`, `INR 1234`, `₹1,234` - the amount and nothing else. */
-const AMOUNT = /(?:rs\.?|inr|₹)\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i;
+/**
+ * The amount, tried in order of how certain each shape is.
+ *
+ * Only the first form existed, and it requires the unit to LEAD. SBI's UPI
+ * alert ("A/C X1234 debited by 250.0") names no unit at all and was dropped
+ * entirely - direction read correctly, then no amount, then null.
+ *
+ * The last pattern is anchored to the verb on purpose. A bare number pattern
+ * would happily read the "26" out of a date or the digits of a reference as
+ * the amount; requiring "debited"/"credited" immediately before it means the
+ * only number it can reach is the one the verb is talking about.
+ */
+const AMOUNT_PATTERNS: Array<{ id: string; re: RegExp }> = [
+  { id: 'prefixed', re: /(?:rs\.?|inr|₹)\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)/i },
+  { id: 'suffixed', re: /\b([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s?(?:rs\b|inr\b|₹)/i },
+  {
+    id: 'after-verb',
+    re: /\b(?:debited|credited|withdrawn|deposited)\s+(?:by|with|for)?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)\b/i,
+  },
+];
 
 const ACCOUNT_TAIL = /(?:a\/c|ac|acct|account|card)\s*(?:no\.?|ending|xx+)?\s*[xX*]*([0-9]{3,6})\b/i;
 
@@ -123,11 +164,19 @@ export function parseTransactionSms(body: string): ParsedSms | null {
   const direction = DIRECTION.find((rule) => rule.test.test(body));
   if (!direction) return null;
 
-  const amountMatch = AMOUNT.exec(body);
-  if (!amountMatch) return null;
-
-  const amountPaise = rupeesToPaise(amountMatch[1]);
-  if (amountPaise === null || amountPaise === 0) return null;
+  let amountPaise: number | null = null;
+  for (const pattern of AMOUNT_PATTERNS) {
+    const match = pattern.re.exec(body);
+    if (!match) continue;
+    const paise = rupeesToPaise(match[1]);
+    // A pattern that matched but produced nothing usable does not end the
+    // search - the next shape may still read the same message correctly.
+    if (paise !== null && paise !== 0) {
+      amountPaise = paise;
+      break;
+    }
+  }
+  if (amountPaise === null) return null;
 
   const parsed: ParsedSms = {
     kind: direction.kind,

@@ -140,3 +140,82 @@ describe('staying silent when it cannot be sure', () => {
     expect(parsed?.reference).toBeUndefined();
   });
 });
+
+/**
+ * Money ARRIVING, in the words the phone actually uses.
+ *
+ * Reported from a real phone: someone sent Rs.80 and the app offered it as an
+ * expense, showing -80.00. The cause was one word - "Rahul paid you Rs.80"
+ * contains "paid", and the rule that owns "paid" means money leaving. Nothing
+ * in the table looked at who the recipient was.
+ *
+ * A miss costs a tap. This costs twice the amount in the wrong direction, and
+ * it is the person's own balance that ends up wrong, so each phrasing gets its
+ * own line rather than a loop.
+ */
+describe('someone sending money TO you', () => {
+  const incomeFrom = (body: string) => parseTransactionSms(body)?.kind;
+
+  it('reads "paid you" as income, not as a payment you made', () => {
+    expect(incomeFrom('Rahul Dhiman paid you Rs.80')).toBe('credit');
+    expect(incomeFrom('Rahul paid you Rs.80.00 via UPI')).toBe('credit');
+  });
+
+  it('reads "sent you", which used to be read as nothing at all', () => {
+    expect(incomeFrom('Rahul Dhiman sent you Rs.80')).toBe('credit');
+  });
+
+  it('still reads a payment YOU made as a debit', () => {
+    // The guard on the rule above: "paid" only flips when "you" follows it.
+    expect(incomeFrom('Paid Rs.250 to Swiggy')).toBe('debit');
+    expect(incomeFrom('Payment of Rs.499 to Jio Recharge successful')).toBe('debit');
+  });
+
+  it('reads the bank wordings for an incoming UPI transfer', () => {
+    expect(incomeFrom('Your A/c XX1234 is credited with Rs.80.00 by a/c linked to VPA rahul@okhdfc')).toBe('credit');
+    expect(incomeFrom('INR 80.00 credited to A/c no. XX1234 on 07-09-26, info UPI/P2A/523456/RAHUL')).toBe('credit');
+    expect(incomeFrom('Received Rs.80.00 in your Kotak Bank A/c XX1234 from RAHUL')).toBe('credit');
+  });
+
+  /* A refund names the debit it reverses, and "debited" outranks "credited".
+     Without a rule of its own, money coming back was filed as money going. */
+  it('reads a refund as income even though it mentions the original debit', () => {
+    expect(incomeFrom('Refund of Rs.999 credited to A/c XX1234 for the amount debited on 01-09-26')).toBe('credit');
+  });
+});
+
+/**
+ * Formats that were silently dropped - direction read fine, then the amount
+ * pattern did not recognise how the bank had written the number.
+ */
+describe('amounts as banks really write them', () => {
+  it('reads an amount with no currency unit at all', () => {
+    // SBI's UPI alert, and the most common debit SMS in the country.
+    const parsed = parseTransactionSms(
+      'Dear UPI user A/C X1234 debited by 250.0 on date 06Sep26 trf to SWIGGY Refno 523456789012',
+    );
+    expect(parsed).toMatchObject({ kind: 'debit', amountPaise: 25000 });
+  });
+
+  it('reads an amount with the unit written after it', () => {
+    expect(parseTransactionSms('Your A/c XX1234 debited 250.00 INR on 06-09-26')?.amountPaise).toBe(25000);
+  });
+
+  it('reads the verb and its preposition when the amount sits between them', () => {
+    // "Sent ... From ... To ..." - "sent to" as one phrase never matched.
+    const parsed = parseTransactionSms('Sent Rs.250.00 From HDFC Bank A/C x1234 To SWIGGY On 06-09-26');
+    expect(parsed).toMatchObject({ kind: 'debit', amountPaise: 25000 });
+  });
+
+  it('reads a card alert that says "used for"', () => {
+    expect(parseTransactionSms('Your Credit Card XX1234 has been used for Rs.2,500.00 at AMAZON')?.kind)
+      .toBe('debit');
+  });
+
+  /* The looser amount patterns must not start reading dates or reference
+     numbers as money. Both of these have digits and no real amount. */
+  it('does not mistake a date or a reference for an amount', () => {
+    expect(parseTransactionSms('Your account has been debited on 06-09-26. Check the app.')).toBeNull();
+    expect(parseTransactionSms('Transaction 523456789012 debited. See statement.')).toBeNull();
+  });
+});
