@@ -4,6 +4,8 @@ import { Plus, Landmark, CreditCard, Wallet } from 'lucide-react';
 import { AccountCard } from '../components/financial/AccountCard';
 import { AccountModal } from '../components/financial/AccountModal';
 import { AccountDetailModal } from '../components/financial/AccountDetailModal';
+import { CardCycleSection } from '../components/financial/CardCycleSection';
+import { EmiModal } from '../components/financial/EmiModal';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { Button } from '../components/ui/Button';
 import { ErrorState, EmptyState } from '../components/ui/States';
@@ -11,7 +13,7 @@ import { AccountsSkeleton } from '../components/ui/Skeleton';
 import { apiClient, describeApiError } from '../services/apiClient';
 import { useUiStore } from '../stores/useUiStore';
 import { formatMonetaryValue } from '../utils/money';
-import type { Account } from '../types/api';
+import type { Account, Emi, Transaction } from '../types/api';
 import './AccountsPage.css';
 
 interface OutletContextType {
@@ -34,7 +36,37 @@ export const AccountsPage: React.FC = () => {
   const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
+  // Card cycles and instalments
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [emis, setEmis] = useState<Emi[]>([]);
+  const [isEmiModalOpen, setIsEmiModalOpen] = useState<boolean>(false);
+  const [emiToEdit, setEmiToEdit] = useState<Emi | null>(null);
+
+  // One instant for the whole screen, so two cards cannot disagree about what
+  // day it is, and so a re-render mid-scroll does not shift a countdown.
+  const [now] = useState<number>(() => Date.now());
+
   const { addToast } = useUiStore();
+
+  /* The card panel needs the ledger and the plans as well as the accounts, but
+     neither is worth failing the page over: a card whose transactions did not
+     load shows its dates and a zero, which is wrong-ish, while an error state
+     over the whole accounts list would be wrong outright. So they are fetched
+     alongside and allowed to come back empty. */
+  const fetchCardData = useCallback(async (isMounted: boolean) => {
+    /* A window, not a row count. The panel needs everything back to the
+       statement before last - about two cycles - and a plain `limit` returns
+       the NEWEST rows, so a busy month would silently drop the oldest ones,
+       which are precisely the previous-cycle purchases being totalled. */
+    const since = new Date(Date.now() - 120 * 86_400_000).toISOString();
+    const [ledger, plans] = await Promise.allSettled([
+      apiClient.get<Transaction[]>('/transactions', { params: { start_date: since } }),
+      apiClient.get<Emi[]>('/emis'),
+    ]);
+    if (!isMounted) return;
+    if (ledger.status === 'fulfilled') setTransactions(ledger.value.data || []);
+    if (plans.status === 'fulfilled') setEmis(plans.value.data || []);
+  }, []);
 
   const fetchAccounts = useCallback(async (isMounted: boolean) => {
     try {
@@ -43,6 +75,7 @@ export const AccountsPage: React.FC = () => {
         setAccounts(res.data);
         setError(null);
       }
+      void fetchCardData(isMounted);
     } catch (err: unknown) {
       if (isMounted) {
         const msg = describeApiError(err, 'Failed to load accounts.');
@@ -53,7 +86,7 @@ export const AccountsPage: React.FC = () => {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [fetchCardData]);
 
   useEffect(() => {
     let isMounted = true;
@@ -202,6 +235,19 @@ export const AccountsPage: React.FC = () => {
         </div>
       )}
 
+      {/* Card cycles and instalments. Held back until there is at least one
+          account: on a brand-new profile the page is an invitation to add one,
+          and a second thing to fill in competes with it. */}
+      {accounts.length > 0 && <CardCycleSection
+        accounts={accounts}
+        transactions={transactions}
+        emis={emis}
+        currency="INR"
+        now={now}
+        onAddEmi={() => { setEmiToEdit(null); setIsEmiModalOpen(true); }}
+        onEditEmi={(emi) => { setEmiToEdit(emi); setIsEmiModalOpen(true); }}
+      />}
+
       {/* Add / Edit Modal */}
       <AccountModal
         isOpen={isAddModalOpen || !!accountToEdit}
@@ -211,6 +257,14 @@ export const AccountsPage: React.FC = () => {
           setAccountToEdit(null);
         }}
         onSuccess={() => void fetchAccounts(true)}
+      />
+
+      <EmiModal
+        isOpen={isEmiModalOpen}
+        emiToEdit={emiToEdit}
+        accounts={accounts}
+        onClose={() => { setIsEmiModalOpen(false); setEmiToEdit(null); }}
+        onSuccess={() => void fetchCardData(true)}
       />
 
       {/* Account Details Modal */}

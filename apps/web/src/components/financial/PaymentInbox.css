@@ -154,6 +154,11 @@
 }
 .pay-inbox-amount .is-out { color: var(--moneva-text-primary); }
 .pay-inbox-amount .is-in { color: var(--moneva-blue); }
+/* Money that only MOVED. Deliberately neither the full-strength ink of a
+   spend nor the accent of income: it is not a gain or a loss, and reading as
+   either is the exact mistake this kind exists to stop. Amber is reserved for
+   warnings and this is not one. */
+.pay-inbox-amount .is-moved { color: var(--moneva-text-secondary); }
 
 .pay-inbox-kind {
   font-size: 11.5px;

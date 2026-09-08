@@ -57,7 +57,10 @@ async def create_account(
         name=payload.name.strip(),
         account_type=payload.account_type.lower(),
         currency=payload.currency or current_user.currency,
-        opening_balance_minor=payload.opening_balance_minor or 0
+        opening_balance_minor=payload.opening_balance_minor or 0,
+        statement_day=payload.statement_day,
+        due_day=payload.due_day,
+        credit_limit_minor=payload.credit_limit_minor,
     )
     db.add(new_acc)
     await db.commit()
@@ -114,6 +117,27 @@ async def update_account(
         acc.currency = payload.currency
     if payload.is_active is not None:
         acc.is_active = payload.is_active
+
+    # Read which keys were actually sent rather than testing for None, because
+    # null is a meaningful value here: it is how a card stops being one. With
+    # an is-not-None test the terms could be set but never cleared.
+    sent = payload.model_fields_set
+    if "statement_day" in sent:
+        acc.statement_day = payload.statement_day
+    if "due_day" in sent:
+        acc.due_day = payload.due_day
+    if "credit_limit_minor" in sent:
+        acc.credit_limit_minor = payload.credit_limit_minor
+
+    # Checked after applying, not on the payload: sending only one day is
+    # legitimate when the other is already stored, and illegitimate when it is
+    # not. What matters is the pair the account ends up with.
+    if (acc.statement_day is None) != (acc.due_day is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=("A card needs both a statement day and a due day - "
+                    "one without the other describes no billing cycle."),
+        )
 
     await db.commit()
     await db.refresh(acc)

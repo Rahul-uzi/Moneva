@@ -23,6 +23,7 @@ import {
   Pencil,
   Search,
   MonitorSmartphone,
+  Upload,
 } from 'lucide-react';
 import { categoryIcon } from '../utils/categoryIcons';
 import { Card } from '../components/ui/Card';
@@ -54,8 +55,11 @@ import {
   isCaptureSupported,
   type CaptureStatus,
 } from '../services/notificationCapture';
+import { captureHealth } from '../utils/captureHealth';
 import { markTourPending } from '../services/tourService';
 import { exportBinaryFile } from '../services/exportService';
+import { ImportSheet } from '../components/financial/ImportSheet';
+import type { Account } from '../types/api';
 import './ProfilePage.css';
 
 export const ProfilePage: React.FC = () => {
@@ -79,8 +83,22 @@ export const ProfilePage: React.FC = () => {
 
   // Reading payment alerts. Two states worth telling apart in the copy below:
   // Android has granted access, and the user still wants it used.
-  const [capture, setCapture] = useState<CaptureStatus>({ granted: false, capturing: false });
+  const [capture, setCapture] = useState<CaptureStatus>({
+    granted: false, capturing: false, lastKeptAt: 0, keptCount: 0, enabledAt: 0,
+  });
   const [isPayInboxOpen, setIsPayInboxOpen] = useState<boolean>(false);
+
+  // Derived on render rather than stored: this is a reading of the clock
+  // as much as of the switch, and a stored copy would quietly go stale.
+  const captureState = captureHealth({
+    supported: isCaptureSupported(),
+    granted: capture.granted,
+    capturing: capture.capturing,
+    lastKeptAt: capture.lastKeptAt,
+    keptCount: capture.keptCount,
+    enabledAt: capture.enabledAt,
+    now: Date.now(),
+  });
   useEffect(() => {
     // Re-read when the inbox closes: the user may have granted access, or
     // turned the whole thing off, while it was open.
@@ -148,6 +166,11 @@ export const ProfilePage: React.FC = () => {
 
   // Data Export & Account Deletion State
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  // Bringing history in. The accounts list is fetched when the sheet is
+  // opened rather than on page load: nothing else on this screen needs it,
+  // and a settings page should not pay for a feature nobody opened.
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  const [importAccounts, setImportAccounts] = useState<Account[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState<boolean>(false);
 
@@ -749,16 +772,14 @@ export const ProfilePage: React.FC = () => {
           {/* Reading payment alerts. Only on Android - there is no
               notification shade to read in a browser. */}
           {isCaptureSupported() && (
-            <div className="toggle-row">
+            <div className={`toggle-row${captureState.tone === 'ok' ? '' : ` is-${captureState.tone}`}`}>
               <div className="toggle-info">
-                <span className="toggle-label">Read payment alerts</span>
-                <span className="toggle-sub">
-                  {capture.capturing && capture.granted
-                    ? 'On. Payments from UPI apps and banks appear for you to confirm.'
-                    : capture.capturing && !capture.granted
-                      ? 'Waiting for notification access in Android settings.'
-                      : 'Off. Let MONEVA fill in payments from GPay, PhonePe and bank alerts.'}
-                </span>
+                <span className="toggle-label">{captureState.headline}</span>
+                {/* The subtitle is the health verdict, not a restatement of
+                    the switch. A listener the system has killed still reports
+                    "capturing", so "On." would be a lie in exactly the case
+                    the user most needs to be told about. */}
+                <span className="toggle-sub">{captureState.detail}</span>
               </div>
               <Button
                 variant={capture.capturing && capture.granted ? 'secondary' : 'primary'}
@@ -917,6 +938,27 @@ export const ProfilePage: React.FC = () => {
 
         <Button variant="secondary" onClick={handleExportData} isLoading={isExporting}>
           <Download size={14} /> Export to Excel
+        </Button>
+
+        <p className="text-body text-xs text-muted" style={{ marginTop: 16 }}>
+          Bring in history from before you installed MONEVA. Payment alerts can
+          only see what happens from now on, so a CSV from your bank is the only
+          way to fill in what came before.
+        </p>
+
+        <Button
+          variant="secondary"
+          onClick={async () => {
+            try {
+              const res = await apiClient.get<Account[]>('/accounts');
+              setImportAccounts(res.data);
+              setIsImportOpen(true);
+            } catch {
+              addToast('Could not load your accounts. Try again in a moment.', 'error');
+            }
+          }}
+        >
+          <Upload size={14} /> Import a statement
         </Button>
       </Card>
 
@@ -1336,6 +1378,18 @@ export const ProfilePage: React.FC = () => {
           isOpen
           onClose={() => setIsPayInboxOpen(false)}
           onSuccess={() => addToast('Payment added.', 'success')}
+        />
+      )}
+
+      {/* Same reason as above: it holds a parsed file and the outcome of the
+          last run, and neither should still be on screen the next time it is
+          opened. */}
+      {isImportOpen && (
+        <ImportSheet
+          isOpen
+          onClose={() => setIsImportOpen(false)}
+          onImported={() => { void restoreSession(); }}
+          accounts={importAccounts}
         />
       )}
     </div>

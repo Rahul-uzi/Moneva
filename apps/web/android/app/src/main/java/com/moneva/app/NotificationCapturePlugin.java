@@ -74,6 +74,12 @@ public class NotificationCapturePlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("granted", isListenerEnabled(getContext()));
         result.put("capturing", store.isEnabled());
+        // Health travels with status because they are read together and mean
+        // nothing apart: "capturing = true" is not reassurance on its own,
+        // since a listener the system has killed still reports true here.
+        result.put("lastKeptAt", store.lastKeptAt());
+        result.put("keptCount", store.keptCount());
+        result.put("enabledAt", store.enabledAt());
         call.resolve(result);
     }
 

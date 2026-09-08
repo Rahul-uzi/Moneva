@@ -29,6 +29,20 @@ final class CapturedNotificationStore {
     private static final String KEY_ENABLED = "enabled";
     private static final String KEY_EXTRA_PACKAGES = "extra_packages";
 
+    /* Health, kept deliberately OUTSIDE the queue.
+
+       The queue empties as the user confirms or dismisses each alert, so its
+       length says nothing about whether the listener is alive. These two do,
+       and they are what makes a dead listener visible: a notification service
+       that has been killed, or a bank that changed its wording, both look like
+       silence, and silence is otherwise indistinguishable from a quiet week. */
+    private static final String KEY_LAST_KEPT_AT = "last_kept_at";
+    private static final String KEY_KEPT_COUNT = "kept_count";
+    /* When capture was last switched ON. Silence is only measured from here:
+       without it, turning capture off for a month and back on would report a
+       month of silence the moment it was re-enabled. */
+    private static final String KEY_ENABLED_AT = "enabled_at";
+
     /** Roughly a fortnight of alerts for a busy account; older ones fall off. */
     private static final int CAPACITY = 200;
 
@@ -55,8 +69,29 @@ final class CapturedNotificationStore {
     }
 
     void setEnabled(boolean enabled) {
-        prefs.edit().putBoolean(KEY_ENABLED, enabled).apply();
+        prefs.edit()
+                .putBoolean(KEY_ENABLED, enabled)
+                // Stamped only when switching ON, so the silence clock starts
+                // from the moment the user asked for capture.
+                .putLong(KEY_ENABLED_AT, enabled ? System.currentTimeMillis()
+                                                 : prefs.getLong(KEY_ENABLED_AT, 0L))
+                .apply();
         if (!enabled) clear();   // off means the queue goes too
+    }
+
+    /** Epoch ms of the last alert kept, or 0 if none has ever been kept. */
+    long lastKeptAt() {
+        return prefs.getLong(KEY_LAST_KEPT_AT, 0L);
+    }
+
+    /** How many alerts have ever been kept. Survives the queue emptying. */
+    int keptCount() {
+        return prefs.getInt(KEY_KEPT_COUNT, 0);
+    }
+
+    /** Epoch ms when capture was last switched on, or 0 if never. */
+    long enabledAt() {
+        return prefs.getLong(KEY_ENABLED_AT, 0L);
     }
 
     /** Extra packages the app has added on top of the built-in list. */
@@ -94,7 +129,13 @@ final class CapturedNotificationStore {
             // Drop the oldest once over capacity.
             while (queue.length() > CAPACITY) queue.remove(0);
 
-            prefs.edit().putString(KEY_QUEUE, queue.toString()).apply();
+            prefs.edit()
+                    .putString(KEY_QUEUE, queue.toString())
+                    // Written on every kept alert, whatever becomes of it
+                    // afterwards - this is the proof the listener is running.
+                    .putLong(KEY_LAST_KEPT_AT, System.currentTimeMillis())
+                    .putInt(KEY_KEPT_COUNT, prefs.getInt(KEY_KEPT_COUNT, 0) + 1)
+                    .apply();
         } catch (JSONException ignored) {
             // A malformed entry is not worth taking the listener down for.
         }

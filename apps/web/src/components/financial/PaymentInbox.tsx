@@ -16,6 +16,7 @@ import {
 } from '../../services/notificationCapture';
 import type { AlertProposal } from '../../utils/paymentAlert';
 import { suggestCategory } from '../../utils/categorise';
+import { decideConfirm, badgeFor, needsDestinationPicker, describeProposal } from './paymentInboxRules';
 import type { Account, Category, Transaction } from '../../types/api';
 import './PaymentInbox.css';
 
@@ -40,10 +41,17 @@ interface Props {
  * connection lands on the row that already exists rather than making another.
  */
 export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
-  const [status, setStatus] = useState<CaptureStatus>({ granted: false, capturing: false });
+  const [status, setStatus] = useState<CaptureStatus>({
+    granted: false, capturing: false, lastKeptAt: 0, keptCount: 0, enabledAt: 0,
+  });
   const [proposals, setProposals] = useState<AlertProposal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState<string>('');
+  // Where money that only MOVED ended up. A transfer is the one kind the
+  // server will not accept without a destination, and there is nothing in a
+  // bank's alert that says which of your accounts it landed in - so it is
+  // asked for rather than guessed.
+  const [toAccountId, setToAccountId] = useState<string>('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [history, setHistory] = useState<Transaction[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -108,8 +116,9 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
   };
 
   const confirm = async (proposal: AlertProposal) => {
-    if (!accountId) {
-      addToast('Add an account first, then confirm this payment.', 'error');
+    const decision = decideConfirm(proposal.kind, accountId, toAccountId);
+    if (!decision.ok) {
+      addToast(decision.message, 'error');
       return;
     }
     setBusyId(proposal.clientMutationId);
@@ -121,12 +130,14 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
       await apiClient.post<Transaction>('/transactions', {
         client_mutation_id: proposal.clientMutationId,
         account_id: accountId,
-        to_account_id: null,
+        to_account_id: decision.toAccountId,
         category_id: categoryFor(proposal).categoryId,
-        transaction_type: proposal.kind === 'debit' ? 'expense' : 'income',
+        // Three kinds, not two - see decideConfirm. A bare debit/credit
+        // ternary files a transfer as income.
+        transaction_type: decision.transactionType,
         amount_minor: proposal.amountPaise,
         currency: 'INR',
-        description: proposal.merchant ?? `From ${proposal.sources.join(', ')}`,
+        description: describeProposal(proposal.merchant, proposal.sources),
         transaction_date: new Date(proposal.postedAt).toISOString(),
         device_id: 'android-notification',
       });
@@ -141,14 +152,26 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
   };
 
   /** What category this payment probably belongs to, and why. */
-  const categoryFor = (proposal: AlertProposal) =>
-    suggestCategory({
+  const categoryFor = (proposal: AlertProposal) => {
+    // A transfer has no spending category, and inventing one would be worse
+    // than leaving it blank: money moved into savings is not "Food & Dining",
+    // and a category here is what would drag it back into a budget.
+    if (proposal.kind === 'transfer') {
+      return {
+        categoryId: null,
+        categoryName: null,
+        source: 'none' as const,
+        reason: 'Moved between your own accounts, so it is not spending.',
+      };
+    }
+    return suggestCategory({
       merchant: proposal.merchant,
       text: proposal.merchant ?? '',
       kind: proposal.kind,
       categories,
       history,
     });
+  };
 
   const dismiss = async (proposal: AlertProposal) => {
     await acknowledgeProposal(proposal);
@@ -234,6 +257,18 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
               </label>
             )}
 
+            {needsDestinationPicker(proposals.map((p) => p.kind), accounts.length) && (
+              <label className="pay-inbox-account">
+                <span>Moved to</span>
+                <select value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
+                  <option value="">Choose an account&hellip;</option>
+                  {accounts.filter((a) => a.id !== accountId).map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             {proposals.map((p) => (
               <div key={p.clientMutationId} className="pay-inbox-card">
                 <div className="pay-inbox-row">
@@ -243,11 +278,9 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
                     <Money
                       amount={p.amountPaise}
                       alwaysShow
-                      className={p.kind === 'debit' ? 'is-out' : 'is-in'}
+                      className={badgeFor(p.kind).className}
                     />
-                    <span className="pay-inbox-kind">
-                      {p.kind === 'debit' ? 'Paid' : 'Received'}
-                    </span>
+                    <span className="pay-inbox-kind">{badgeFor(p.kind).label}</span>
                   </div>
                   <div className="pay-inbox-actions">
                     <button

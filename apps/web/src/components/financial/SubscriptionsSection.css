@@ -1,0 +1,126 @@
+/* ===========================================================================
+   REPEATING PAYMENTS
+
+   A list to scan, not a set of cards to admire. Each row answers three
+   questions in the order they get asked: what is it, how often, and what does
+   it actually cost me. The yearly figure is the one that changes minds -
+   Rs 649 a month reads as nothing, Rs 7,788 a year does not - so it sits in
+   the same column as the charge rather than being buried in the meta line.
+   =========================================================================== */
+
+.subs-intro {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--moneva-text-muted);
+}
+
+.subs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.subs-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+}
+
+/* One that has stopped is still worth showing - it is the strongest signal in
+   the list - but it is no longer money going out, so it recedes. */
+.subs-row.is-lapsed {
+  opacity: 0.72;
+}
+
+.subs-mark {
+  flex: none;
+}
+
+.subs-mark-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--moneva-overlay-weak);
+  color: var(--moneva-text-secondary);
+}
+
+.subs-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* Without this a long payee name pushes the amount off the row instead of
+     wrapping - the failure mode of every flex row with text in it. */
+  min-width: 0;
+  flex: 1;
+}
+
+.subs-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--moneva-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subs-meta {
+  font-size: 12px;
+  color: var(--moneva-text-muted);
+}
+
+.subs-flag {
+  display: inline-flex;
+  /* Top, not centre. These sentences wrap to two lines on a phone, and
+     centring floated the icon into the gap between them, level with neither.
+     The 2px nudges it onto the cap-height of the first line. */
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.subs-flag > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.subs-flag.is-rise {
+  color: var(--moneva-orange);
+}
+
+.subs-flag.is-lapsed-flag {
+  color: var(--moneva-text-secondary);
+}
+
+.subs-amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex: none;
+}
+
+.subs-amount {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--moneva-text-primary);
+  /* Amounts in a column line up only if the digits are the same width. */
+  font-variant-numeric: tabular-nums;
+}
+
+.subs-yearly {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--moneva-text-muted);
+  font-variant-numeric: tabular-nums;
+}

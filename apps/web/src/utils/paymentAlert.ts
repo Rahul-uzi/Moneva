@@ -60,6 +60,23 @@ const APP_NAMES: Record<string, string> = {
   'com.dreamplug.androidapp': 'CRED',
   'com.mobikwik_new': 'MobiKwik',
   'com.freecharge.android': 'Freecharge',
+  'com.samsung.android.spay': 'Samsung Wallet',
+  'com.samsung.android.spaymini': 'Samsung Wallet',
+  'in.slice.android': 'slice',
+  'money.jupiter.app': 'Jupiter',
+  'com.epifi.paisa': 'Fi Money',
+  'com.naviapp': 'Navi',
+  'com.fampay.in': 'FamPay',
+  'com.myairtelapp': 'Airtel Payments Bank',
+  'com.jio.myjio': 'JioPay',
+  'com.hdfcbank.payzapp': 'PayZapp',
+  'com.whizdm.lazypay': 'LazyPay',
+  'com.olacabs.customer': 'Ola Money',
+  // A chat app that also moves money. Named like any other rail, because
+  // by the time a message gets here it has already cleared the receipt
+  // test in PaymentNotificationFilter - see CONVERSATIONAL_PACKAGES.
+  'com.whatsapp': 'WhatsApp Pay',
+  'com.whatsapp.w4b': 'WhatsApp Pay',
   'com.sbi.lotusintouch': 'SBI YONO',
   'com.sbi.SBIFreedomPlus': 'SBI',
   'com.snapwork.hdfc': 'HDFC Bank',
@@ -74,6 +91,11 @@ const APP_NAMES: Record<string, string> = {
   'com.idbibank.mpassbook': 'IDBI',
   'com.bankofindia.boiapp': 'Bank of India',
   'com.unionbankofindia.vyom': 'Union Bank',
+  'com.fss.indus': 'IndusInd Bank',
+  'com.idfcfirstbank.optimus': 'IDFC FIRST Bank',
+  'com.fss.fedmobile': 'Federal Bank',
+  'com.rblbank.mobank': 'RBL Bank',
+  'com.aubank.aubankapp': 'AU Small Finance Bank',
   'com.google.android.apps.messaging': 'Messages',
   'com.samsung.android.messaging': 'Messages',
   'com.android.mms': 'Messages',
@@ -84,14 +106,38 @@ export const appLabel = (packageName: string): string =>
   APP_NAMES[packageName] ?? packageName;
 
 /**
+ * Whether a source label names the app the money actually moved through.
+ *
+ * "Google Pay" is worth saying in a description - it is the rail, and it is
+ * how people describe the payment to themselves. "Messages" is not: a bank's
+ * SMS merely arrives there, and "Messages - SWIGGY" would name the wrong
+ * thing entirely. An unrecognised package name is never worth showing.
+ */
+export const isPaymentApp = (label: string): boolean =>
+  label !== 'Messages' && Object.values(APP_NAMES).includes(label);
+
+/**
  * A notification's whole text.
  *
  * The title carries the sender for an SMS ("VM-HDFCBK") and the headline for
  * an app alert ("Paid ₹250"), and either half can hold the part that decides
  * what this is - so the parser is given both.
  */
-export const alertBody = (alert: PaymentAlert): string =>
-  `${alert.title ?? ''} ${alert.text ?? ''}`.trim();
+export const alertBody = (alert: PaymentAlert): string => {
+  const title = (alert.title ?? '').trim();
+  const text = (alert.text ?? '').trim();
+  if (!title) return text;
+  if (!text) return title;
+
+  // A chat app titles the notification with the sender and then repeats the
+  // name at the start of the message: title "Karan", text "Karan paid you
+  // Rs.45". Joined blindly that reads "Karan Karan paid you Rs.45", and the
+  // payer comes out as "Karan Karan" - which is then the description on the
+  // row and the name the categoriser learns.
+  if (text.toLowerCase().startsWith(title.toLowerCase())) return text;
+
+  return `${title} ${text}`;
+};
 
 /* --------------------------------------------------------------------------
    A deterministic id

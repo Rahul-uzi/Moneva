@@ -56,6 +56,7 @@ class User(Base):
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     recurring_incomes = relationship("RecurringIncome", back_populates="user", cascade="all, delete-orphan")
     sync_metadata = relationship("SyncMetadata", back_populates="user", cascade="all, delete-orphan")
+    emis = relationship("Emi", back_populates="user", cascade="all, delete-orphan")
 
 
 class Account(Base):
@@ -68,6 +69,19 @@ class Account(Base):
     currency = Column(String, default="INR", nullable=False)
     opening_balance_minor = Column(BigInteger, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Credit-card billing terms. Null on every other kind of account, which is
+    # also how an account is recognised AS a card - both days set. A separate
+    # is_card flag would be a second source of truth able to disagree with the
+    # days it depends on.
+    #
+    # Days are stored as given, 1-31, and clamped into the month at read time:
+    # a card that closes on the 31st still closes in February, and rewriting it
+    # to 28 here would move that card's closing date in every other month.
+    statement_day = Column(SmallInteger, nullable=True)
+    due_day = Column(SmallInteger, nullable=True)
+    credit_limit_minor = Column(BigInteger, nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -238,3 +252,51 @@ class SyncMetadata(Base):
 
     # Relationships
     user = relationship("User", back_populates="sync_metadata")
+
+
+class Emi(Base):
+    """A purchase converted into instalments.
+
+    Not a transaction. An EMI is a commitment that shows up nowhere in a
+    month's spending until the month it lands in, which is exactly how people
+    end up with more of them running at once than they meant to - the phone,
+    the laptop and the fridge each looked affordable on its own.
+
+    It is deliberately NOT derived from the ledger. The bank takes the
+    instalment whether or not the app saw the alert, so a plan reconstructed
+    from captured payments would under-report the moment one notification was
+    missed, and tell somebody they owe less than they do. What the user enters
+    once - the instalment, how many, when it started - is the truth, and the
+    calendar does the rest.
+    """
+    __tablename__ = "emis"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Which card or loan account it is charged to. Nullable, because plenty of
+    # people are paying off something on a card they have not added here, and
+    # refusing to record the commitment until they do would lose the very
+    # figure this table exists to keep.
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+
+    name = Column(String, nullable=False)
+    monthly_minor = Column(BigInteger, nullable=False)
+    months = Column(SmallInteger, nullable=False)
+
+    # The first instalment. Progress is counted forward from this date, so it
+    # is the one field that must be right.
+    started_at = Column(DateTime(timezone=True), nullable=False)
+
+    currency = Column(String, default="INR", nullable=False)
+
+    # Closed by hand - a plan settled early, or entered wrong. A finished plan
+    # is not closed: it stays, and is reported as finished from its own dates,
+    # so the history of what was being paid off stays readable.
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="emis")

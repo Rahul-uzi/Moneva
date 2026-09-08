@@ -20,7 +20,8 @@ from app.routers import (
     income,
     notifications,
     profile,
-    ai
+    ai,
+    emis,
 )
 
 app = FastAPI(
@@ -99,6 +100,7 @@ app.include_router(income.router, prefix=settings.API_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_PREFIX)
 app.include_router(profile.router, prefix=settings.API_PREFIX)
 app.include_router(ai.router, prefix=settings.API_PREFIX)
+app.include_router(emis.router, prefix=settings.API_PREFIX)
 
 @app.get("/health", tags=["Health"])
 @app.get("/api/health", tags=["Health"])

@@ -1,0 +1,83 @@
+/* ===========================================================================
+   INSTALMENT PLAN FORM
+
+   The preview block is the point of this form, not decoration. A shop quotes a
+   monthly figure; the number that decides anything is what it comes to in
+   total, and it is rarely put in front of anybody. So it is shown as the form
+   is filled, in the same weight as the fields above it.
+   =========================================================================== */
+
+.emi-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.emi-modal-error {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--moneva-overlay-weak);
+  color: var(--moneva-coral);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.emi-modal-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Two narrow fields side by side stop being readable well before the phone
+   does; a date input in particular has a minimum it will not go under. */
+@media (max-width: 360px) {
+  .emi-modal-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.emi-modal-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  background: var(--moneva-overlay-weak);
+}
+
+.emi-modal-preview-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--moneva-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.emi-modal-preview-row.is-muted {
+  font-size: 11.5px;
+  color: var(--moneva-text-muted);
+}
+
+.emi-modal-close-plan {
+  padding: 8px;
+  border: 0;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--moneva-text-muted);
+  cursor: pointer;
+}
+
+.emi-modal-close-plan:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.emi-modal-close-plan:focus-visible {
+  outline: 2px solid var(--moneva-teal);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

@@ -77,6 +77,20 @@ FORGOT_BY_ACCOUNT = SlidingWindow(limit=4, window_seconds=3600, name="forgot-acc
 # real defence; this stops the noise before it reaches the database at all.
 RESET_BY_IP = SlidingWindow(limit=20, window_seconds=900, name="reset-ip")
 
+# Bringing a statement in. Keyed by ACCOUNT rather than by address: these
+# routes need a signed-in user, so the thing being limited is one account
+# doing too much, not an anonymous flood.
+#
+# Generous by design - a decade of history is fifty chunks of two hundred
+# rows, and a person doing that should not be stopped half way. It is here to
+# bound the damage from a loop that has gone wrong, or an account being used
+# to hammer the database, not to police normal use.
+IMPORT_BY_ACCOUNT = SlidingWindow(limit=120, window_seconds=3600, name="import-account")
+
+# Converting a spreadsheet costs far more than storing rows: a decompress and
+# an XML parse, on a shared instance. Held much tighter for that reason.
+SHEET_BY_ACCOUNT = SlidingWindow(limit=30, window_seconds=3600, name="sheet-account")
+
 # The second factor. This was the ONE credential-checking route in the router
 # with no limiter at all, which made a six-digit code brute-forceable: pyotp is
 # asked with valid_window=1, so three codes are live at any instant, and nothing

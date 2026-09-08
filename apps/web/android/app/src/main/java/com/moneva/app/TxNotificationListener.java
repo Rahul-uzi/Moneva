@@ -93,7 +93,9 @@ public class TxNotificationListener extends NotificationListenerService {
                     charSequence(extras, Notification.EXTRA_TEXT),
                     charSequence(extras, Notification.EXTRA_SUMMARY_TEXT));
 
-            if (!PaymentNotificationFilter.looksFinancial(title, text)) {
+            // The package decides how strict the test is: a chat app has to
+            // look like a receipt, a bank only has to look like money moving.
+            if (!PaymentNotificationFilter.looksFinancial(packageName, title, text)) {
                 Log.d(TAG, "drop " + packageName + ": not a payment"
                         + " (title=" + (title == null ? 0 : title.length())
                         + " text=" + (text == null ? 0 : text.length()) + " chars)");

@@ -19,7 +19,9 @@ import { apiClient, describeApiError } from '../services/apiClient';
 import { useUiStore } from '../stores/useUiStore';
 import { formatMonetaryCompact } from '../utils/money';
 import { parseApiDate } from '../utils/datetime';
-import type { Budget, SavingsGoal, Bill, Category, Account } from '../types/api';
+import type { Budget, SavingsGoal, Bill, Category, Account, Transaction } from '../types/api';
+import { SubscriptionsSection } from '../components/financial/SubscriptionsSection';
+import { findSubscriptions } from '../utils/subscriptions';
 import './PlanPage.css';
 
 interface OutletContextType {
@@ -33,6 +35,10 @@ export const PlanPage: React.FC = () => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  // History, only so repeating payments can be spotted in it. A year is
+  // the shortest window that can see a yearly renewal twice, which is what
+  // it takes to call one a subscription rather than a purchase.
+  const [history, setHistory] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,12 +75,13 @@ export const PlanPage: React.FC = () => {
 
   const fetchPlanData = useCallback(async (isMounted: boolean) => {
     try {
-      const [budRes, goalRes, billRes, catRes, accRes] = await Promise.all([
+      const [budRes, goalRes, billRes, catRes, accRes, txRes] = await Promise.all([
         apiClient.get<Budget[]>('/budgets'),
         apiClient.get<SavingsGoal[]>('/goals'),
         apiClient.get<Bill[]>('/bills'),
         apiClient.get<Category[]>('/categories'),
         apiClient.get<Account[]>('/accounts'),
+        apiClient.get<Transaction[]>('/transactions', { params: { limit: 500 } }),
       ]);
 
       if (isMounted) {
@@ -83,6 +90,7 @@ export const PlanPage: React.FC = () => {
         setBills(billRes.data);
         setCategories(catRes.data);
         setAccounts(accRes.data);
+        setHistory(txRes.data);
         setError(null);
       }
     } catch (err: unknown) {
@@ -141,6 +149,22 @@ export const PlanPage: React.FC = () => {
       billsDueCount: bills.filter((b) => b.status === 'upcoming').length,
     };
   }, [budgets, goals, bills]);
+
+  /**
+   * Payments that repeat, read out of the ledger rather than set up by anyone.
+   *
+   * Derived, not stored: it is a reading of history, so it should change the
+   * moment the history does, and there is nothing here that could go stale in
+   * a state variable. `Date.now()` is captured once per computation so every
+   * row on screen is measured from the same instant.
+   */
+  const subscriptions = useMemo(
+    () => findSubscriptions(history, Date.now()),
+    [history],
+  );
+
+  /** Whatever the accounts are denominated in; they share one currency. */
+  const planCurrency = accounts[0]?.currency ?? 'INR';
 
   /** Nothing planned at all - one invitation reads better than three refusals. */
   const isPlanEmpty = budgets.length === 0 && goals.length === 0 && bills.length === 0;
@@ -429,6 +453,22 @@ export const PlanPage: React.FC = () => {
       {/* Keyed on the tab so the card cascade replays when the filter changes -
           otherwise the list swaps in place with nothing to show it reacted. */}
       <div className="plan-sections" key={activeTab}>
+
+      {/* 0. What already repeats. Above the plans the user made, because it
+             is the one section they did not have to build - and the one most
+             likely to contain a surprise.
+
+             Grouped with Bills rather than Budgets: a bill is a recurring
+             obligation and so is a subscription, whereas a budget is a limit
+             the user chose. Filtering to "Budgets" and being shown Netflix
+             was simply the wrong shelf. */}
+      {(activeTab === 'all' || activeTab === 'bills') && (
+        <SubscriptionsSection
+          subscriptions={subscriptions}
+          currency={planCurrency}
+          now={Date.now()}
+        />
+      )}
 
       {/* 1. Category Budgets Section */}
       {!isPlanEmpty && (activeTab === 'all' || activeTab === 'budgets') && (

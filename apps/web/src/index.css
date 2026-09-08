@@ -606,3 +606,29 @@ button,
     animation: none;
   }
 }
+
+/* ===========================================================================
+   THE PACKAGED APP IS NOT A WEB PAGE
+
+   `is-native-app` is set in main.tsx only when running inside the native
+   shell, so none of this reaches the web app.
+
+   A WebView lets you pinch and double-tap to scale the page, because it was
+   built to show documents. In an app it is only ever an accident: a stray
+   pinch leaves the whole interface scaled with the tab bar half off-screen,
+   and there is no visible way back - it reads as the app having broken, and
+   the user cannot tell what they did. No native app does this, which is
+   precisely what makes it feel like a website in a frame.
+
+   `pan-x pan-y` keeps every scroll and swipe working and removes only the
+   scaling gesture.
+
+   Text size is deliberately untouched. The system font-size setting still
+   scales this app's text, which is the accessibility need pinch-zoom was
+   standing in for - so nothing here costs anyone legibility.
+   =========================================================================== */
+
+html.is-native-app,
+html.is-native-app body {
+  touch-action: pan-x pan-y;
+}
