@@ -294,3 +294,41 @@ describe('reading one card out of the ledger', () => {
     expect(totals.outstandingMinor).toBe(150000);
   });
 });
+
+/**
+ * A due date is a day, not an instant.
+ *
+ * Measured from the current moment, a card went overdue one second past
+ * midnight on its own due date - alarming somebody on the very morning the
+ * payment is due - and, because the leftover hours then rounded the wrong way,
+ * a card a full day late still read as "due today".
+ */
+describe('the due date is a whole day', () => {
+  const morningOfTheDueDate = Date.UTC(2026, 9, 8, 9, 30);   // 8 Oct, 09:30
+  const lateOnTheDueDate = Date.UTC(2026, 9, 8, 23, 59);
+  const nextMorning = Date.UTC(2026, 9, 9, 9, 30);
+
+  it('is not overdue at any hour of the due date itself', () => {
+    for (const now of [morningOfTheDueDate, lateOnTheDueDate]) {
+      const cycle = cardCycle(HDFC, now);
+      expect(new Date(cycle.dueAt).toISOString().slice(0, 10)).toBe('2026-10-08');
+      expect(cycle.daysUntilDue).toBe(0);
+      expect(cycle.isOverdue).toBe(false);
+    }
+  });
+
+  it('is one day overdue the next morning, not still due today', () => {
+    const cycle = cardCycle(HDFC, nextMorning);
+    expect(cycle.daysUntilDue).toBe(-1);
+    expect(cycle.isOverdue).toBe(true);
+  });
+
+  it('reports the same number of days whatever time of day it is asked', () => {
+    // Otherwise a countdown changes as the user scrolls past midnight, and two
+    // cards on one screen can disagree about what day it is.
+    const early = cardCycle(HDFC, Date.UTC(2026, 9, 3, 0, 1));
+    const late = cardCycle(HDFC, Date.UTC(2026, 9, 3, 23, 59));
+    expect(early.daysUntilDue).toBe(late.daysUntilDue);
+    expect(early.daysUntilStatement).toBe(late.daysUntilStatement);
+  });
+});

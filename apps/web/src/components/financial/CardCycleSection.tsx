@@ -40,8 +40,9 @@ const onDay = (at: number): string =>
  * to panic somebody who already knows.
  */
 const dueIn = (days: number): string => {
-  if (days < -1) return `${Math.abs(days)} days overdue`;
-  if (days <= 0) return 'due today';
+  if (days === -1) return '1 day overdue';
+  if (days < 0) return `${-days} days overdue`;
+  if (days === 0) return 'due today';
   if (days === 1) return 'due tomorrow';
   return `due in ${days} days`;
 };
@@ -140,8 +141,8 @@ export const CardCycleSection: React.FC<Props> = ({
                       <span className="cardcycle-meta">
                         Closes {onDay(cycle.nextStatementAt)}
                         {' · '}
-                        {cycle.daysUntilStatement <= 0
-                          ? 'closing today'
+                        {cycle.daysUntilStatement === 1
+                          ? '1 day of this cycle left'
                           : `${cycle.daysUntilStatement} days of this cycle left`}
                       </span>
                     </div>
@@ -152,7 +153,7 @@ export const CardCycleSection: React.FC<Props> = ({
                       statement that closed, and when it has to be paid. */}
                   <div className="cardcycle-owed">
                     <div className="cardcycle-owed-figure">
-                      <span className="text-label">Owed on last statement</span>
+                      <span className="text-label">Owed on statement</span>
                       <span className="number-md">
                         {formatMonetaryValue(totals.outstandingMinor, currency)}
                       </span>

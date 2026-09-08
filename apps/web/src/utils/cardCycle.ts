@@ -43,11 +43,11 @@ export interface CardCycle {
   currentCycleFrom: number;
   /** When the last closed statement must be paid. */
   dueAt: number;
-  /** Whole days until that payment is due; negative once it has passed. */
+  /** Whole days from today to the due date; negative once the day has passed. */
   daysUntilDue: number;
   /** Whole days until the cycle now accruing closes. */
   daysUntilStatement: number;
-  /** The due date has passed. */
+  /** The due DAY has ended without the statement being cleared. */
   isOverdue: boolean;
 }
 
@@ -102,14 +102,25 @@ export function cardCycle(terms: CardTerms, now: number): CardCycle {
     lastDate.getUTCFullYear(), lastDate.getUTCMonth() + dueMonthOffset, terms.dueDay,
   );
 
+  /* Counted from the START of today, not from this instant.
+     A due date is a day, not a moment: a payment due on the 8th is not late at
+     ten in the morning on the 8th. Measuring from `now` made a card overdue
+     from one second past midnight on its own due date, and - because the
+     remainder then rounded the wrong way - showed a card a full day late as
+     still "due today". Both disappear once the unit is the day. */
+  const todayStart = Date.UTC(year, month, today.getUTCDate());
+
+  const daysUntilDue = Math.round((dueAt - todayStart) / DAY);
+
   return {
     lastStatementAt,
     nextStatementAt,
     currentCycleFrom: lastStatementAt,
     dueAt,
-    daysUntilDue: Math.ceil((dueAt - now) / DAY),
-    daysUntilStatement: Math.ceil((nextStatementAt - now) / DAY),
-    isOverdue: now > dueAt,
+    daysUntilDue,
+    daysUntilStatement: Math.round((nextStatementAt - todayStart) / DAY),
+    // Late only once the due day itself has ended.
+    isOverdue: daysUntilDue < 0,
   };
 }
 

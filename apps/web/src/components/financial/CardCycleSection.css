@@ -133,11 +133,15 @@
 
 /* --- what is owed, and when --- */
 
+/* The pill drops to its own line rather than squeezing the label into two.
+   A phone at a larger system font size runs out of width here first, and the
+   label wrapping mid-phrase is what looks broken. */
 .cardcycle-owed {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
 }
 
 .cardcycle-owed-figure {
