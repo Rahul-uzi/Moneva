@@ -82,7 +82,13 @@ async def calculate_income_totals(
     Calculates total income for a user within an optional date range.
     Excludes transfers to prevent double counting.
     """
-    filters = [Transaction.user_id == user_id, Transaction.transaction_type == "income"]
+    filters = [
+        Transaction.user_id == user_id,
+        Transaction.transaction_type == "income",
+        # A correction is not money earned. Counting it would inflate income
+        # and every "left to spend" figure derived from it.
+        Transaction.is_adjustment.is_(False),
+    ]
     if start_date:
         filters.append(Transaction.transaction_date >= start_date)
     if end_date:
@@ -103,7 +109,14 @@ async def calculate_expense_totals(
     Calculates total expenses for a user within an optional date range.
     Excludes transfers to prevent double counting.
     """
-    filters = [Transaction.user_id == user_id, Transaction.transaction_type == "expense"]
+    filters = [
+        Transaction.user_id == user_id,
+        Transaction.transaction_type == "expense",
+        # A balance correction moves money but is not something the person
+        # spent. Counting it would make a reconciliation look like the
+        # biggest purchase of the month.
+        Transaction.is_adjustment.is_(False),
+    ]
     if start_date:
         filters.append(Transaction.transaction_date >= start_date)
     if end_date:
@@ -147,6 +160,8 @@ async def calculate_budget_spending(
             Transaction.user_id == user_id,
             Transaction.category_id == category_id,
             Transaction.transaction_type == "expense",
+            # Never let a correction eat into a budget.
+            Transaction.is_adjustment.is_(False),
             Transaction.transaction_date >= start_date,
             Transaction.transaction_date <= end_date
         )
@@ -217,7 +232,14 @@ async def calculate_category_breakdown(
     """
     Calculates category breakdown for expenses in minor units.
     """
-    filters = [Transaction.user_id == user_id, Transaction.transaction_type == "expense"]
+    filters = [
+        Transaction.user_id == user_id,
+        Transaction.transaction_type == "expense",
+        # A balance correction moves money but is not something the person
+        # spent. Counting it would make a reconciliation look like the
+        # biggest purchase of the month.
+        Transaction.is_adjustment.is_(False),
+    ]
     if start_date:
         filters.append(Transaction.transaction_date >= start_date)
     if end_date:
@@ -264,7 +286,14 @@ async def calculate_spending_trends(
     """
     Groups expense amounts by date label for spending trends.
     """
-    filters = [Transaction.user_id == user_id, Transaction.transaction_type == "expense"]
+    filters = [
+        Transaction.user_id == user_id,
+        Transaction.transaction_type == "expense",
+        # A balance correction moves money but is not something the person
+        # spent. Counting it would make a reconciliation look like the
+        # biggest purchase of the month.
+        Transaction.is_adjustment.is_(False),
+    ]
     if start_date:
         filters.append(Transaction.transaction_date >= start_date)
     if end_date:

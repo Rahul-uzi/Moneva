@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, and_
@@ -6,8 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
 from app.db.database import get_db
-from app.models.models import User, Account
-from app.schemas.schemas import AccountCreate, AccountUpdate, AccountResponse
+from app.models.models import User, Account, Transaction
+from app.schemas.schemas import (
+    AccountCreate,
+    AccountUpdate,
+    AccountResponse,
+    ReconcileRequest,
+    ReconcileResponse,
+)
 from app.services.finance import calculate_account_balance
 
 router = APIRouter(prefix="/accounts", tags=["Accounts"])
@@ -134,3 +141,86 @@ async def delete_account(
     acc.is_active = False
     await db.commit()
     return None
+
+
+@router.post("/{account_id}/reconcile", response_model=ReconcileResponse)
+async def reconcile_account(
+    account_id: uuid.UUID,
+    payload: ReconcileRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Tells the app what the account really holds, and lets it correct itself.
+
+    A balance here is a sum of the events the app managed to see: the opening
+    figure, plus every transaction. Anything it missed - cash, a payment whose
+    alert never arrived, a wrong opening balance - leaves the number quietly
+    wrong. Without this endpoint there is no way back, which is one of the
+    loudest complaints against every app that works this way: not "it does not
+    sync", but "my balance is wrong and I cannot fix it".
+
+    The correction is written as a transaction, NOT as a quiet edit of
+    opening_balance_minor. Two reasons. The ledger stays the single source of
+    truth, so the balance is still derived rather than stored in two places
+    that can disagree. And the correction stays visible in history - a person
+    who reconciles twice can see it happened twice, and how much drifted each
+    time, which is a signal about how much the capture is missing.
+
+    It is flagged is_adjustment so that no spending figure counts it. A
+    correction is money moving, not money spent.
+    """
+    stmt = select(Account).where(and_(Account.id == account_id, Account.user_id == current_user.id))
+    res = await db.execute(stmt)
+    account = res.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found.")
+
+    previous = await calculate_account_balance(db, account_id)
+    difference = payload.actual_balance_minor - previous
+
+    if difference == 0:
+        return ReconcileResponse(
+            account_id=account_id,
+            previous_balance_minor=previous,
+            actual_balance_minor=payload.actual_balance_minor,
+            difference_minor=0,
+            adjustment_transaction_id=None,
+            message="That already matches. Nothing was changed.",
+        )
+
+    # An adjustment carries its direction in transaction_type, the way every
+    # other row does, so the balance arithmetic needs no special case - which
+    # is what keeps this from becoming a second, divergent way to compute a
+    # balance.
+    kind = "income" if difference > 0 else "expense"
+    note = (payload.note or "").strip()
+    description = f"Balance correction{f' - {note}' if note else ''}"
+
+    adjustment = Transaction(
+        client_mutation_id=uuid.uuid4(),
+        user_id=current_user.id,
+        account_id=account_id,
+        category_id=None,
+        transaction_type=kind,
+        amount_minor=abs(difference),
+        currency=account.currency,
+        description=description,
+        transaction_date=datetime.now(timezone.utc),
+        device_id="reconcile",
+        sync_status="synced",
+        is_adjustment=True,
+    )
+    db.add(adjustment)
+    await db.commit()
+    await db.refresh(adjustment)
+
+    direction = "added" if difference > 0 else "removed"
+    return ReconcileResponse(
+        account_id=account_id,
+        previous_balance_minor=previous,
+        actual_balance_minor=payload.actual_balance_minor,
+        difference_minor=difference,
+        adjustment_transaction_id=adjustment.id,
+        message=f"Balance corrected. {abs(difference) / 100:.2f} {direction}.",
+    )

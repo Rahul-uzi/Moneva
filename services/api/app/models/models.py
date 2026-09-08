@@ -106,6 +106,13 @@ class Transaction(Base):
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     savings_goal_id = Column(UUID(as_uuid=True), ForeignKey("savings_goals.id", ondelete="SET NULL"), nullable=True)
     transaction_type = Column(String, nullable=False)  # income, expense, transfer
+    #: A correction the user made when the running balance had drifted from the
+    #: real one - a missed cash spend, a payment the parser never saw, a wrong
+    #: opening balance. It is a real ledger event, so it MOVES the balance like
+    #: any income or expense, but it is not something the person spent or
+    #: earned, so every spending figure excludes it. Without that exclusion a
+    #: reconciliation would show up as the largest purchase of the month.
+    is_adjustment = Column(Boolean, default=False, nullable=False)
     amount_minor = Column(BigInteger, nullable=False)
     currency = Column(String, nullable=False)
     description = Column(String, nullable=True)

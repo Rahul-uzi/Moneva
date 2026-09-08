@@ -478,3 +478,26 @@ class AIQueryRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=1000)
     conversation_id: Optional[str] = None
 
+
+
+class ReconcileRequest(BaseModel):
+    """What the account really holds, according to the person looking at it."""
+
+    #: Signed: a credit card or overdraft is legitimately negative, and a
+    #: current account can be too, so this cannot be constrained to positive.
+    actual_balance_minor: int = Field(ge=-100_000_000_000, le=100_000_000_000)
+    #: Optional note - "missed some cash spends", "opening balance was wrong".
+    note: Optional[str] = Field(default=None, max_length=140)
+
+
+class ReconcileResponse(BaseModel):
+    """What the correction did, in the terms the screen needs to explain it."""
+
+    account_id: uuid.UUID
+    previous_balance_minor: int
+    actual_balance_minor: int
+    #: Signed. Positive means the app was UNDER-counting and money was added.
+    difference_minor: int
+    #: None when the balance already matched and nothing was written.
+    adjustment_transaction_id: Optional[uuid.UUID] = None
+    message: str
