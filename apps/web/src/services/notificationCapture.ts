@@ -19,6 +19,7 @@ import {
   type AlertProposal,
   type PaymentAlert,
 } from '../utils/paymentAlert';
+import { getCachedUser } from './apiClient';
 
 export interface CaptureStatus {
   /** The OS has granted notification access. Only the user can change this. */
@@ -134,7 +135,12 @@ export const drainProposals = async (): Promise<AlertProposal[]> => {
     }
   }
 
-  return proposalsFromAlerts(items);
+  /* Scoped to whoever is signed in. The id is derived from the payment, and
+     client_mutation_id is unique across the whole table - so two people paying
+     the same amount in the same minute would otherwise collide, and the second
+     of them would be refused permanently. Empty when signed out, which is
+     harmless: nothing is filed without a session anyway. */
+  return proposalsFromAlerts(items, getCachedUser()?.id ?? '');
 };
 
 /**

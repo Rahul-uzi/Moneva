@@ -39,6 +39,10 @@ import { useUiStore } from '../stores/useUiStore';
 import { apiClient, setStoredTokens } from '../services/apiClient';
 import { nativeNotificationService, type PermissionStatus } from '../services/notificationService';
 import { runNotificationSync } from '../services/notificationSync';
+import {
+  loadAutoAddSettings, saveAutoAddSettings, forgetAllTrust,
+} from '../services/autoAddStore';
+import { CONFIRMATIONS_TO_TRUST, DEFAULT_CEILING_MINOR } from '../utils/autoAdd';
 import type { User, Category } from '../types/api';
 import { fileToAvatarDataUrl, uploadAvatar, deleteAvatar } from '../services/avatarService';
 import {
@@ -77,6 +81,10 @@ export const ProfilePage: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
 
   // Whether this phone will actually show notifications. The server-side
+  // Read once from this device rather than from the server: see autoAddStore
+  // for why trust that fails towards "ask" has to be local.
+  const [autoAdd, setAutoAdd] = useState(() => loadAutoAddSettings());
+
   // toggles below meant nothing while the OS permission had never been asked.
   const [devicePerm, setDevicePerm] = useState<PermissionStatus>('prompt');
   const [isEnablingPerm, setIsEnablingPerm] = useState<boolean>(false);
@@ -792,6 +800,46 @@ export const ProfilePage: React.FC = () => {
             </div>
           )}
 
+          {/* Only offered once capture is actually working. Offering it while
+              nothing is being captured would be a switch with no effect, and a
+              user who flips it would reasonably believe payments were being
+              handled when none were being seen at all. */}
+          {isCaptureSupported() && capture.capturing && capture.granted && (
+            <label className="toggle-row">
+              <div className="toggle-info">
+                <span className="toggle-label">Add payments without asking</span>
+                {/* When capture has quietly died, "no payments lately" stops
+                    meaning a quiet week and starts meaning nothing is being
+                    recorded at all - and somebody who has been told the app
+                    handles it is exactly the person who will not check. So the
+                    warning is repeated here rather than left to the row above. */}
+                <span className="toggle-sub">
+                  {autoAdd.enabled && captureState.tone !== 'ok'
+                    ? `On - but no payments are reaching MONEVA right now, so nothing is being added. ${captureState.detail}`
+                    : autoAdd.enabled
+                      ? `On for payments up to ₹${(autoAdd.ceilingMinor / 100).toLocaleString('en-IN')} from a payment app, once you have confirmed that kind ${CONFIRMATIONS_TO_TRUST} times. Texts, transfers and larger amounts still ask.`
+                      : `Off. Payments you confirm ${CONFIRMATIONS_TO_TRUST} times can go in on their own - never from a text message, never a transfer, never above ₹${(DEFAULT_CEILING_MINOR / 100).toLocaleString('en-IN')}.`}
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                className="toggle-checkbox"
+                checked={autoAdd.enabled}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  const next = { ...autoAdd, enabled };
+                  setAutoAdd(next);
+                  saveAutoAddSettings(next);
+                  /* Turning it off forgets what was learned. Somebody switching
+                     this off after it got something wrong means "stop, and do
+                     not resume where you left off" - so trust is not merely
+                     paused, it is discarded and has to be earned again. */
+                  if (!enabled) forgetAllTrust();
+                }}
+              />
+            </label>
+          )}
+
           <label className="toggle-row">
             <div className="toggle-info">
               <span className="toggle-label">Upcoming Bill Reminders</span>
@@ -933,7 +981,8 @@ export const ProfilePage: React.FC = () => {
 
         <p className="text-body text-xs text-muted">
           Download an Excel workbook of your financial records &mdash; a sheet each for
-          transactions, accounts, budgets, goals, bills and recurring income.
+          transactions, accounts, budgets, goals, bills, recurring income and
+          instalment plans.
         </p>
 
         <Button variant="secondary" onClick={handleExportData} isLoading={isExporting}>

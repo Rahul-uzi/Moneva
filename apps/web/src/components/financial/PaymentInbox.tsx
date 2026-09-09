@@ -17,6 +17,8 @@ import {
 import type { AlertProposal } from '../../utils/paymentAlert';
 import { suggestCategory } from '../../utils/categorise';
 import { decideConfirm, badgeFor, needsDestinationPicker, describeProposal } from './paymentInboxRules';
+import { recordConfirmation, recordRejection } from '../../utils/autoAdd';
+import { loadTrustLedger, saveTrustLedger } from '../../services/autoAddStore';
 import type { Account, Category, Transaction } from '../../types/api';
 import './PaymentInbox.css';
 
@@ -141,6 +143,10 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
         transaction_date: new Date(proposal.postedAt).toISOString(),
         device_id: 'android-notification',
       });
+      // Recorded only after the write succeeded. A confirmation the server
+      // rejected is not evidence that this reading was right.
+      saveTrustLedger(recordConfirmation(loadTrustLedger(), proposal, Date.now()));
+
       await acknowledgeProposal(proposal);
       setProposals((rest) => rest.filter((p) => p.clientMutationId !== proposal.clientMutationId));
       onSuccess();
@@ -174,6 +180,11 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
   };
 
   const dismiss = async (proposal: AlertProposal) => {
+    /* Waving a payment away says the reading was wrong, and a pattern that
+       produces wrong readings is precisely the one that must not be filing
+       anything unasked. So this revokes rather than merely not-counting. */
+    saveTrustLedger(recordRejection(loadTrustLedger(), proposal, Date.now()));
+
     await acknowledgeProposal(proposal);
     setProposals((rest) => rest.filter((p) => p.clientMutationId !== proposal.clientMutationId));
   };
@@ -202,7 +213,15 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
             </p>
             <ul className="pay-inbox-facts">
               <li>Only alerts from payment and banking apps are read.</li>
-              <li>Nothing is added until you tap to confirm it.</li>
+              {/* Kept true rather than reassuring. Adding without asking is
+                  off unless the user turns it on, and saying only the first
+                  half of that would make this list a promise the settings
+                  screen can quietly break. */}
+              <li>
+                Nothing is added until you tap to confirm it - unless you later
+                choose to let the ones you have confirmed many times go in on
+                their own.
+              </li>
               <li>The text stays on this phone. Only the transaction is saved.</li>
               <li>You can turn this off here at any time.</li>
             </ul>

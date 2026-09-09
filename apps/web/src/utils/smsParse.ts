@@ -176,7 +176,24 @@ const AMOUNT_PATTERNS: Array<{ id: string; re: RegExp }> = [
 
 const ACCOUNT_TAIL = /(?:a\/c|ac|acct|account|card)\s*(?:no\.?|ending|xx+)?\s*[xX*]*([0-9]{3,6})\b/i;
 
-const REFERENCE = /(?:upi(?:\/| )?ref(?:erence)?(?: no\.?)?|ref(?:erence)?(?: no\.?)?|txn(?: id)?|transaction id|imps ref)\s*[:.# ]?\s*([A-Za-z0-9]{4,25})\b/i;
+/**
+ * The bank's own reference for a payment.
+ *
+ * Two details here are load-bearing, because this value is now what tells one
+ * payment from another - two alerts whose references DISAGREE are refused a
+ * merge, so a wrong reading here silently merges two real payments into one
+ * row and loses half the money.
+ *
+ *   1. The label may end in the word "number", not just "no". Without that
+ *      alternative, "UPI Reference Number 512345678901" captured the literal
+ *      word "Number" - measured, not guessed - and every alert phrased that
+ *      way then carried the SAME reference as every other, which is worse than
+ *      carrying none: identical references read as agreement.
+ *   2. The captured value must contain a digit. That is what stops an English
+ *      word from ever standing in for a reference again, whatever wording a
+ *      bank invents next.
+ */
+const REFERENCE = /(?:upi(?:\/| )?ref(?:erence)?|ref(?:erence)?|txn(?: id)?|transaction id|imps ref)(?:\s*(?:no|number)\.?)?\s*[:.# ]?\s*(?=[A-Za-z0-9]*[0-9])([A-Za-z0-9]{4,25})\b/i;
 
 /**
  * The other party: the payee on a debit, the payer on a credit.

@@ -14,7 +14,10 @@ import { apiClient } from './apiClient';
 import { nativeNotificationService, type UserNotifPreferences } from './notificationService';
 import { shouldSync, syncDeviceReminders, type ReminderCard } from './reminderScheduler';
 import { cardCycle, cardLedger, cycleTotals } from '../utils/cardCycle';
-import type { Account, Bill, NotificationRecord, RecurringIncome, Transaction } from '../types/api';
+import { runAutoAdd } from './autoAddRunner';
+import type {
+  Account, Bill, Category, NotificationRecord, RecurringIncome, Transaction,
+} from '../types/api';
 
 const DEFAULT_PREFS: UserNotifPreferences = {
   notif_bills: true,
@@ -36,10 +39,14 @@ export interface SyncResult {
   permission: string;
   deliveredNow: number;
   scheduled: number;
+  /** Payments filed without asking on this pass. Zero unless switched on. */
+  autoAdded: number;
 }
 
 export const runNotificationSync = async (opts: { force?: boolean } = {}): Promise<SyncResult> => {
-  const result: SyncResult = { skipped: true, permission: 'n/a', deliveredNow: 0, scheduled: 0 };
+  const result: SyncResult = {
+    skipped: true, permission: 'n/a', deliveredNow: 0, scheduled: 0, autoAdded: 0,
+  };
   if (!Capacitor.isNativePlatform()) return result;
 
   const now = new Date();
@@ -63,7 +70,7 @@ export const runNotificationSync = async (opts: { force?: boolean } = {}): Promi
      owe less than they do. */
   const since = new Date(now.getTime() - 120 * 86_400_000).toISOString();
 
-  const [notifs, prefs, bills, streams, accounts, ledger] = await Promise.all([
+  const [notifs, prefs, bills, streams, accounts, ledger, categories] = await Promise.all([
     settled(apiClient.get<NotificationRecord[]>('/notifications'), [] as NotificationRecord[]),
     settled(apiClient.get<UserNotifPreferences>('/notifications/preferences'), DEFAULT_PREFS),
     settled(apiClient.get<Bill[]>('/bills'), [] as Bill[]),
@@ -71,6 +78,10 @@ export const runNotificationSync = async (opts: { force?: boolean } = {}): Promi
     settled(apiClient.get<Account[]>('/accounts'), [] as Account[]),
     settled(apiClient.get<Transaction[]>('/transactions', { params: { start_date: since } }),
             [] as Transaction[]),
+    // Only so an auto-filed row can repeat a category the user already chose
+    // for that merchant. Failure is an empty list, which means "no category" -
+    // never a guessed one.
+    settled(apiClient.get<Category[]>('/categories'), [] as Category[]),
   ]);
 
   /* What each card still owes, worked out exactly as the card screen works it
@@ -92,6 +103,18 @@ export const runNotificationSync = async (opts: { force?: boolean } = {}): Promi
 
   for (const n of notifs.filter((x) => !x.is_read)) {
     if (await nativeNotificationService.deliverNativeNotification(n, prefs)) result.deliveredNow += 1;
+  }
+
+  /* Runs here because this is the path that already fires on launch and on
+     return to the foreground - the moments when a phone that was closed has a
+     queue waiting. Before the reminders, so a payment that lands now is part
+     of the picture the reminders are planned from. Failure is swallowed: an
+     unfiled payment simply stays in the inbox, which is where it used to be. */
+  try {
+    const outcome = await runAutoAdd(accounts, now.getTime(), categories, ledger);
+    result.autoAdded = outcome.added;
+  } catch {
+    /* the proposals stay queued for the inbox */
   }
 
   try {
