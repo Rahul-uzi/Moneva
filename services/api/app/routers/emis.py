@@ -2,9 +2,10 @@ import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ratelimit import EMI_WRITES_BY_ACCOUNT, enforce
 from app.core.security import get_current_user
 from app.db.database import get_db
 from app.models.models import User, Account, Emi
@@ -66,12 +67,18 @@ async def create_emi(
     db: AsyncSession = Depends(get_db),
 ):
     """Records a plan the user is already committed to."""
+    enforce(EMI_WRITES_BY_ACCOUNT, str(current_user.id))
     account = await _owned_account(db, current_user, payload.account_id)
 
+    # Counted in the database rather than by loading the rows and measuring
+    # the list: the cap is checked on every create, and a rejected create
+    # should cost less than an accepted one, not more.
     count = await db.execute(
-        select(Emi).where(and_(Emi.user_id == current_user.id, Emi.is_active == True))  # noqa: E712
+        select(func.count()).select_from(Emi).where(
+            and_(Emi.user_id == current_user.id, Emi.is_active == True)  # noqa: E712
+        )
     )
-    if len(count.scalars().all()) >= MAX_ACTIVE_PLANS:
+    if (count.scalar_one() or 0) >= MAX_ACTIVE_PLANS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"That is more than {MAX_ACTIVE_PLANS} running plans. Close one first.",
@@ -102,6 +109,7 @@ async def update_emi(
     db: AsyncSession = Depends(get_db),
 ):
     """Corrects a plan that was entered wrong, or closes one settled early."""
+    enforce(EMI_WRITES_BY_ACCOUNT, str(current_user.id))
     res = await db.execute(
         select(Emi).where(and_(Emi.id == emi_id, Emi.user_id == current_user.id))
     )
@@ -143,6 +151,7 @@ async def delete_emi(
     false - rather than deleted, so the record of what was being paid off
     survives. This is here for the mistyped row.
     """
+    enforce(EMI_WRITES_BY_ACCOUNT, str(current_user.id))
     res = await db.execute(
         select(Emi).where(and_(Emi.id == emi_id, Emi.user_id == current_user.id))
     )

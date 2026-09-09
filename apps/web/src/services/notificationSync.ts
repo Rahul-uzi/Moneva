@@ -12,8 +12,9 @@
 import { Capacitor } from '@capacitor/core';
 import { apiClient } from './apiClient';
 import { nativeNotificationService, type UserNotifPreferences } from './notificationService';
-import { shouldSync, syncDeviceReminders } from './reminderScheduler';
-import type { Bill, NotificationRecord, RecurringIncome } from '../types/api';
+import { shouldSync, syncDeviceReminders, type ReminderCard } from './reminderScheduler';
+import { cardCycle, cardLedger, cycleTotals } from '../utils/cardCycle';
+import type { Account, Bill, NotificationRecord, RecurringIncome, Transaction } from '../types/api';
 
 const DEFAULT_PREFS: UserNotifPreferences = {
   notif_bills: true,
@@ -55,12 +56,39 @@ export const runNotificationSync = async (opts: { force?: boolean } = {}): Promi
     /* offline or cold backend - the device plan below still runs */
   }
 
-  const [notifs, prefs, bills, streams] = await Promise.all([
+  /* The ledger window matches the card panel: back to the statement before
+     last, by date rather than by row count, so a busy month cannot drop the
+     previous-cycle purchases that make up the amount owed. Understating that
+     would produce the worst possible reminder - one that tells somebody they
+     owe less than they do. */
+  const since = new Date(now.getTime() - 120 * 86_400_000).toISOString();
+
+  const [notifs, prefs, bills, streams, accounts, ledger] = await Promise.all([
     settled(apiClient.get<NotificationRecord[]>('/notifications'), [] as NotificationRecord[]),
     settled(apiClient.get<UserNotifPreferences>('/notifications/preferences'), DEFAULT_PREFS),
     settled(apiClient.get<Bill[]>('/bills'), [] as Bill[]),
     settled(apiClient.get<RecurringIncome[]>('/income/recurring'), [] as RecurringIncome[]),
+    settled(apiClient.get<Account[]>('/accounts'), [] as Account[]),
+    settled(apiClient.get<Transaction[]>('/transactions', { params: { start_date: since } }),
+            [] as Transaction[]),
   ]);
+
+  /* What each card still owes, worked out exactly as the card screen works it
+     out - same functions, same instant - so a reminder can never quote a
+     figure the screen disagrees with. */
+  const cards: ReminderCard[] = accounts
+    .filter((a) => a.is_active && a.statement_day != null && a.due_day != null)
+    .map((a) => {
+      const terms = { statementDay: a.statement_day as number, dueDay: a.due_day as number };
+      const totals = cycleTotals(cardLedger(ledger, a.id), cardCycle(terms, now.getTime()), terms);
+      return {
+        id: a.id,
+        name: a.name,
+        statement_day: terms.statementDay,
+        due_day: terms.dueDay,
+        outstanding_minor: totals.outstandingMinor,
+      };
+    });
 
   for (const n of notifs.filter((x) => !x.is_read)) {
     if (await nativeNotificationService.deliverNativeNotification(n, prefs)) result.deliveredNow += 1;
@@ -82,6 +110,7 @@ export const runNotificationSync = async (opts: { force?: boolean } = {}): Promi
         next_occurrence: s.next_occurrence,
         active: s.active,
       })),
+      cards,
       prefs: { notif_bills: prefs.notif_bills, notif_salary: prefs.notif_salary },
       now,
     });

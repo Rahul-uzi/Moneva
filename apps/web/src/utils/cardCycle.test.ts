@@ -15,7 +15,21 @@ import {
  * 36-46% a year, backdated to the purchase date.
  */
 
-const at = (y: number, m: number, d: number) => Date.UTC(y, m - 1, d);
+const at = (y: number, m: number, d: number) => new Date(y, m - 1, d).getTime();
+
+/**
+ * A date as the reader's own calendar shows it.
+ *
+ * Local, not UTC, and read back the same way it was built - so these tests
+ * assert what a person in India sees and still pass on a machine set to UTC.
+ * Asserting through toISOString would have measured Greenwich's calendar and
+ * hidden the very bug this module was corrected for.
+ */
+const ymd = (t: number): string => {
+  const d = new Date(t);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+};
 
 /** Statement closes on the 18th, payment due on the 8th of the next month. */
 const HDFC: CardTerms = { statementDay: 18, dueDay: 8, creditLimitMinor: 20_000_00 };
@@ -39,28 +53,28 @@ describe('the day a month does not have', () => {
     // The classic failure: asking for 31 February and being handed 3 March,
     // which moves the cycle and every purchase in it.
     const cycle = cardCycle({ statementDay: 31, dueDay: 20 }, at(2026, 2, 20));
-    expect(new Date(cycle.lastStatementAt).toISOString().slice(0, 10)).toBe('2026-01-31');
-    expect(new Date(cycle.nextStatementAt).toISOString().slice(0, 10)).toBe('2026-02-28');
+    expect(ymd(cycle.lastStatementAt)).toBe('2026-01-31');
+    expect(ymd(cycle.nextStatementAt)).toBe('2026-02-28');
   });
 });
 
 describe('where the card is in its cycle', () => {
   it('after the statement day, the last statement is this month', () => {
     const cycle = cardCycle(HDFC, at(2026, 9, 20));
-    expect(new Date(cycle.lastStatementAt).toISOString().slice(0, 10)).toBe('2026-09-18');
-    expect(new Date(cycle.nextStatementAt).toISOString().slice(0, 10)).toBe('2026-10-18');
+    expect(ymd(cycle.lastStatementAt)).toBe('2026-09-18');
+    expect(ymd(cycle.nextStatementAt)).toBe('2026-10-18');
   });
 
   it('before the statement day, the last statement was last month', () => {
     const cycle = cardCycle(HDFC, at(2026, 9, 10));
-    expect(new Date(cycle.lastStatementAt).toISOString().slice(0, 10)).toBe('2026-08-18');
-    expect(new Date(cycle.nextStatementAt).toISOString().slice(0, 10)).toBe('2026-09-18');
+    expect(ymd(cycle.lastStatementAt)).toBe('2026-08-18');
+    expect(ymd(cycle.nextStatementAt)).toBe('2026-09-18');
   });
 
   it('crosses a year boundary', () => {
     const cycle = cardCycle(HDFC, at(2027, 1, 5));
-    expect(new Date(cycle.lastStatementAt).toISOString().slice(0, 10)).toBe('2026-12-18');
-    expect(new Date(cycle.nextStatementAt).toISOString().slice(0, 10)).toBe('2027-01-18');
+    expect(ymd(cycle.lastStatementAt)).toBe('2026-12-18');
+    expect(ymd(cycle.nextStatementAt)).toBe('2027-01-18');
   });
 });
 
@@ -75,13 +89,13 @@ describe('where the card is in its cycle', () => {
 describe('when the payment is actually due', () => {
   it('is next month when the due day comes before the statement day', () => {
     const cycle = cardCycle(HDFC, at(2026, 9, 20));
-    expect(new Date(cycle.dueAt).toISOString().slice(0, 10)).toBe('2026-10-08');
+    expect(ymd(cycle.dueAt)).toBe('2026-10-08');
   });
 
   it('is the same month when the due day comes after it', () => {
     const card: CardTerms = { statementDay: 5, dueDay: 25 };
     const cycle = cardCycle(card, at(2026, 9, 10));
-    expect(new Date(cycle.dueAt).toISOString().slice(0, 10)).toBe('2026-09-25');
+    expect(ymd(cycle.dueAt)).toBe('2026-09-25');
   });
 
   it('counts the days left, and says when they have run out', () => {
@@ -192,7 +206,7 @@ describe('an instalment plan', () => {
   });
 
   it('knows when the last instalment falls', () => {
-    expect(new Date(emiProgress(phone, at(2026, 9, 20)).finishesAt).toISOString().slice(0, 10))
+    expect(ymd(emiProgress(phone, at(2026, 9, 20)).finishesAt))
       .toBe('2027-02-10');
   });
 
@@ -304,14 +318,21 @@ describe('reading one card out of the ledger', () => {
  * a card a full day late still read as "due today".
  */
 describe('the due date is a whole day', () => {
-  const morningOfTheDueDate = Date.UTC(2026, 9, 8, 9, 30);   // 8 Oct, 09:30
-  const lateOnTheDueDate = Date.UTC(2026, 9, 8, 23, 59);
-  const nextMorning = Date.UTC(2026, 9, 9, 9, 30);
+  /* A time of day on the reader's own clock. These cases are about what the
+     card says at 9 in the morning and at midnight, so the hours have to be
+     the user's hours - built through Date.UTC they were Greenwich's, and in
+     India "late on the due date" was already the next day. */
+  const atTime = (y: number, m: number, d: number, hh: number, mm: number) =>
+    new Date(y, m - 1, d, hh, mm).getTime();
+
+  const morningOfTheDueDate = atTime(2026, 10, 8, 9, 30);
+  const lateOnTheDueDate = atTime(2026, 10, 8, 23, 59);
+  const nextMorning = atTime(2026, 10, 9, 9, 30);
 
   it('is not overdue at any hour of the due date itself', () => {
     for (const now of [morningOfTheDueDate, lateOnTheDueDate]) {
       const cycle = cardCycle(HDFC, now);
-      expect(new Date(cycle.dueAt).toISOString().slice(0, 10)).toBe('2026-10-08');
+      expect(ymd(cycle.dueAt)).toBe('2026-10-08');
       expect(cycle.daysUntilDue).toBe(0);
       expect(cycle.isOverdue).toBe(false);
     }
@@ -326,9 +347,85 @@ describe('the due date is a whole day', () => {
   it('reports the same number of days whatever time of day it is asked', () => {
     // Otherwise a countdown changes as the user scrolls past midnight, and two
     // cards on one screen can disagree about what day it is.
-    const early = cardCycle(HDFC, Date.UTC(2026, 9, 3, 0, 1));
-    const late = cardCycle(HDFC, Date.UTC(2026, 9, 3, 23, 59));
+    const early = cardCycle(HDFC, atTime(2026, 10, 3, 0, 1));
+    const late = cardCycle(HDFC, atTime(2026, 10, 3, 23, 59));
     expect(early.daysUntilDue).toBe(late.daysUntilDue);
     expect(early.daysUntilStatement).toBe(late.daysUntilStatement);
+  });
+});
+
+/**
+ * The calendar the answer is given in is the reader's own.
+ *
+ * These do not test a date, they test the frame. Computed in UTC, the whole
+ * module was a day behind for the five and a half hours after midnight in
+ * India: at 2am on the due date the card showed the due date as today and the
+ * countdown as "due in 1 day", contradicting itself on the one screen whose
+ * only job is to say when to pay - and erring towards paying late, which is
+ * the exact mistake the feature exists to prevent.
+ *
+ * Written as invariants rather than fixed dates so they hold, and keep
+ * holding, wherever the machine running them is set.
+ */
+describe('the calendar the reader lives in', () => {
+  const cards: CardTerms[] = [
+    { statementDay: 18, dueDay: 8 },
+    { statementDay: 5, dueDay: 25 },
+    { statementDay: 31, dueDay: 15 },
+    { statementDay: 1, dueDay: 20 },
+  ];
+
+  it('puts every boundary on a local midnight', () => {
+    // Under UTC arithmetic these land at 05:30 for a reader in India, which is
+    // what made "today" mean yesterday for part of every day.
+    for (const terms of cards) {
+      for (let day = 1; day <= 28; day += 3) {
+        const cycle = cardCycle(terms, at(2026, 7, day));
+        for (const boundary of [cycle.lastStatementAt, cycle.nextStatementAt, cycle.dueAt]) {
+          const d = new Date(boundary);
+          expect([d.getHours(), d.getMinutes(), d.getSeconds()]).toEqual([0, 0, 0]);
+        }
+      }
+    }
+  });
+
+  it('says "due today" exactly when the date it shows is today', () => {
+    // The contradiction itself, as a property: the countdown and the printed
+    // date are two renderings of one fact and may never disagree.
+    for (const terms of cards) {
+      for (let day = 1; day <= 28; day += 1) {
+        for (const hour of [0, 2, 12, 23]) {
+          const now = new Date(2026, 6, day, hour, 30).getTime();
+          const cycle = cardCycle(terms, now);
+          expect(cycle.daysUntilDue === 0).toBe(ymd(cycle.dueAt) === ymd(now));
+          expect(cycle.isOverdue).toBe(ymd(cycle.dueAt) < ymd(now));
+        }
+      }
+    }
+  });
+
+  it('does not change its answer as the hours pass', () => {
+    // A countdown that ticks over at 18:30 rather than midnight is the same
+    // bug wearing a different hat.
+    for (const terms of cards) {
+      const hours = [0, 1, 6, 12, 18, 23];
+      const answers = hours.map((h) => {
+        const c = cardCycle(terms, new Date(2026, 6, 12, h, 30).getTime());
+        return `${c.daysUntilDue}/${c.daysUntilStatement}/${c.isOverdue}`;
+      });
+      expect(new Set(answers).size).toBe(1);
+    }
+  });
+
+  it('counts an instalment from the month the user is actually in', () => {
+    const plan: EmiPlan = {
+      name: 'Fridge', monthlyMinor: 3000_00, months: 9,
+      startedAt: new Date(at(2026, 3, 10)).toISOString(),
+    };
+    // Just after midnight on the day the instalment falls: it has been taken
+    // today, on this reader's calendar, whatever Greenwich says.
+    const justAfterMidnight = new Date(2026, 8, 10, 0, 5).getTime();
+    expect(emiProgress(plan, justAfterMidnight).paidCount)
+      .toBe(emiProgress(plan, new Date(2026, 8, 10, 12, 0).getTime()).paidCount);
   });
 });

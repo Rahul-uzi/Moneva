@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { rupeesToPaise, paiseToRupeesString } from '../../utils/money';
+import {
+  rupeesToPaise, paiseToRupeesString, groupIndianDigits, ungroupDigits,
+} from '../../utils/money';
 import './AmountInput.css';
 
 interface AmountInputProps {
@@ -19,7 +21,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
 }) => {
   const [displayVal, setDisplayVal] = useState<string>(() => {
     try {
-      return valuePaise ? paiseToRupeesString(valuePaise) : '';
+      return valuePaise ? groupIndianDigits(paiseToRupeesString(valuePaise)) : '';
     } catch {
       return '';
     }
@@ -40,7 +42,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   useEffect(() => {
     let current: number;
     try {
-      current = displayVal.trim() ? rupeesToPaise(displayVal) : 0;
+      current = displayVal.trim() ? rupeesToPaise(ungroupDigits(displayVal)) : 0;
     } catch {
       return; // Half-typed and unparseable: leave it be.
     }
@@ -49,7 +51,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
     // within it, matching how the rest of the app defers effect state.
     const timer = setTimeout(() => {
       try {
-        setDisplayVal(valuePaise ? paiseToRupeesString(valuePaise) : '');
+        setDisplayVal(valuePaise ? groupIndianDigits(paiseToRupeesString(valuePaise)) : '');
         setLocalError(null);
       } catch {
         // An unrepresentable value keeps whatever is on screen.
@@ -61,6 +63,9 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   }, [valuePaise]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Kept exactly as typed. Regrouping mid-entry would move the caret out
+    // from under the cursor on every third digit, which is worse than not
+    // formatting at all - the tidying happens on the way out instead.
     const val = e.target.value;
     setDisplayVal(val);
 
@@ -71,7 +76,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
     }
 
     try {
-      const paise = rupeesToPaise(val);
+      const paise = rupeesToPaise(ungroupDigits(val));
       if (paise < 0) {
         setLocalError('Amount cannot be negative');
       } else {
@@ -80,6 +85,21 @@ export const AmountInput: React.FC<AmountInputProps> = ({
       }
     } catch {
       setLocalError('Invalid amount format');
+    }
+  };
+
+  /* Grouped when the field is at rest, plain while it is being edited.
+     Left ungrouped, "6500" reads as ambiguous - six thousand five hundred
+     rupees, or sixty-five rupees entered in paise? - and the answer only
+     appeared once the row had been saved. */
+  const handleFocus = () => setDisplayVal(ungroupDigits(displayVal));
+
+  const handleBlur = () => {
+    if (!displayVal.trim()) return;
+    try {
+      setDisplayVal(groupIndianDigits(paiseToRupeesString(rupeesToPaise(ungroupDigits(displayVal)))));
+    } catch {
+      // Half-typed or unparseable: leave it alone and let the error show.
     }
   };
 
@@ -97,6 +117,8 @@ export const AmountInput: React.FC<AmountInputProps> = ({
           className="amount-field"
           value={displayVal}
           onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
         />
       </div>
       {activeError && <span className="error-message">{activeError}</span>}

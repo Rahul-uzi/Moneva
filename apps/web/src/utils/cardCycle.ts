@@ -18,9 +18,11 @@
  *   - the due date is in the SAME month as the statement when the due day
  *     falls after it, and the NEXT month when it does not.
  *
- * Every date is computed in UTC and every "now" is passed in, so the same
- * ledger always produces the same answer and none of this depends on when the
- * test is run.
+ * Every date is computed in the reader's own timezone, because a card closes
+ * on "the 18th" in their calendar rather than in Greenwich's - see `dateOn`.
+ * Every "now" is passed in rather than read from the clock, so the same ledger
+ * always produces the same answer and none of this depends on when it is
+ * asked.
  */
 
 const DAY = 86_400_000;
@@ -60,13 +62,23 @@ export interface CardCycle {
  * and every purchase in it.
  */
 export function clampDayToMonth(year: number, month: number, day: number): number {
-  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const lastDay = new Date(year, month + 1, 0).getDate();
   return Math.min(day, lastDay);
 }
 
-/** Midnight UTC on the given day-of-month, clamped into that month. */
+/**
+ * Midnight on the given day-of-month, in the reader's own timezone.
+ *
+ * Local rather than UTC, and that is the whole point. A card closes on "the
+ * 18th" in the calendar hanging on the user's wall, not in Greenwich's. In
+ * India - UTC+5:30 - the two disagree for the five and a half hours after
+ * local midnight, and computing in UTC put the app a day behind for that
+ * whole window: at 2am on the due date it showed the date as today and the
+ * countdown as "due in 1 day", disagreeing with itself on the one screen
+ * whose only job is to say when to pay.
+ */
 const dateOn = (year: number, month: number, day: number): number =>
-  Date.UTC(year, month, clampDayToMonth(year, month, day));
+  new Date(year, month, clampDayToMonth(year, month, day)).getTime();
 
 /**
  * Where the card is in its cycle right now.
@@ -76,8 +88,8 @@ const dateOn = (year: number, month: number, day: number): number =>
  */
 export function cardCycle(terms: CardTerms, now: number): CardCycle {
   const today = new Date(now);
-  const year = today.getUTCFullYear();
-  const month = today.getUTCMonth();
+  const year = today.getFullYear();
+  const month = today.getMonth();
 
   const thisMonthStatement = dateOn(year, month, terms.statementDay);
 
@@ -89,7 +101,7 @@ export function cardCycle(terms: CardTerms, now: number): CardCycle {
 
   const lastDate = new Date(lastStatementAt);
   const nextStatementAt = dateOn(
-    lastDate.getUTCFullYear(), lastDate.getUTCMonth() + 1, terms.statementDay,
+    lastDate.getFullYear(), lastDate.getMonth() + 1, terms.statementDay,
   );
 
   /* The due date belongs to the statement that just closed, and which month it
@@ -99,7 +111,7 @@ export function cardCycle(terms: CardTerms, now: number): CardCycle {
      puts the reminder four weeks late for the first kind. */
   const dueMonthOffset = terms.dueDay > terms.statementDay ? 0 : 1;
   const dueAt = dateOn(
-    lastDate.getUTCFullYear(), lastDate.getUTCMonth() + dueMonthOffset, terms.dueDay,
+    lastDate.getFullYear(), lastDate.getMonth() + dueMonthOffset, terms.dueDay,
   );
 
   /* Counted from the START of today, not from this instant.
@@ -108,7 +120,7 @@ export function cardCycle(terms: CardTerms, now: number): CardCycle {
      from one second past midnight on its own due date, and - because the
      remainder then rounded the wrong way - showed a card a full day late as
      still "due today". Both disappear once the unit is the day. */
-  const todayStart = Date.UTC(year, month, today.getUTCDate());
+  const todayStart = new Date(year, month, today.getDate()).getTime();
 
   const daysUntilDue = Math.round((dueAt - todayStart) / DAY);
 
@@ -191,7 +203,7 @@ export function cycleTotals(
 ): CycleTotals {
   const previousStatementAt = (() => {
     const d = new Date(cycle.lastStatementAt);
-    return dateOn(d.getUTCFullYear(), d.getUTCMonth() - 1, terms.statementDay);
+    return dateOn(d.getFullYear(), d.getMonth() - 1, terms.statementDay);
   })();
 
   let currentCycleMinor = 0;
@@ -279,15 +291,15 @@ export interface EmiProgress {
  */
 export function emiProgress(plan: EmiPlan, now: number): EmiProgress {
   const start = new Date(Date.parse(plan.startedAt));
-  const startYear = start.getUTCFullYear();
-  const startMonth = start.getUTCMonth();
-  const startDay = start.getUTCDate();
+  const startYear = start.getFullYear();
+  const startMonth = start.getMonth();
+  const startDay = start.getDate();
 
   const today = new Date(now);
-  let elapsed = (today.getUTCFullYear() - startYear) * 12
-    + (today.getUTCMonth() - startMonth);
+  let elapsed = (today.getFullYear() - startYear) * 12
+    + (today.getMonth() - startMonth);
   // The instalment for the current month has not been taken until its day.
-  if (today.getUTCDate() < clampDayToMonth(today.getUTCFullYear(), today.getUTCMonth(), startDay)) {
+  if (today.getDate() < clampDayToMonth(today.getFullYear(), today.getMonth(), startDay)) {
     elapsed -= 1;
   }
 

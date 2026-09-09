@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.security import create_access_token, hash_password
 from app.db.database import get_db
 from app.models.models import Account, Base, User
+from app.routers.emis import MAX_ACTIVE_PLANS
 from main import app
 
 pytestmark = pytest.mark.asyncio
@@ -65,6 +66,10 @@ async def env():
             "account_id": str(my_account),
             "their_account_id": str(their_account),
             "their_token": create_access_token({"sub": str(theirs)}),
+            # The rate-limit key is the user id, so the tests that exercise it
+            # need to be able to clear their own bucket.
+            "user_id": str(mine),
+            "their_user_id": str(theirs),
         }
 
     app.dependency_overrides.clear()
@@ -267,6 +272,101 @@ class TestInstalmentPlans:
 
         assert (await env["client"].get("/api/emis")).json() == []
         assert len((await env["client"].get("/api/emis?include_closed=true")).json()) == 1
+
+    async def test_a_stuck_client_cannot_fill_the_table(self, env):
+        """The cap is what stops a loop from writing rows forever.
+
+        Sixty running plans is far past anything a person is actually paying,
+        so nobody legitimate meets this - which is exactly what makes it safe
+        to refuse at. Without it a client stuck in a retry loop, or a stolen
+        token, writes until the database says stop.
+        """
+        for n in range(MAX_ACTIVE_PLANS):
+            res = await env["client"].post("/api/emis", json={**PLAN, "name": f"plan {n}"})
+            assert res.status_code == 201, f"plan {n} was refused: {res.text[:200]}"
+
+        over = await env["client"].post("/api/emis", json={**PLAN, "name": "one too many"})
+        assert over.status_code == 400
+        assert "Close one first" in over.json()["detail"]
+
+        listed = await env["client"].get("/api/emis")
+        assert len(listed.json()) == MAX_ACTIVE_PLANS
+
+    async def test_closing_a_plan_makes_room_for_another(self, env):
+        """The cap counts what is RUNNING, not what was ever entered.
+
+        Counted over every row instead, somebody who had genuinely finished
+        sixty plans over the years could never enter another one.
+        """
+        ids = []
+        for n in range(MAX_ACTIVE_PLANS):
+            res = await env["client"].post("/api/emis", json={**PLAN, "name": f"plan {n}"})
+            ids.append(res.json()["id"])
+
+        assert (await env["client"].post("/api/emis", json=PLAN)).status_code == 400
+
+        closed = await env["client"].patch(f"/api/emis/{ids[0]}", json={"is_active": False})
+        assert closed.status_code == 200
+        assert (await env["client"].post("/api/emis", json={**PLAN, "name": "now it fits"})).status_code == 201
+
+    async def test_one_users_plans_do_not_fill_anothers_cap(self, env):
+        """The cap is per person, not global.
+
+        Shared, one busy account would lock every other user out of the
+        feature entirely.
+        """
+        for n in range(MAX_ACTIVE_PLANS):
+            await env["client"].post("/api/emis", json={**PLAN, "name": f"plan {n}"})
+
+        theirs = await env["client"].post(
+            "/api/emis", json={**PLAN, "name": "their first plan"},
+            headers={"Authorization": f"Bearer {env['their_token']}"},
+        )
+        assert theirs.status_code == 201, theirs.text[:200]
+
+    async def test_writes_are_rate_limited(self, env):
+        """The cap bounds what gets STORED; this bounds what gets ASKED.
+
+        Without it, every rejected create still cost a query, and nothing
+        limited how many could arrive - so a client stuck in a retry loop, or
+        a stolen token, could hammer the table indefinitely while never
+        storing a single extra row.
+        """
+        from app.core.ratelimit import EMI_WRITES_BY_ACCOUNT
+
+        # A window shared across the process, so it has to be cleared or an
+        # earlier test in this file leaves it primed and this one measures
+        # somebody else's requests.
+        EMI_WRITES_BY_ACCOUNT.reset(env['user_id'])
+
+        seen = set()
+        for n in range(EMI_WRITES_BY_ACCOUNT.limit + 5):
+            res = await env["client"].post("/api/emis", json={**PLAN, "name": f"p{n}"})
+            seen.add(res.status_code)
+            if res.status_code == 429:
+                assert "Retry-After" in res.headers
+                break
+        else:
+            pytest.fail("the write limit never triggered")
+
+        assert 429 in seen
+
+    async def test_the_write_limit_is_per_person(self, env):
+        """Shared, one busy account would lock everybody else out."""
+        from app.core.ratelimit import EMI_WRITES_BY_ACCOUNT
+        EMI_WRITES_BY_ACCOUNT.reset(env['user_id'])
+        EMI_WRITES_BY_ACCOUNT.reset(env['their_user_id'])
+
+        for n in range(EMI_WRITES_BY_ACCOUNT.limit + 2):
+            res = await env["client"].post("/api/emis", json={**PLAN, "name": f"p{n}"})
+            if res.status_code == 429:
+                break
+
+        theirs = await env["client"].post(
+            "/api/emis", json={**PLAN, "name": "their first plan"},
+            headers={"Authorization": f"Bearer {env['their_token']}"},
+        )
+        assert theirs.status_code != 429, "one user's writes locked out another"
 
     async def test_a_mistyped_plan_can_be_removed(self, env):
         created = await env["client"].post("/api/emis", json=PLAN)

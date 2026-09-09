@@ -19,13 +19,37 @@ interface Props {
   onSuccess: () => void;
 }
 
-/** An ISO instant as the yyyy-mm-dd a date input wants. */
-const asDateInput = (iso: string): string => {
+/**
+ * An ISO instant as the yyyy-mm-dd a date input wants, on the local calendar.
+ *
+ * Local rather than UTC, and it has to match the way `emiProgress` counts the
+ * months, or the date shown is not the date the plan runs on. Read through
+ * toISOString, a plan started on the 1st came back as the last day of the
+ * previous month for any reader west of Greenwich - and then, saved again,
+ * walked a day earlier each time it was edited.
+ */
+export const asDateInput = (iso: string): string => {
   const at = Date.parse(iso);
-  return Number.isFinite(at) ? new Date(at).toISOString().slice(0, 10) : '';
+  if (!Number.isFinite(at)) return '';
+  const d = new Date(at);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 };
 
-const todayInput = (): string => new Date().toISOString().slice(0, 10);
+const todayInput = (): string => asDateInput(new Date().toISOString());
+
+/**
+ * The yyyy-mm-dd from the input, as the instant the day began for this reader.
+ *
+ * Built from the parts rather than parsed from a string, so it cannot depend
+ * on whether an engine reads a bare date as local or as UTC.
+ */
+export const fromDateInput = (value: string): string | null => {
+  const [y, m, d] = value.split('-').map((part) => Number.parseInt(part, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+  const at = new Date(y, m - 1, d);
+  return Number.isNaN(at.getTime()) ? null : at.toISOString();
+};
 
 /**
  * Entering a plan the user is already committed to.
@@ -95,11 +119,11 @@ export const EmiModal: React.FC<Props> = ({
     if (!monthsAreValid) return setError('Enter how many instalments, between 1 and 600.');
     if (!startedOn) return setError('Enter the date of the first instalment.');
 
-    // Sent as an instant at midnight UTC, matching how the calendar reads it
-    // back. A local-midnight date would land in the previous day east of
-    // Greenwich and move the instalment a month for a plan that starts on the
-    // 1st.
-    const startedAt = new Date(`${startedOn}T00:00:00.000Z`).toISOString();
+    // The instant this day began for this reader, which is how the calendar
+    // reads it back. Sent as midnight UTC it described a different day either
+    // side of Greenwich, and moved a plan that starts on the 1st by a month.
+    const startedAt = fromDateInput(startedOn);
+    if (!startedAt) return setError('That start date is not a real date.');
 
     setIsSubmitting(true);
     try {

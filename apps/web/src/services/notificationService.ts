@@ -76,6 +76,25 @@ class NativeNotificationService {
         { id: 'budgets', name: 'Budget Alerts', description: 'When a category reaches or passes its limit', importance: 4, vibration: true },
         { id: 'goals', name: 'Goal Milestones', description: 'Progress on savings goals', importance: 3 },
         { id: 'salary', name: 'Salary Reminders', description: 'Payday prompts for expected income', importance: 4, vibration: true },
+        /* Its own channel so a card can be silenced without silencing bills,
+           and so it can be left loud when everything else is muted - this is
+           the one whose cost is measured in interest.
+
+           visibility 0 is VISIBILITY_PRIVATE: content hidden on the lock
+           screen, so "Rs 42,000 owed" is not legible to whoever picks the
+           phone up off a desk. Stated here as intent rather than as the
+           mechanism - Capacitor already calls setVisibility(VISIBILITY_PRIVATE)
+           on every notification it posts, so the redaction is in place with or
+           without this line, and it applies to bills and salary too. Measured
+           on a real device: the posted record reads `vis=PRIVATE`, while the
+           channel itself still reports mLockscreenVisibility=-1000, because
+           PRIVATE is the platform default and Android stores that as
+           NO_OVERRIDE rather than as an override.
+
+           Channels are immutable once Android has created them - only the name
+           and description change afterwards - so anything that DOES depend on
+           this value has to be right on the build that first ships it. */
+        { id: 'cards', name: 'Credit Card Payments', description: 'Statement due dates and overdue card payments', importance: 4, vibration: true, visibility: 0 },
         { id: 'system', name: 'System', description: 'Application updates and security alerts', importance: 3 },
       ];
       for (const ch of channels) {

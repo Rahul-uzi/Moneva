@@ -91,6 +91,14 @@ IMPORT_BY_ACCOUNT = SlidingWindow(limit=120, window_seconds=3600, name="import-a
 # an XML parse, on a shared instance. Held much tighter for that reason.
 SHEET_BY_ACCOUNT = SlidingWindow(limit=30, window_seconds=3600, name="sheet-account")
 
+# Writing instalment plans. A person enters these by hand, one at a time,
+# after buying something - a handful in a busy hour is already unusual, and
+# nobody legitimate approaches this. It is here so that a client stuck in a
+# retry loop, or a stolen token, cannot hammer the table: the sixty-plan cap
+# bounds what gets STORED, but without this each rejected attempt still costs
+# a query, and nothing bounded how many of those could arrive.
+EMI_WRITES_BY_ACCOUNT = SlidingWindow(limit=90, window_seconds=3600, name="emi-account")
+
 # The second factor. This was the ONE credential-checking route in the router
 # with no limiter at all, which made a six-digit code brute-forceable: pyotp is
 # asked with valid_window=1, so three codes are live at any instant, and nothing
