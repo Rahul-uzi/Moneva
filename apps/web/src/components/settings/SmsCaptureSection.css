@@ -1,0 +1,32 @@
+/* The promise made before the permission dialog, not after.
+ *
+ * Set apart from the toggle rows deliberately: it is not a setting, it is the
+ * terms of the thing being asked for, and a person reading it is deciding
+ * whether to hand over their inbox. Quiet, but not so quiet it reads as legal
+ * boilerplate to be scrolled past. */
+.sms-promise {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: -4px 0 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background-color: var(--moneva-overlay-strong);
+  border: 1px solid var(--moneva-border);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--moneva-text-secondary);
+}
+
+.sms-promise svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--moneva-teal);
+}
+
+/* Keeps the icon on the label's baseline rather than sitting above it. */
+.toggle-label .toggle-icon {
+  vertical-align: -2px;
+  margin-right: 6px;
+  color: var(--moneva-text-secondary);
+}

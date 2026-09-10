@@ -60,6 +60,31 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- The live half of SMS capture.
+
+             Plenty of Indian banks send a transaction SMS and post no
+             notification at all, so the listener above cannot see them. This
+             receiver can.
+
+             android:exported must be true - the system delivers this
+             broadcast from outside the app. The receiver holds no data of its
+             own: it applies the same two native gates the backfill uses, and
+             a message that is not a payment is dropped before anything is
+             written. It never aborts the broadcast, so the user's messaging
+             app sees every message exactly as it would otherwise.
+
+             Holding the permission does not start collection: the receiver
+             checks the app's own SMS switch first, and that defaults to off
+             and is separate from the notification switch. -->
+        <receiver
+            android:name=".SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="500">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->
@@ -72,6 +97,24 @@
          "Alarms & reminders" as one that needs special access. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
     <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Reading bank SMS: the months before the app was installed, and the
+         banks that text without posting a notification.
+
+         This is the permission the app deliberately avoided for a long time,
+         and the trade is worth stating where it will be read. MONEVA is
+         distributed from its own website rather than Play, so Play's
+         restricted-permission review does not gate it - but the obligation
+         the policy describes is the right line regardless of who enforces
+         it, and the code keeps it: messages are filtered natively by SENDER
+         before their content is examined, only payments are queued, and raw
+         SMS is never uploaded anywhere. Only the parsed transaction leaves
+         the device, and only after the user confirms it.
+
+         See SmsSenderFilter for the gates, which run before anything is
+         stored. -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
     <!-- Held by the SERVICE, not requested from the user: it is what stops
          any app other than the system binding TxNotificationListener. The

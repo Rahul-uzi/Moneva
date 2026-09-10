@@ -42,6 +42,8 @@ final class CapturedNotificationStore {
        without it, turning capture off for a month and back on would report a
        month of silence the moment it was re-enabled. */
     private static final String KEY_ENABLED_AT = "enabled_at";
+    private static final String KEY_SMS_ENABLED = "sms_enabled";
+    private static final String KEY_SMS_BACKFILLED_TO = "sms_backfilled_to";
 
     /** Roughly a fortnight of alerts for a busy account; older ones fall off. */
     private static final int CAPACITY = 200;
@@ -77,6 +79,42 @@ final class CapturedNotificationStore {
                                                  : prefs.getLong(KEY_ENABLED_AT, 0L))
                 .apply();
         if (!enabled) clear();   // off means the queue goes too
+    }
+
+    /**
+     * Whether SMS capture is wanted, separately from notification capture.
+     *
+     * Two switches rather than one, because they are two different grants with
+     * two different costs. READ_SMS reaches an inbox that also holds one-time
+     * codes and private conversation; notification access does not. Someone
+     * who wants payment alerts read has not thereby agreed to have their
+     * messages read, and collapsing both into a single toggle would take that
+     * decision away from them.
+     *
+     * Defaults to false. Holding the permission is not consent to use it.
+     */
+    boolean isSmsEnabled() {
+        return prefs.getBoolean(KEY_SMS_ENABLED, false);
+    }
+
+    void setSmsEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SMS_ENABLED, enabled).apply();
+    }
+
+    /**
+     * The oldest point the backfill has already covered, as epoch ms.
+     *
+     * A second backfill re-reads the same inbox, and every message it finds
+     * again derives the same id, so the queue de-duplicates it. This exists so
+     * the SCAN can stop early instead - re-reading years of messages to
+     * discard all of them is work the phone does not need to do.
+     */
+    long smsBackfilledTo() {
+        return prefs.getLong(KEY_SMS_BACKFILLED_TO, 0L);
+    }
+
+    void setSmsBackfilledTo(long epochMs) {
+        prefs.edit().putLong(KEY_SMS_BACKFILLED_TO, epochMs).apply();
     }
 
     /** Epoch ms of the last alert kept, or 0 if none has ever been kept. */

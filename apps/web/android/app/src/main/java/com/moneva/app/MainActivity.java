@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
         // Registered before super.onCreate: the bridge builds its plugin list
         // there, and anything added afterwards is not in it.
         registerPlugin(NotificationCapturePlugin.class);
+        registerPlugin(SmsCapturePlugin.class);
         super.onCreate(savedInstanceState);
         disablePageZoom();
     }

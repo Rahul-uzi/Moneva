@@ -63,6 +63,7 @@ import { captureHealth } from '../utils/captureHealth';
 import { markTourPending } from '../services/tourService';
 import { exportBinaryFile } from '../services/exportService';
 import { ImportSheet } from '../components/financial/ImportSheet';
+import { SmsCaptureSection } from '../components/settings/SmsCaptureSection';
 import type { Account } from '../types/api';
 import './ProfilePage.css';
 
@@ -799,6 +800,11 @@ export const ProfilePage: React.FC = () => {
               </Button>
             </div>
           )}
+
+          {/* The other half of capture. Notification access sees what the
+              phone displays; this sees the banks that text and display
+              nothing. Adjacent because they are one job, not two features. */}
+          <SmsCaptureSection onCaptured={() => setIsPayInboxOpen(true)} />
 
           {/* Only offered once capture is actually working. Offering it while
               nothing is being captured would be a switch with no effect, and a
