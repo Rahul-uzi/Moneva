@@ -3,6 +3,12 @@ import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { Preferences } from '@capacitor/preferences';
 import { RefreshGate } from './refreshGate';
 import { apiCache, cacheKey, scopeOfWrite, ttlFor } from './apiCache';
+import {
+  isReachabilityFailure,
+  isWorthKeeping,
+  recall,
+  remember,
+} from './lastKnownGood';
 import type { AuthTokens, User } from '../types/api';
 
 /**
@@ -474,20 +480,82 @@ const detach = <T,>(res: { data: T }): { data: T } => {
   return { ...res };
 };
 
+/**
+ * Notified whenever a screen is being shown saved figures instead of live ones.
+ *
+ * An event rather than a return value because the fallback happens several
+ * layers below the component that renders it, and threading a "this is stale"
+ * flag up through every call site would mean touching every screen. The banner
+ * listens; nothing else has to know.
+ */
+export const STALE_DATA_EVENT = 'moneva:showing-saved-data';
+export const FRESH_DATA_EVENT = 'moneva:showing-live-data';
+
+/**
+ * Carries the saved-at time, so it cannot use `announce` above - that one
+ * dispatches a bare Event by name and there is nowhere to put the timestamp.
+ * Same guard, for the same reason: this runs on a read path that also executes
+ * under node in the tests, where there is no window at all.
+ */
+const announceStale = (savedAt: number) => {
+  try {
+    window.dispatchEvent(new CustomEvent(STALE_DATA_EVENT, { detail: { savedAt } }));
+  } catch {
+    /* no window (tests); the fallback data is what matters, not the banner */
+  }
+};
+
 apiClient.get = ((url: string, config?: Parameters<GetSignature>[1]) => {
   const ttl = ttlFor(url);
-  if (ttl <= 0) return uncachedGet(url, config);
+  const key = cacheKey(url, config?.params as Record<string, unknown> | undefined);
+  const keep = isWorthKeeping(url);
+
+  /**
+   * Serve from disk when the server cannot be reached.
+   *
+   * This is what stops the app opening blank. The API sleeps after fifteen
+   * idle minutes and takes up to 43 seconds to wake, so a cold start used to
+   * mean a skeleton and nothing else; now the last figures appear at once,
+   * labelled with their age, and are replaced when the server answers.
+   *
+   * Only for failures that mean "no answer" - see isReachabilityFailure. A
+   * 401 or 403 must reach the caller, because hiding an ended session behind
+   * saved figures would let someone read stale numbers believing they were
+   * signed in.
+   */
+  const withFallback = <T,>(p: Promise<T>): Promise<T> =>
+    keep
+      ? p.then(
+          (res) => {
+            void remember(key, (res as { data: unknown }).data);
+            announce(FRESH_DATA_EVENT);
+            return res;
+          },
+          async (err) => {
+            const status = (err as AxiosError).response?.status;
+            const code = (err as AxiosError).code;
+            if (!isReachabilityFailure(status, code)) throw err;
+            const saved = await recall<unknown>(key);
+            if (!saved) throw err;
+            announceStale(saved.savedAt);
+            return { data: saved.data } as T;
+          },
+        )
+      : p;
+
+  if (ttl <= 0) return withFallback(uncachedGet(url, config));
 
   // A caller that brings its own signal or response type wants that exact
   // request, not one shared with somebody else.
   if (config?.signal || (config?.responseType && config.responseType !== 'json')) {
-    return uncachedGet(url, config);
+    return withFallback(uncachedGet(url, config));
   }
 
-  const key = cacheKey(url, config?.params as Record<string, unknown> | undefined);
-  return apiCache
-    .read(key, ttl, () => uncachedGet(url, config))
-    .then((res) => detach(res as { data: unknown }));
+  return withFallback(
+    apiCache
+      .read(key, ttl, () => uncachedGet(url, config))
+      .then((res) => detach(res as { data: unknown })),
+  );
 }) as GetSignature;
 
 // A write invalidates the lot, unless it is one of the few declared as having
