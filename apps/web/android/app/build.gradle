@@ -1,5 +1,34 @@
 apply plugin: 'com.android.application'
 
+/*
+ * Release signing.
+ *
+ * The key is read from a properties file that is NOT in git, so the signing
+ * identity never travels with the source. Create it once:
+ *
+ *     keytool -genkeypair -v -keystore moneva-release.jks  *             -keyalg RSA -keysize 4096 -validity 10000 -alias moneva
+ *
+ * then put keystore.properties next to this file (see keystore.properties.example).
+ *
+ * THIS KEY CANNOT BE REPLACED LATER. Android identifies an app by its signing
+ * certificate, not by its name or package: an APK signed with a different key
+ * is a different app as far as the system is concerned, and it will refuse to
+ * install over the existing one. Everyone who installed MONEVA would have to
+ * uninstall first, losing whatever the app kept on the device. Distributing
+ * from a website rather than a store makes this sharper still - there is no
+ * Play App Signing holding a copy for you. Back the file up, and remember the
+ * password somewhere that is not this machine.
+ *
+ * With no properties file the release build still assembles - unsigned - so a
+ * fresh clone and CI both work without the secret.
+ */
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasSigningKey = keystorePropertiesFile.exists()
+if (hasSigningKey) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.moneva.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +36,19 @@ android {
         applicationId "com.moneva.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        /*
+         * Versioning.
+         *
+         * versionCode is what Android compares when deciding whether an APK is
+         * an upgrade; it must increase on every build anyone might install, and
+         * it is never shown to a person. versionName is what the person reads.
+         *
+         * Derived from the properties below rather than typed here so that one
+         * edit moves both, and so the About screen and the update check cannot
+         * disagree with the APK about which version this is.
+         */
+        versionCode rootProject.ext.monevaVersionCode
+        versionName rootProject.ext.monevaVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +56,44 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasSigningKey) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Only when the key is actually present. Pointing at an empty
+            // signingConfig fails the build with an error about a missing
+            // store file, which reads like a broken project rather than a
+            // missing secret.
+            if (hasSigningKey) {
+                signingConfig signingConfigs.release
+            }
+
+            /*
+             * Shrink and obfuscate.
+             *
+             * This was off, so the release APK shipped every unused library
+             * class and every original name. Turning it on is worth two things
+             * beyond size: the app's own strings and class names stop being
+             * readable in a decompiler, and an APK downloaded from a website is
+             * exactly the kind that gets decompiled.
+             *
+             * The Capacitor bridge finds plugins reflectively, so the rules in
+             * proguard-rules.pro keep those - without them the app builds,
+             * installs, and fails at runtime with a plugin that is "not
+             * implemented", which is a very expensive way to find out.
+             */
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }

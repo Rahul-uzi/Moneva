@@ -13,15 +13,21 @@ databases:
   - name: moneva-db
     databaseName: moneva
     user: moneva
-    # Free plan expires after a limited period; move to a paid plan before
-    # this holds anything you care about.
-    plan: free
+    # Basic, not free. The free database EXPIRES after about 30 days and
+    # takes its contents with it - fine for a smoke test, not for anything
+    # holding a person's financial history.
+    plan: basic-256mb
 
 services:
   - type: web
     name: moneva-api
     runtime: python
-    plan: free
+    # Starter, not free. Measured on the free plan: a cold request answered in
+    # 42.9 seconds, of which 0.14 was the network - it sleeps after 15 idle
+    # minutes and the rest is the wake-up. No amount of client work fixes that;
+    # the client already fetches in parallel behind a skeleton. Starter does
+    # not sleep.
+    plan: starter
     # The API lives in a subdirectory of the repo.
     rootDir: services/api
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt

@@ -1,0 +1,47 @@
+# Keeps the Render free service from spinning down.
+#
+# HONEST LIMITATION, because this will look like it works and sometimes will
+# not: GitHub's scheduled workflows are best-effort. The minimum interval is
+# five minutes, but under load runs are commonly delayed ten to twenty, and
+# during busy periods they are occasionally dropped altogether. Render's window
+# is fifteen minutes. So a schedule of ten minutes usually holds and will
+# sometimes miss, and a miss means the next person to open the app waits the
+# full cold start.
+#
+# For something dependable, use a purpose-built free pinger (cron-job.org and
+# similar hit reliably on the minute). This file exists because it needs no
+# account anywhere and lives with the code.
+#
+# And none of it saves the database: Render's free Postgres expires after about
+# thirty days regardless. This buys time, not a solution.
+
+name: Keep API awake
+
+on:
+  schedule:
+    # Every ten minutes, to leave slack inside Render's fifteen-minute window
+    # for the delays described above.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:        # so it can be triggered by hand to warm the API
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the API
+        run: |
+          URL="${{ vars.MONEVA_HEALTH_URL || 'https://moneva.onrender.com/api/health' }}"
+          start=$(date +%s)
+          # A real application route. Render's edge answers /robots.txt itself
+          # while the service is asleep, so pinging that returns 200 without
+          # ever waking anything.
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "$URL")
+          elapsed=$(( $(date +%s) - start ))
+          echo "HTTP $code in ${elapsed}s"
+          # Over ten seconds means it had gone to sleep and this run is what
+          # woke it - the schedule is not keeping up.
+          if [ "$elapsed" -gt 10 ]; then
+            echo "::warning::Service was asleep (${elapsed}s to answer) - a scheduled run was missed or delayed."
+          fi
+          [ "$code" = "200" ] || exit 1
