@@ -1,0 +1,115 @@
+/* Shares .onboarding-overlay, .onboarding-card, .onboarding-skip,
+   .onboarding-title, .onboarding-body and .onboarding-actions with the
+   welcome slideshow - this screen is the last beat of the same sequence, and
+   giving it its own frame would read as a different part of the app. */
+
+.setup-card {
+  /* The slides are centred around one illustration; this one is a list, and a
+     list centred in a tall card leaves its items floating. */
+  text-align: left;
+  gap: 18px;
+}
+
+.setup-card .onboarding-title,
+.setup-card .onboarding-body {
+  text-align: left;
+}
+
+.setup-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.setup-step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--moneva-border);
+  border-radius: 12px;
+  background: var(--moneva-surface);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.setup-step.is-done {
+  border-color: var(--moneva-teal);
+  background: var(--moneva-overlay-soft, rgba(205, 255, 74, 0.06));
+}
+
+.setup-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--moneva-overlay-strong);
+  color: var(--moneva-text-secondary);
+}
+
+.setup-step.is-done .setup-mark {
+  background: rgba(205, 255, 74, 0.15);
+  color: var(--moneva-teal);
+}
+
+.setup-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.setup-text strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moneva-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.setup-text p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--moneva-text-secondary);
+}
+
+/* Says "you may leave this" without a second sentence explaining that it is
+   optional - the word is doing the whole job. */
+.setup-optional {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--moneva-text-secondary);
+  border: 1px solid var(--moneva-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* The step buttons sit against the right edge of a three-column row; on a
+   narrow phone that squeezes the text to a couple of words per line. */
+@media (max-width: 380px) {
+  .setup-step {
+    grid-template-columns: auto 1fr;
+  }
+  .setup-step > .moneva-btn {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-step {
+    transition: none;
+  }
+}
