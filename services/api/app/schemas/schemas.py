@@ -52,6 +52,10 @@ class UserProfileUpdate(BaseModel):
 class UserResponse(UserBase):
     id: uuid.UUID
     is_active: bool
+    # Whether the address has been proved, not merely claimed. Carried on the
+    # user rather than fetched separately so every screen that already knows
+    # who is signed in also knows whether to nag.
+    email_verified: bool = False
     avatar_data_url: Optional[str] = None
     totp_enabled: bool = False
     created_at: UtcDateTime
@@ -133,6 +137,21 @@ class ForgotPasswordResponse(BaseModel):
     """
     message: str
     delivery_configured: bool
+
+
+class VerifyEmailRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=10)
+
+
+class SendVerificationResponse(BaseModel):
+    message: str
+    # Whether mail is switched on at all on this server - about the SERVER, not
+    # the address. Lets the app say "check the server log" in development
+    # instead of "check your inbox" for a mail that was never sent.
+    delivery_configured: bool
+    # Seconds until another send is allowed, so the screen can disable its own
+    # button rather than let someone tap into a refusal.
+    retry_after_seconds: int = 0
 
 
 class ResetPasswordRequest(BaseModel):

@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.passwords import password_problem
 from app.core.security import get_current_user, verify_password, hash_password
 from app.db.database import get_db
 from app.models.models import User, Account, Transaction, Budget, SavingsGoal, Bill, Category, RecurringIncome, Emi
@@ -81,6 +82,13 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be at least 8 characters long."
         )
+
+    # One definition of "strong enough", shared by registration, reset and
+    # change. Three call sites with three opinions is how an app ends up
+    # refusing a password on one screen and accepting it on another.
+    problem = password_problem(payload.new_password, email=current_user.email, display_name=current_user.display_name)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
 
     current_user.password_hash = hash_password(payload.new_password)
     await db.commit()

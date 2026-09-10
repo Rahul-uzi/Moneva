@@ -12,6 +12,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.passwords import password_problem
+from app.core import sessions as session_store
+from app.core.sessions import ReuseDetected
 from app.core.security import (
     hash_password,
     verify_password,
@@ -33,7 +36,12 @@ from app.core.ratelimit import (
     enforce,
 )
 from app.db.database import get_db
-from app.services.mailer import delivery_configured, masked, send_password_reset
+from app.services.mailer import (
+    delivery_configured,
+    masked,
+    send_email_verification,
+    send_password_reset,
+)
 from app.models.models import User, Category
 from app.schemas.schemas import (
     UserCreate,
@@ -50,12 +58,25 @@ from app.schemas.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     ResetPasswordRequest,
+    VerifyEmailRequest,
+    SendVerificationResponse,
 )
 
 # How long a reset code is good for. Long enough to fetch it from a phone that
 # is slow to sync mail, short enough that a code sitting in an old inbox is not
 # a standing key to the account.
 RESET_CODE_TTL_MINUTES = 30
+
+# How long a confirmation code is good for, and how long before another may
+# be sent. The resend gap is per account and deliberately short: the usual
+# reason someone asks again is that the first one went to spam, and making
+# them wait five minutes to discover that is its own problem.
+VERIFY_CODE_TTL_MINUTES = 30
+VERIFY_RESEND_SECONDS = 60
+# A six-digit code inside a thirty-minute window is guessable at unlimited
+# speed; this is what stops that. Lower than the reset ceiling because there
+# is no legitimate reason to mistype a code from an email ten times.
+VERIFY_MAX_ATTEMPTS = 6
 # Wrong codes accepted before the code is destroyed. Six digits is a million
 # combinations, but five guesses is far below what a person needs.
 RESET_MAX_ATTEMPTS = 5
@@ -89,8 +110,19 @@ DEFAULT_CATEGORIES = [
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register_user(payload: UserCreate, db: AsyncSession = Depends(get_db)):
+async def register_user(
+    request: Request,
+    payload: UserCreate,
+    db: AsyncSession = Depends(get_db),
+):
     """Registers a new user with secure password hashing and returns JWT tokens."""
+    # One definition of "strong enough", shared by registration, reset and
+    # change. Three call sites with three opinions is how an app ends up
+    # refusing a password on one screen and accepting it on another.
+    problem = password_problem(payload.password, email=payload.email, display_name=payload.display_name)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
+
     # Check if email is already taken
     stmt = select(User).where(User.email == payload.email.lower().strip())
     res = await db.execute(stmt)
@@ -125,16 +157,15 @@ async def register_user(payload: UserCreate, db: AsyncSession = Depends(get_db))
     await db.commit()
     await db.refresh(new_user)
 
-    # Generate JWT Tokens
-    access_token = create_access_token(data={"sub": str(new_user.id), "tv": new_user.token_version or 0})
-    refresh_token = create_refresh_token(data={"sub": str(new_user.id), "tv": new_user.token_version or 0})
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    # A tracked session from the very first token, so this device's chain has
+    # an identity to rotate. Without one the first refresh would silently adopt
+    # the token into a fresh family, which works but loses the sign-in record.
+    jti = await session_store.start_session(
+        db, new_user, device_label=_device_label(request), ip=client_ip(request)
     )
+    await db.commit()
+
+    return _issue_token_pair(new_user, jti)
 
 
 @router.post("/login", response_model=None)
@@ -184,20 +215,38 @@ async def login_user(request: Request, payload: UserLogin, db: AsyncSession = De
     # not left throttled.
     LOGIN_BY_ACCOUNT.reset(email)
 
-    access_token = create_access_token(data={"sub": str(user.id), "tv": user.token_version or 0})
-    refresh_token = create_refresh_token(data={"sub": str(user.id), "tv": user.token_version or 0})
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        token_type="bearer",
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    # Sign-in is the only moment the session table reliably grows, so it is
+    # also where the dead rows are cleared - no scheduled job for a table that
+    # only changes when someone is here.
+    await session_store.prune_expired(db, user)
+    jti = await session_store.start_session(
+        db, user, device_label=_device_label(request), ip=client_ip(request)
     )
+    await db.commit()
+
+    return _issue_token_pair(user, jti)
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_tokens(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
-    """Validates refresh token and issues a new access token."""
+async def refresh_tokens(
+    request: Request,
+    payload: RefreshTokenRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Exchanges a refresh token for a new pair, retiring the one presented.
+
+    The exchange is the security mechanism, not a formality. A refresh token
+    used to be reusable for sixty days, so one stolen off a device granted
+    sixty days of access that nothing could detect - the owner stayed signed in
+    throughout, because a thief using the token did not disturb their session.
+
+    Now each token is single-use. A stolen one works only until the real device
+    refreshes, and when the loser of that race presents the retired token, that
+    is a fact no correct client ever produces: two parties hold the same
+    credential. Nothing in the request says which is the owner, so the whole
+    family is revoked and both sign in again. The owner is inconvenienced, and
+    - the point - told that something happened.
+    """
     decoded = decode_token(payload.refresh_token)
     if decoded.get("type") != "refresh":
         raise HTTPException(
@@ -236,15 +285,25 @@ async def refresh_tokens(payload: RefreshTokenRequest, db: AsyncSession = Depend
             detail="This session has been signed out."
         )
 
-    access_token = create_access_token(data={"sub": str(user.id), "tv": user.token_version or 0})
-    new_refresh_token = create_refresh_token(data={"sub": str(user.id), "tv": user.token_version or 0})
+    try:
+        new_jti, _tracked = await session_store.rotate(
+            db, user, decoded.get("jti"), ip=client_ip(request)
+        )
+    except ReuseDetected:
+        # Committed before answering: the revocation must survive even if the
+        # response never reaches anyone, and the caller here may well be the
+        # attacker.
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            # Says what happened without saying how it was detected. The owner
+            # needs to know their session ended for a reason; whoever else has
+            # the token learns nothing about the mechanism.
+            detail="This session was ended for security. Please sign in again.",
+        )
 
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=new_refresh_token,
-        token_type="bearer",
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    )
+    await db.commit()
+    return _issue_token_pair(user, new_jti)
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
@@ -386,6 +445,13 @@ async def reset_password(
     if not accepted:
         raise rejected()
 
+    # One definition of "strong enough", shared by registration, reset and
+    # change. Three call sites with three opinions is how an app ends up
+    # refusing a password on one screen and accepting it on another.
+    problem = password_problem(payload.new_password, email=user.email, display_name=user.display_name)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
+
     user.password_hash = hash_password(payload.new_password)
     user.reset_code_hash = None
     user.reset_code_expires_at = None
@@ -420,10 +486,56 @@ TOTP_ISSUER = "MONEVA"
 RECOVERY_CODE_COUNT = 10
 
 
-def _issue_token_pair(user: User) -> TokenResponse:
+def _device_label(request: Request) -> str | None:
+    """A human name for the device, for the signed-in-devices list.
+
+    Taken from the User-Agent, which the client controls, so this is a LABEL
+    and never an identity - nothing is decided by it. It exists so the list
+    reads "Android 13" rather than a row of identical UUIDs, which is the
+    difference between a person recognising their own session and not.
+
+    Deliberately coarse. A full User-Agent is a fingerprint and there is no
+    reason to keep one; the platform and major version are enough to tell two
+    of your own devices apart.
+    """
+    ua = (request.headers.get("user-agent") or "").strip()
+    if not ua:
+        return None
+    for needle, label in (
+        ("Android", "Android"),
+        ("iPhone", "iPhone"),
+        ("iPad", "iPad"),
+        ("Macintosh", "Mac"),
+        ("Windows", "Windows"),
+        ("Linux", "Linux"),
+    ):
+        if needle in ua:
+            import re as _re
+            version = _re.search(needle + r"[ /]?(\d+)", ua)
+            return f"{label} {version.group(1)}" if version else label
+    return "Unknown device"
+
+
+def _issue_token_pair(user: User, jti: str | None = None) -> TokenResponse:
+    """The pair a client is given.
+
+    `jti` names the refresh token's row in refresh_sessions. It is what makes
+    rotation possible at all: without an identity, a presented token cannot be
+    looked up, so it cannot be retired and its reuse cannot be noticed. Access
+    tokens carry no jti - they live fifteen minutes and are never exchanged for
+    anything, so there is nothing to rotate.
+
+    Optional so the 2FA and logout-all paths can keep calling it while their
+    own session handling is added; a pair with no jti still works, it simply
+    starts a fresh family on its next refresh.
+    """
+    claims = {"sub": str(user.id), "tv": user.token_version or 0}
+    refresh_claims = dict(claims)
+    if jti:
+        refresh_claims["jti"] = jti
     return TokenResponse(
-        access_token=create_access_token(data={"sub": str(user.id), "tv": user.token_version or 0}),
-        refresh_token=create_refresh_token(data={"sub": str(user.id), "tv": user.token_version or 0}),
+        access_token=create_access_token(data=claims),
+        refresh_token=create_refresh_token(data=refresh_claims),
         token_type="bearer",
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
@@ -626,3 +738,161 @@ async def logout_all_devices(
         "message": "Signed out on all devices.",
         "tokens": _issue_token_pair(current_user).model_dump(),
     }
+
+
+@router.post("/send-verification", response_model=SendVerificationResponse)
+async def send_verification(
+    request: Request,
+    background: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sends a code to the address on the account.
+
+    Unlike the password-reset endpoint, this one may speak plainly. It requires
+    a signed-in user and only ever sends to the address already on that
+    account, so there is nothing here to enumerate - the caller has, by
+    definition, already proved they hold the account.
+    """
+    if current_user.email_verified:
+        return SendVerificationResponse(
+            message="This address is already confirmed.",
+            delivery_configured=delivery_configured(),
+        )
+
+    # A per-account throttle on top of the IP limiter. Without it a signed-in
+    # user is an unlimited mail generator pointed at their own address, which
+    # is a spam complaint waiting to happen against whatever relay is set up.
+    now = datetime.now(timezone.utc)
+    last_sent = current_user.verify_code_sent_at
+    if last_sent is not None:
+        if last_sent.tzinfo is None:
+            last_sent = last_sent.replace(tzinfo=timezone.utc)
+        waited = (now - last_sent).total_seconds()
+        if waited < VERIFY_RESEND_SECONDS:
+            return SendVerificationResponse(
+                message="A code was just sent. Check your inbox, including spam.",
+                delivery_configured=delivery_configured(),
+                retry_after_seconds=int(VERIFY_RESEND_SECONDS - waited),
+            )
+
+    enforce(FORGOT_BY_IP, client_ip(request))
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    # Hashed, for the same reason the reset code and the recovery codes are: a
+    # leaked database must not hand over live codes.
+    current_user.verify_code_hash = hash_password(code)
+    current_user.verify_code_expires_at = now + timedelta(minutes=VERIFY_CODE_TTL_MINUTES)
+    current_user.verify_code_attempts = 0
+    current_user.verify_code_sent_at = now
+    await db.commit()
+
+    background.add_task(
+        send_email_verification, current_user.email, code, VERIFY_CODE_TTL_MINUTES
+    )
+
+    return SendVerificationResponse(
+        message=f"A code is on its way to {masked(current_user.email)}.",
+        delivery_configured=delivery_configured(),
+        retry_after_seconds=VERIFY_RESEND_SECONDS,
+    )
+
+
+@router.post("/verify-email", response_model=UserResponse)
+async def verify_email(
+    payload: VerifyEmailRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Confirms the address, if the code is right and still current."""
+    if current_user.email_verified:
+        return current_user
+
+    if not current_user.verify_code_hash or not current_user.verify_code_expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ask for a new code first.",
+        )
+
+    expires = current_user.verify_code_expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That code has expired. Ask for a new one.",
+        )
+
+    # Counted BEFORE the comparison and committed either way, so a wrong guess
+    # costs an attempt even if the request is abandoned mid-flight. Counting
+    # after a successful compare would leave the ceiling trivial to bypass.
+    attempts = int(current_user.verify_code_attempts or 0) + 1
+    current_user.verify_code_attempts = attempts
+    if attempts > VERIFY_MAX_ATTEMPTS:
+        # Burn the code rather than merely refuse. Someone who has spent the
+        # ceiling must not be able to wait out a counter and carry on.
+        current_user.verify_code_hash = None
+        current_user.verify_code_expires_at = None
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many wrong codes. Ask for a new one.",
+        )
+
+    if not verify_password(payload.code.strip(), current_user.verify_code_hash):
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That code is not right.",
+        )
+
+    current_user.email_verified = True
+    # Single use. A spent code left live still works for whoever read it over
+    # somebody's shoulder.
+    current_user.verify_code_hash = None
+    current_user.verify_code_expires_at = None
+    current_user.verify_code_attempts = 0
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.get("/sessions")
+async def list_sessions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The devices currently signed in to this account.
+
+    Built from the refresh-session families that rotation already maintains, so
+    it costs nothing extra to keep. Before this, logout-all was the only
+    control there was: all or nothing, with no way to see what you were ending
+    or to end only the device you actually lost.
+    """
+    rows = await session_store.active_sessions(db, current_user)
+    return [
+        {
+            "id": str(row.family_id),
+            "device": row.device_label or "Unknown device",
+            "last_seen_at": row.last_seen_at,
+            "started_at": row.issued_at,
+        }
+        for row in rows
+    ]
+
+
+@router.delete("/sessions/{family_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def end_session(
+    family_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ends one device without touching the others."""
+    rows = await session_store.active_sessions(db, current_user)
+    # Scoped to this account's own families. Without the check, a family id
+    # from anywhere would end a stranger's session.
+    if not any(row.family_id == family_id for row in rows):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such session.")
+
+    await session_store.revoke_family(db, family_id, "you")
+    await db.commit()

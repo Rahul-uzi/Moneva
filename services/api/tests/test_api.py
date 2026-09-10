@@ -41,7 +41,7 @@ async def test_auth_register_login_flow(api_client: AsyncClient):
     """
     reg_payload = {
         "email": "testuser@example.com",
-        "password": "SecurePassword123!",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "Test User",
         "currency": "INR",
         "timezone": "Asia/Kolkata"
@@ -55,7 +55,7 @@ async def test_auth_register_login_flow(api_client: AsyncClient):
     # Login with same credentials
     login_payload = {
         "email": "testuser@example.com",
-        "password": "SecurePassword123!"
+        "password": "Jhelum-Ferry-1892"
     }
     login_res = await api_client.post("/api/auth/login", json=login_payload)
     assert login_res.status_code == 200
@@ -88,7 +88,7 @@ async def test_accounts_crud_and_user_isolation(api_client: AsyncClient):
     # Register User 1
     u1_reg = await api_client.post("/api/auth/register", json={
         "email": "user1_acc@example.com",
-        "password": "Password123!",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "User 1"
     })
     token1 = u1_reg.json()["access_token"]
@@ -97,7 +97,7 @@ async def test_accounts_crud_and_user_isolation(api_client: AsyncClient):
     # Register User 2
     u2_reg = await api_client.post("/api/auth/register", json={
         "email": "user2_acc@example.com",
-        "password": "Password123!",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "User 2"
     })
     token2 = u2_reg.json()["access_token"]
@@ -129,7 +129,7 @@ async def test_transaction_idempotency_and_transfer_integrity(api_client: AsyncC
     """
     u_reg = await api_client.post("/api/auth/register", json={
         "email": "tx_user@example.com",
-        "password": "Password123!",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "Tx User"
     })
     headers = {"Authorization": f"Bearer {u_reg.json()['access_token']}"}
@@ -179,7 +179,7 @@ async def test_bill_creation_and_payment_flow(api_client: AsyncClient):
     """
     u_reg = await api_client.post("/api/auth/register", json={
         "email": "bill_user@example.com",
-        "password": "Password123!",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "Bill User"
     })
     headers = {"Authorization": f"Bearer {u_reg.json()['access_token']}"}
@@ -220,7 +220,7 @@ async def test_profile_update(api_client: AsyncClient):
     """
     u_reg = await api_client.post("/api/auth/register", json={
         "email": "profile_user@example.com",
-        "password": "Password123!",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "Original Name"
     })
     headers = {"Authorization": f"Bearer {u_reg.json()['access_token']}"}

@@ -243,7 +243,8 @@ def probe_smtp_ports(host: Optional[str] = None, timeout: float = 4.0) -> dict:
             "any_open": any(v["open"] for v in results.values())}
 
 
-def _send_over_smtp(settings: dict, to_email: str, text: str, html: str) -> bool:
+def _send_over_smtp(settings: dict, to_email: str, text: str, html: str,
+                    subject: str = "Your MONEVA password reset code") -> bool:
     """
     Blocking send. Called from a worker thread - see send_password_reset.
 
@@ -259,7 +260,7 @@ def _send_over_smtp(settings: dict, to_email: str, text: str, html: str) -> bool
     from email.message import EmailMessage
 
     message = EmailMessage()
-    message["Subject"] = "Your MONEVA password reset code"
+    message["Subject"] = subject
     message["From"] = settings["from"]
     message["To"] = to_email
     message.set_content(text)
@@ -324,6 +325,39 @@ def _body(code: str, minutes: int) -> tuple[str, str]:
     return text, html
 
 
+def _verify_body(code: str, minutes: int) -> tuple[str, str]:
+    """Deliberately not the reset wording.
+
+    A reset email has to end with "if this was not you, ignore it" because an
+    unexpected one means somebody tried to take the account. An unexpected
+    verification email means somebody typed the address by mistake, which needs
+    the opposite advice - ignoring it is exactly right, and there is nothing to
+    worry about. Reusing the reset copy would alarm people over a typo.
+    """
+    text = (
+        f"Your MONEVA confirmation code is {code}\n\n"
+        f"Type it into the app to confirm this email address. It expires in "
+        f"{minutes} minutes.\n\n"
+        "Confirming matters for one reason: if you ever forget your password, "
+        "this is the address the reset code goes to.\n\n"
+        "If you were not expecting this, someone probably mistyped their own "
+        "address. You can ignore it - no account of yours is affected."
+    )
+    html = (
+        '<div style="font-family:system-ui,-apple-system,sans-serif;max-width:420px">'
+        '<p style="font-size:15px;color:#333">Your MONEVA confirmation code is</p>'
+        f'<p style="font-size:32px;font-weight:800;letter-spacing:.18em;margin:16px 0">{code}</p>'
+        f'<p style="font-size:14px;color:#555">Type it into the app to confirm this email '
+        f'address. It expires in {minutes} minutes.</p>'
+        '<p style="font-size:14px;color:#555">Confirming matters for one reason: if you ever '
+        'forget your password, this is the address the reset code goes to.</p>'
+        '<p style="font-size:13px;color:#888">If you were not expecting this, someone probably '
+        'mistyped their own address. You can ignore it - no account of yours is affected.</p>'
+        '</div>'
+    )
+    return text, html
+
+
 def _log_code_if_stranded(to_email: str, code: str) -> None:
     """
     Last resort when a CONFIGURED mail route fails: put the code in the log.
@@ -360,6 +394,26 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
     would confirm the address exists.
     """
     text, html = _body(code, minutes)
+    return await _deliver(to_email, "Your MONEVA password reset code", text, html, code)
+
+
+async def send_email_verification(to_email: str, code: str, minutes: int = 30) -> bool:
+    """
+    Sends the code that proves someone owns the address they signed up with.
+
+    Until this existed an address was only a claim, and the failure that
+    actually bites is not impersonation - it is a typo. An account attached to
+    a mailbox its owner cannot read looks completely normal until the day they
+    forget their password, and at that point the reset code goes somewhere
+    else and the ledger is unreachable for good.
+
+    Same delivery chain as the reset code, and the same refusal to raise.
+    """
+    text, html = _verify_body(code, minutes)
+    return await _deliver(to_email, "Confirm your MONEVA email address", text, html, code)
+
+
+async def _deliver(to_email: str, subject: str, text: str, html: str, code: str) -> bool:
 
     # SMTP first when it is configured: it is the explicit choice, and a host
     # that has both set almost certainly means the one it just set up.
@@ -369,7 +423,7 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             import asyncio
             # smtplib blocks, and blocking here would stall the whole event
             # loop for the length of an SMTP conversation.
-            await asyncio.to_thread(_send_over_smtp, smtp, to_email, text, html)
+            await asyncio.to_thread(_send_over_smtp, smtp, to_email, text, html, subject)
             _remember_send(True)
             return True
         except Exception as exc:  # noqa: BLE001 - delivery must not break the request
@@ -412,7 +466,7 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
                 res = await client.post(relay["url"], json={
                     "token": relay["token"],
                     "to": to_email,
-                    "subject": "Your MONEVA password reset code",
+                    "subject": subject,
                     "text": text,
                     "html": html,
                 })
@@ -469,7 +523,7 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
                 json={
                     "from": os.getenv("RESET_EMAIL_FROM", DEFAULT_FROM),
                     "to": [to_email],
-                    "subject": "Your MONEVA password reset code",
+                    "subject": subject,
                     "text": text,
                     "html": html,
                 },

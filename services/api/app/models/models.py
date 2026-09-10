@@ -43,6 +43,25 @@ class User(Base):
     # so revocation is one integer write and needs no lookup table.
     token_version = Column(Integer, default=0, nullable=False)
 
+    # Email ownership.
+    #
+    # Until this exists, an address is only a claim. Anyone could register with
+    # anyone else's email, which squats it so the real owner cannot sign up -
+    # and, far more common and far worse, a typo means the account is attached
+    # to an address the person cannot read. They notice the day they forget
+    # their password, and by then the ledger is unreachable: reset codes go to
+    # a mailbox that is not theirs.
+    #
+    # The gate is soft on purpose. An unverified user may use the app; what
+    # they may not do is change the address, because that is the one action
+    # that turns an unverified account into a permanently stolen one.
+    email_verified = Column(Boolean, default=False, nullable=False)
+    verify_code_hash = Column(String, nullable=True)
+    verify_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+    verify_code_attempts = Column(SmallInteger, default=0, nullable=False)
+    # Throttles resends per account, independently of the IP rate limiter.
+    verify_code_sent_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -53,10 +72,79 @@ class User(Base):
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     savings_goals = relationship("SavingsGoal", back_populates="user", cascade="all, delete-orphan")
     bills = relationship("Bill", back_populates="user", cascade="all, delete-orphan")
+    refresh_sessions = relationship("RefreshSession", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     recurring_incomes = relationship("RecurringIncome", back_populates="user", cascade="all, delete-orphan")
     sync_metadata = relationship("SyncMetadata", back_populates="user", cascade="all, delete-orphan")
     emis = relationship("Emi", back_populates="user", cascade="all, delete-orphan")
+
+
+class RefreshSession(Base):
+    """One device's signed-in session, and the chain of refresh tokens it used.
+
+    WHY THIS EXISTS AT ALL.
+
+    A refresh token used to be a bearer credential good for sixty days and
+    reusable without limit. Stolen once - off a backed-up device, out of an
+    intercepted response, from storage on a rooted phone - it granted sixty
+    days of quiet access, and nothing anywhere could tell. The account owner
+    stayed signed in throughout, because the thief's use of the token did not
+    disturb theirs. There was no signal to notice and no record to check.
+
+    Rotation fixes the silence rather than the theft. Each refresh mints a new
+    token and retires the one presented, so a stolen token is only good until
+    the real device refreshes next - minutes, normally. What matters more is
+    what happens AFTERWARDS: whoever refreshes second presents a token that has
+    already been used, and a used token coming back is not something a working
+    client ever does. It means two parties hold the same credential.
+
+    At that point the honest response is to disbelieve both. `revoke_family`
+    kills the whole chain, and the real owner signs in again - an inconvenience
+    that tells them something happened, which is strictly better than a thief
+    with sixty silent days.
+
+    The same rows answer a question the app could not answer before: which
+    devices are signed in, and when was each last used. That is the "3 devices"
+    list, and it comes free.
+
+    NOT stored here: the token itself. Only its jti, and only hashed - a leaked
+    database must not hand over live sessions, exactly as with reset codes and
+    recovery codes.
+    """
+
+    __tablename__ = "refresh_sessions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Every token descended from one sign-in shares a family. Reuse anywhere in
+    # the chain condemns all of it, because there is no way to tell which half
+    # of the fork is the honest one.
+    family_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+
+    # sha256 of the jti, not the jti. Indexed because every refresh looks it up.
+    jti_hash = Column(String(64), nullable=False, unique=True, index=True)
+
+    # Set the moment this token is exchanged. A second presentation after that
+    # is the signal the whole design turns on.
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Set when the family is condemned, by reuse or by the user ending the
+    # session deliberately. Either way the row stays, so the event is auditable.
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # Why it ended, for the screen that shows sessions: "you", or "reuse".
+    revoked_reason = Column(String(32), nullable=True)
+
+    # For the session list. Best-effort and self-reported by the client, so it
+    # is a label rather than an identity - never used to make a decision.
+    device_label = Column(String(120), nullable=True)
+    last_ip = Column(String(45), nullable=True)          # 45 fits IPv6
+
+    issued_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    user = relationship("User", back_populates="refresh_sessions")
 
 
 class Account(Base):
