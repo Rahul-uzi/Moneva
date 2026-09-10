@@ -75,9 +75,37 @@ export const AnalyticsPage: React.FC = () => {
       startDate.setFullYear(now.getFullYear() - 1);
     }
 
+    /**
+     * Snapped to whole days, so the same range asks the same question.
+     *
+     * These went out as `now.toISOString()` - the current instant, to the
+     * millisecond - which made the request URL different on every single
+     * mount. Nothing could cache it: not the twenty-second memory cache, which
+     * never saw one key twice, and not the saved-figures fallback, which had
+     * no matching copy when the server could not be reached. Measured on the
+     * device with the network off, Analytics was the one screen that failed
+     * outright while Home, Accounts, Activity and Plan all carried on.
+     *
+     * Rounding to the minute was the first attempt and was still too fine: the
+     * key turned over every sixty seconds, so anything cached was stale before
+     * it was useful. A day is the right grain here - the shortest range on
+     * this screen is a week.
+     *
+     * The end is the END of today, not the start. Truncating to midnight would
+     * make the key stable by quietly dropping every transaction made today,
+     * which is a far worse bug than the one being fixed.
+     */
+    const dayStart = (d: Date) => {
+      const copy = new Date(d);
+      copy.setHours(0, 0, 0, 0);
+      return copy;
+    };
+    const endOfToday = dayStart(now);
+    endOfToday.setHours(23, 59, 59, 999);
+
     return {
-      start_date: startDate.toISOString(),
-      end_date: now.toISOString(),
+      start_date: dayStart(startDate).toISOString(),
+      end_date: endOfToday.toISOString(),
     };
   }, [range]);
 
