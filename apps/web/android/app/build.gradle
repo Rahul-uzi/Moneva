@@ -67,6 +67,28 @@ android {
                 storePassword keystoreProperties['storePassword']
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
+
+                /*
+                 * Which signature schemes the APK carries.
+                 *
+                 * It shipped with v2 alone. v3 matters most here: it is the
+                 * scheme that supports KEY ROTATION, and MONEVA is distributed
+                 * from a website with no Play App Signing holding a spare - so
+                 * without it, a compromised or lost key is permanently
+                 * unrecoverable rather than merely painful.
+                 *
+                 * v1 stays off deliberately. It is JAR signing, needed only
+                 * below API 24, and this app's minimum is 24 - leaving it on
+                 * would add an older, weaker signature for nobody's benefit.
+                 *
+                 * v4 produces a side file that lets Android stream an install
+                 * instead of copying the whole APK first. Harmless when
+                 * unused, and noticeably faster over adb.
+                 */
+                enableV1Signing false
+                enableV2Signing true
+                enableV3Signing true
+                enableV4Signing true
             }
         }
     }
