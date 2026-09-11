@@ -7,9 +7,12 @@ import { QuickAddModal } from '../financial/QuickAddModal';
 import { NotificationsModal } from '../notifications/NotificationsModal';
 import { ToastContainer } from '../ui/Toast';
 import { OfflineBanner, SavedDataBanner } from '../ui/States';
+import { UpdateBanner } from './UpdateBanner';
 import { SyncStatusIndicator } from '../ui/SyncStatusIndicator';
 import { useUiStore } from '../../stores/useUiStore';
 import { apiClient, STALE_DATA_EVENT, FRESH_DATA_EVENT } from '../../services/apiClient';
+import { checkForUpdate, dismissUpdate, wasRecentlyDismissed, type UpdateNews } from '../../services/updateCheck';
+import { flushCrashes } from '../../services/crashReporter';
 import { runNotificationSync } from '../../services/notificationSync';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -48,6 +51,7 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
    * having to do anything.
    */
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [update, setUpdate] = useState<UpdateNews | null>(null);
   const [showSetup, setShowSetup] = useState<boolean>(isSetupPending);
   const [showTour, setShowTour] = useState<boolean>(isTourPending);
 
@@ -73,6 +77,39 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
       clearTimeout(timer);
     };
   }, [fetchUnreadCount, refreshTrigger]);
+
+  /**
+   * Two things that belong on launch and nowhere else.
+   *
+   * Crashes are sent NOW rather than when they happened: the app had just
+   * failed, and an error handler is the worst possible place to start a
+   * network request. Whatever is on disk is sent once everything is working.
+   *
+   * The update check is deliberately quiet - it returns null for every
+   * uninteresting case, including a failure, so an unreachable version
+   * endpoint never produces a message.
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void flushCrashes((record) => apiClient.post('/app/crashes', {
+        message: record.message,
+        where: record.where,
+        stack: record.stack,
+        app_version: record.version,
+        at: Date.parse(record.at) || undefined,
+      }));
+
+      void checkForUpdate().then((news) => {
+        if (!news) return;
+        // A version waved away stays away for a few days - unless it is the
+        // one the release marked as required.
+        if (!news.latest.mandatory && wasRecentlyDismissed(news.latest.version_code)) return;
+        setUpdate(news);
+      });
+      // After the first paint, so neither delays the screen appearing.
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const onStale = (e: Event) => {
@@ -177,6 +214,15 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
 
   return (
     <div className="app-viewport">
+      {update && (
+        <UpdateBanner
+          news={update}
+          onDismiss={() => {
+            dismissUpdate(update.latest.version_code);
+            setUpdate(null);
+          }}
+        />
+      )}
       {!isOnline && <OfflineBanner />}
       {/* Only when online: offline already has its own banner, and stacking
           two strips of explanation above the content says less than one. */}

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.db.database import engine
 from app.models.models import Base
 from app.routers import (
+    app_release,
     auth,
     accounts,
     categories,
@@ -88,6 +89,7 @@ async def startup_event():
     pass
 
 # Register API Routers
+app.include_router(app_release.router, prefix=settings.API_PREFIX)
 app.include_router(auth.router, prefix=settings.API_PREFIX)
 app.include_router(accounts.router, prefix=settings.API_PREFIX)
 app.include_router(categories.router, prefix=settings.API_PREFIX)

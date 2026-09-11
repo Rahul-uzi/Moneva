@@ -1,19 +1,28 @@
 /**
  * The one place a crash is written down.
  *
- * There is no crash-reporting service wired up yet, and until there is, a
- * crash on somebody else's phone is invisible: they see a broken screen, they
- * close the app, and nothing about it ever reaches us. MONEVA is distributed
- * from a website rather than a store, so there are no Play vitals to fall back
- * on either - this file is the only record that will exist.
+ * A crash on somebody else's phone used to be invisible: they saw a broken
+ * screen, closed the app, and nothing about it ever reached us. MONEVA is
+ * installed from a website rather than a store, so there are no store vitals
+ * to fall back on - what this file records is the only account of the fault
+ * that will ever exist.
  *
- * So it keeps the last few crashes on the device, where the user can read them
- * and send them on if they choose. That is worth more than it sounds: the
- * hardest part of a bug report is the stack trace, and this is the only thing
- * that can capture it at the moment it happens.
+ * Two steps, and the order is the point:
  *
- * It is also deliberately the ONLY seam. When Sentry or Crashlytics is added,
- * `report` is where it goes and nothing else in the app changes.
+ *   1. `report` writes to the device, synchronously, and never throws. It runs
+ *      inside an error handler in an app that has just failed, so it does the
+ *      smallest possible thing.
+ *   2. `flushCrashes` sends what is on disk on the NEXT launch, when
+ *      everything is working again. Nothing is sent at the moment of the crash.
+ *
+ * Reports go to MONEVA's own backend rather than to Sentry or Crashlytics.
+ * That server already exists, already holds the user's records, and is already
+ * named in the privacy page - so this adds no third party who receives data.
+ *
+ * What is sent is the fault and nothing else: a message, a route, a stack, a
+ * version. No amounts, no account names, no transaction text. A stack trace
+ * finds a bug; the figures that happened to be on screen do not, and
+ * collecting them would turn a debugging aid into a copy of a ledger.
  */
 
 export interface CrashRecord {
@@ -30,6 +39,7 @@ export interface CrashRecord {
 }
 
 const STORE_KEY = 'moneva_crashes';
+const SENT_KEY = 'moneva_crashes_sent';
 
 /**
  * How many to keep.
@@ -124,3 +134,57 @@ export const describeCrash = (c: CrashRecord): string =>
     `Error: ${c.message}`,
     c.stack ? `\n${c.stack}` : '',
   ].join('\n');
+
+
+/**
+ * Send anything not yet sent, on the NEXT launch.
+ *
+ * Not at the moment of the crash. The app has just failed badly enough to
+ * unmount a screen; asking it to open a network connection and await a
+ * response, inside an error handler, is asking the broken thing to perform
+ * under load. The record is already on disk by then, and it will still be
+ * there in a second when everything is working again.
+ *
+ * Silent either way. This runs on every launch and nobody should ever see it:
+ * a crash reporter that produces a visible error is a second bug on top of
+ * the first, and one the user cannot act on.
+ */
+export const flushCrashes = async (
+  post: (record: CrashRecord) => Promise<unknown>,
+): Promise<number> => {
+  let sentKeys: string[] = [];
+  try {
+    sentKeys = JSON.parse(localStorage.getItem(SENT_KEY) || '[]') as string[];
+  } catch {
+    sentKeys = [];
+  }
+
+  // Identity is content plus time, so the same crash recorded twice is sent
+  // once - and a crash loop that filled the local store does not become a
+  // burst of identical requests.
+  const keyOf = (c: CrashRecord) => `${c.at}|${c.message.slice(0, 60)}`;
+
+  const pending = loadCrashes().filter((c) => !sentKeys.includes(keyOf(c)));
+  if (pending.length === 0) return 0;
+
+  let sent = 0;
+  for (const record of pending) {
+    try {
+      await post(record);
+      sentKeys.push(keyOf(record));
+      sent += 1;
+    } catch {
+      // Offline, signed out, or the server refused. Leave it unsent and try
+      // again next launch - the record stays on the device either way.
+      break;
+    }
+  }
+
+  try {
+    // Bounded, or the sent-list outlives the crash list it describes.
+    localStorage.setItem(SENT_KEY, JSON.stringify(sentKeys.slice(-20)));
+  } catch {
+    /* ignore */
+  }
+  return sent;
+};
