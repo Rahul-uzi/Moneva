@@ -1527,6 +1527,33 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 }
 .p3 .s { display: block; font-size: 10.5px; line-height: 1.35; color: var(--a-ink3); margin-top: 1px; }
 
+/* The card's due date. Amber rather than ember: it is a deadline, not an
+   error, and the app keeps ember for money that has actually gone out. */
+.card-due {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--a-amber);
+  background: var(--a-amber-wash);
+  border-radius: 15px;
+  padding: 12px 14px;
+}
+.card-due .cd-top {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 700; color: var(--a-amber);
+}
+.card-due .cd-amt { font-size: 22px; font-weight: 800; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+.card-due .cd-sub { font-size: 11.5px; color: var(--a-ink3); }
+
+/* A subscription whose price went up since last time. */
+.rise { font-style: normal; color: var(--a-amber); font-weight: 700; }
+
+/* Six tabs do not fit a phone, so this strip scrolls sideways. */
+.seg-scroll { overflow-x: auto; scrollbar-width: none; }
+.seg-scroll::-webkit-scrollbar { display: none; }
+.seg-scroll button { flex: 0 0 auto; padding-inline: 13px; }
+
 .bill-alert {
   display: flex; align-items: center; gap: 9px;
   border: 1px solid var(--a-amber);
@@ -2063,9 +2090,10 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 
       <p class="lead rv" style="--d:140ms">
         MONEVA keeps track of your spending without you having to type it in.
-        It notices the payment alerts your phone already gets, and asks whether
-        to record them. Your accounts, budgets, bills and savings all sit in one
-        place — and it keeps working when you have no signal.
+        It reads the payment alerts and bank texts your phone already gets, and
+        can bring in the months before you installed it. Accounts, cards,
+        subscriptions, budgets and bills all sit in one place — and it keeps
+        working when you have no signal.
       </p>
 
       <div class="cta-row rv" style="--d:210ms">
@@ -2368,8 +2396,17 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       <p class="lead rv" style="--d:140ms">
         Pay for petrol by UPI and your phone buzzes three times — the payment
         app, your bank, and a text message. Same ₹711.83, three times over.
-        MONEVA works out they are all one payment and offers you a single entry
-        to approve. This is the part that means you stop typing things in.
+        MONEVA reads all three, works out they are one payment, and offers you
+        a single entry to approve. This is the part that means you stop typing
+        things in.
+      </p>
+      <p class="lead rv" style="--d:200ms; margin-top:18px">
+        It can read your bank's text messages as well as the alerts, which is
+        also how it reaches the months before you installed it. And once you
+        have approved the same shop the same way five times, you can let it
+        stop asking — for small everyday amounts, from apps it has learned to
+        trust. That is off until you turn it on, capped, and never allowed for
+        anything that arrived by text message.
       </p>
     </div>
 
@@ -2443,6 +2480,56 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 
         <li class="feat-row rv" style="--d:60ms">
           <span class="feat-n">02</span>
+          <h3>The years before you installed it</h3>
+          <p>
+            An app can only notice payments from the day you install it. MONEVA
+            also reads the statement your bank lets you download — HDFC, ICICI,
+            SBI, Axis and others — and brings that history in with it. It shows
+            you which columns it read before saving a thing, so a file it
+            misreads is something you catch now, not something you find months
+            later.
+          </p>
+        </li>
+
+        <li class="feat-row rv" style="--d:90ms">
+          <span class="feat-n">03</span>
+          <h3>Subscriptions you forgot about</h3>
+          <p>
+            Nobody forgets the rent. What costs people money is the trial that
+            quietly became a subscription, the service they stopped using, the
+            price that went up without an email anyone read. MONEVA spots money
+            leaving on a rhythm, tells you what each one costs you over a year,
+            and flags the ones that got more expensive.
+          </p>
+        </li>
+
+        <li class="feat-row rv" style="--d:120ms">
+          <span class="feat-n">04</span>
+          <h3>Credit cards, and the date that matters</h3>
+          <p>
+            On a card the balance is not really the question — which billing
+            cycle a purchase landed in is, and how many days are left to pay.
+            MONEVA tracks your statement date and your due date, counts down to
+            it, and says so before it costs you. Missing a due date on a card
+            you could afford to clear is the most expensive avoidable mistake
+            there is.
+          </p>
+        </li>
+
+        <li class="feat-row rv" style="--d:150ms">
+          <span class="feat-n">05</span>
+          <h3>EMIs, down to the last instalment</h3>
+          <p>
+            The phone, the laptop and the fridge each looked affordable on
+            their own — which is how people end up with more instalments
+            running at once than they meant to. Record each plan once and
+            MONEVA keeps the count: what is left, and what it adds up to every
+            month before you have spent anything else.
+          </p>
+        </li>
+
+        <li class="feat-row rv" style="--d:180ms">
+          <span class="feat-n">06</span>
           <h3>Budgets that speak up</h3>
           <p>
             Give a category a monthly limit — food, fuel, shopping — and watch
@@ -2452,8 +2539,8 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
           </p>
         </li>
 
-        <li class="feat-row rv" style="--d:120ms">
-          <span class="feat-n">03</span>
+        <li class="feat-row rv" style="--d:210ms">
+          <span class="feat-n">07</span>
           <h3>Savings you can watch grow</h3>
           <p>
             Set a target — an emergency fund, a laptop, a trip — and put money
@@ -2462,8 +2549,8 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
           </p>
         </li>
 
-        <li class="feat-row rv" style="--d:180ms">
-          <span class="feat-n">04</span>
+        <li class="feat-row rv" style="--d:240ms">
+          <span class="feat-n">08</span>
           <h3>Bills you stop forgetting</h3>
           <p>
             Rent, electricity, the internet, a subscription you signed up for
@@ -2472,8 +2559,8 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
           </p>
         </li>
 
-        <li class="feat-row rv" style="--d:240ms">
-          <span class="feat-n">05</span>
+        <li class="feat-row rv" style="--d:270ms">
+          <span class="feat-n">09</span>
           <h3>Where it actually went</h3>
           <p>
             A month broken down by category and traced over time, with the shop
@@ -2483,7 +2570,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
         </li>
 
         <li class="feat-row rv" style="--d:300ms">
-          <span class="feat-n">06</span>
+          <span class="feat-n">10</span>
           <h3>Works with no signal</h3>
           <p>
             A basement restaurant, a train, a village with one bar of reception.
@@ -2549,6 +2636,18 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       <div class="lock rv" style="--d:300ms">
         <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></span>
         <div><b>Password resets that expire</b><p>A reset code works once and only for a few minutes, so an old email cannot be used to get in later.</p></div>
+      </div>
+      <div class="lock rv" style="--d:360ms">
+        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.3A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 11h7M8.5 14.5h4"/></svg></span>
+        <div><b>Your messages stay on your phone</b><p>It only ever looks at texts from a bank, never a person, and it uploads the payment it read — never the message itself.</p></div>
+      </div>
+      <div class="lock rv" style="--d:420ms">
+        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12.5h4l2.5-6 4 12 2.5-6h6"/></svg></span>
+        <div><b>It says when it stops watching</b><p>A permission you revoked by accident looks exactly like a quiet week. The app tells you it has gone quiet rather than letting you find out later.</p></div>
+      </div>
+      <div class="lock rv" style="--d:480ms">
+        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 1 9-9"/><path d="M12 12l4.5-4.5"/><path d="M16.5 16.5h5M19 14v5"/></svg></span>
+        <div><b>Nothing large is ever filed quietly</b><p>Recording without asking is off unless you switch it on, only for small everyday amounts, and only from apps it has watched you approve five times.</p></div>
       </div>
     </div>
   </div>
@@ -3179,7 +3278,24 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
         { id: "hdfc", name: "HDFC Bank", kind: "ASSET", open: 5287383, logo: "hdfc" },
         { id: "sbi", name: "State Bank of India", kind: "ASSET", open: 519617, logo: "sbi" },
         { id: "apay", name: "Amazon Pay", kind: "ASSET", open: 763000, logo: "amazon" },
-        { id: "cash", name: "Cash", kind: "ASSET", open: 1730000, logo: null, tint: "#4C566A" }
+        { id: "cash", name: "Cash", kind: "ASSET", open: 1730000, logo: null, tint: "#4C566A" },
+        // A card is the one account where the balance is not the question -
+        // the cycle is. `owed` is what closed on the last statement.
+        {
+          id: "card", name: "HDFC Credit Card", kind: "LIABILITY", open: 1845000,
+          logo: "hdfc", statementDay: 18, dueDay: 7, daysUntilDue: 4, limitMinor: 25000000
+        }
+      ],
+      // What the app found leaving on a rhythm. The real one derives these
+      // from the ledger under strict rules; the demo shows the result.
+      subs: [
+        { name: "Netflix", cadence: "Monthly", p: 64900, yearly: 778800, logo: "netflix" },
+        { name: "Spotify", cadence: "Monthly", p: 14900, yearly: 178800, logo: null, tint: "#1D6B3A", rise: { from: 11900, to: 14900, pct: 25 } },
+        { name: "Google One", cadence: "Monthly", p: 13000, yearly: 156000, logo: null, tint: "#2C4470" }
+      ],
+      emis: [
+        { name: "iPhone 15", perMonth: 749900, left: 7, of: 12 },
+        { name: "Washing machine", perMonth: 291600, left: 3, of: 9 }
       ],
       txns: [
         { id: 1, who: "Swiggy", cat: "food", p: 47850, type: "expense", acc: "hdfc", day: 7, logo: "swiggy" },
@@ -3222,8 +3338,13 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       return bal + (t.type === "income" ? t.p : -t.p);
     }, acc.open);
   }
+  /* A card's balance is money OWED, so it comes off the total rather than
+     adding to it - the same way the real app treats a liability. */
   function netWorth(s) {
-    return s.accounts.reduce(function (n, a) { return n + accBalance(s, a); }, 0);
+    return s.accounts.reduce(function (n, a) {
+      var bal = accBalance(s, a);
+      return a.kind === "LIABILITY" ? n - bal : n + bal;
+    }, 0);
   }
   function totalOf(s, type) {
     return s.txns.reduce(function (n, t) { return t.type === type ? n + t.p : n; }, 0);
@@ -3317,6 +3438,17 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
           '<div class="acc-name">' + a.name + '</div>' +
           '<div class="acc-bal">' + amt(accBalance(s, a), "", s.hide) + '</div></button>';
       }).join("") + '</div>';
+
+    // The card's due date, which is the thing on a card that actually costs
+    // money if it is missed.
+    var card = s.accounts.filter(function (a) { return a.kind === "LIABILITY"; })[0];
+    if (card) {
+      h += '<button class="card-due" data-act="go" data-to="plan">' +
+        '<span class="cd-top">' + ico("card", 15) + 'Card payment due in ' + card.daysUntilDue + ' days</span>' +
+        '<span class="cd-amt">' + amt(accBalance(s, card), "", s.hide) + '</span>' +
+        '<span class="cd-sub">Statement closed on the ' + card.statementDay + 'th · pay by the ' + card.dueDay + 'th</span>' +
+        '</button>';
+    }
 
     h += '<div class="ap-head"><h4>Upcoming Bills</h4><span>' + s.bills.length + ' due</span></div>';
     h += s.bills.map(function (b) {
@@ -3414,7 +3546,8 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
     h += '<button class="bill-alert" data-act="noop"><span class="dot"></span>' +
       '<b>' + soon.name + ' due in ' + soon.days + 'd</b><span>View bill ' + ico("right", 15) + '</span></button>';
 
-    h += '<div class="seg">' + [["all", "All"], ["budgets", "Budgets"], ["goals", "Goals"], ["bills", "Bills"]]
+    h += '<div class="seg seg-scroll">' +
+      [["all", "All"], ["budgets", "Budgets"], ["subs", "Subs"], ["emis", "EMIs"], ["goals", "Goals"], ["bills", "Bills"]]
       .map(function (f) {
         return '<button class="' + (tab === f[0] ? "on" : "") + '" data-act="plantab" data-v="' + f[0] + '">' + f[1] + '</button>';
       }).join("") + '</div>';
@@ -3442,6 +3575,30 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
         return '<div class="ap-card"><div class="goal-row"><b>' + g.name + '</b><span class="pill">' + pct + '%</span></div>' +
           '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
           '<div class="bud-meta"><span><b>' + full(g.saved) + '</b> saved</span><span>TARGET: <b>' + plain(g.target) + '</b></span></div></div>';
+      }).join("");
+    }
+
+    if (tab === "all" || tab === "subs") {
+      var yearly = s.subs.reduce(function (n, x) { return n + x.yearly; }, 0);
+      h += '<div class="ap-head"><h4>Subscriptions</h4><span>' + plain(yearly) + ' a year</span></div>';
+      h += s.subs.map(function (x) {
+        return '<button class="tx" data-act="noop">' + logoTile(x.logo ? { logo: x.logo } : { who: x.name, tint: x.tint }) +
+          '<span class="who"><b>' + x.name + '</b><span>' + x.cadence.toUpperCase() +
+          (x.rise ? ' · <i class="rise">UP ' + x.rise.pct + '%</i>' : ' · ' + plain(x.yearly) + '/YR') + '</span></span>' +
+          '<span class="val ember-t">' + amt(-x.p, "", s.hide) + '</span></button>';
+      }).join("");
+    }
+
+    if (tab === "all" || tab === "emis") {
+      var perMonth = s.emis.reduce(function (n, e) { return n + e.perMonth; }, 0);
+      h += '<div class="ap-head"><h4>EMIs</h4><span>' + plain(perMonth) + ' a month</span></div>';
+      h += s.emis.map(function (e) {
+        var done = e.of - e.left;
+        return '<div class="ap-card"><div class="goal-row"><b>' + e.name + '</b>' +
+          '<span class="pill warn">' + e.left + ' left</span></div>' +
+          '<div class="bar"><i class="warn" style="width:' + Math.round(done / e.of * 100) + '%"></i></div>' +
+          '<div class="bud-meta"><span><b>' + full(e.perMonth) + '</b> a month</span>' +
+          '<span>' + done + ' of ' + e.of + ' paid</span></div></div>';
       }).join("");
     }
 

@@ -263,6 +263,22 @@ tracking used here, so the font-size is `16.5vw` — that lands the word at ~94%
 of the viewport, full-bleed without clipping the M and the A against the edges.
 Change the weight, width or tracking and that number needs recalculating.
 
+## Keeping it in step with the app
+
+The page describes real behaviour, so when the app gains a feature the page has
+to be re-read against the code — not against the commit subjects, which
+describe *changes* rather than what a user ends up with.
+
+The demo carries its own copy of the app's rules. Two worth knowing, because
+getting them wrong would misrepresent the product:
+
+- **A liability comes off the total.** `netWorth()` subtracts any account
+  marked `LIABILITY`, the same as `calculate_net_worth` does. Adding the credit
+  card correctly moved the demo's net worth from ₹1,68,076.50 to ₹1,49,626.50.
+- **Subscriptions and EMIs are seeded, not detected.** The real app derives
+  subscriptions from the ledger under strict rules and takes EMI plans as user
+  input; the demo shows the *result* of both rather than reimplementing them.
+
 ## Voice — please keep it
 
 The page is written for **anyone with a phone and a bank account**, not for
