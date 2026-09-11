@@ -97,3 +97,63 @@
 @media (prefers-reduced-motion: reduce) {
   .legal-tab { transition: none; }
 }
+
+/* "On this phone, right now."
+ *
+ * Set apart from the prose because it is the only part of the page that is
+ * about THIS reader rather than about the app in general - and it is the
+ * question they opened the page to answer. A policy that buries it reads like
+ * every other policy: a description of what an app could theoretically do. */
+.legal-now {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--moneva-overlay-strong);
+  border: 1px solid var(--moneva-border);
+  font-size: 13px;
+}
+
+.legal-now.is-loading { color: var(--moneva-text-secondary); }
+
+.legal-now > strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--moneva-text-secondary);
+}
+
+.legal-now ul {
+  list-style: none;
+  margin: 0 0 9px;
+  padding: 0;
+}
+
+.legal-now li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  color: var(--moneva-text-primary);
+}
+
+/* A dot rather than a word, so on and off are told apart at a glance and the
+   sentence does not have to carry the whole job. */
+.legal-now li::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--moneva-text-secondary);
+}
+
+.legal-now li.is-on::before { background: var(--moneva-teal); }
+.legal-now li.is-off::before { background: var(--moneva-border); }
+
+.legal-now p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--moneva-text-secondary);
+}
