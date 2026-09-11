@@ -1,96 +1,107 @@
 /**
- * MONEVA mail relay - paste this into script.google.com.
+ * An HTTPS mail relay, hosted on your own Google account.
  *
- * WHY THIS EXISTS
- * Render blocks outbound SMTP. Not throttled, not misconfigured: the kernel
- * refuses the socket outright -
+ * WHY THIS EXISTS. Render blocks outbound SMTP ports to deter spam, so correct
+ * Gmail credentials produce a connection that simply times out and no mail is
+ * ever sent - with nothing in the logs to say why, because a blocked port does
+ * not refuse, it never answers. Port 443 is not blocked anywhere. This runs
+ * under the Gmail account you already have, needs an account with no third
+ * party, and is reached by one POST.
  *
- *     Reset email over SMTP failed: OSError: [Errno 101] Network is unreachable
- *
- * and a probe of Gmail's 587, 465 and 25 from the running service comes back
- * with all three closed. Correct credentials that log in from a laptop in two
- * seconds cannot leave that host at all, so no amount of fixing the password
- * was ever going to work.
- *
- * Port 443 is not blocked. This is a ten-line web app that receives one HTTPS
- * POST and sends the mail from the Gmail account you are already signed into -
- * no third-party service, no account with anyone, no OAuth client to register.
- *
+ * ---------------------------------------------------------------------------
  * SETUP
- *   1. script.google.com -> New project. Paste this file over Code.gs.
- *   2. Change SHARED_SECRET below to a long random string.
- *   3. Deploy -> New deployment -> type "Web app".
+ *
+ *   1. script.google.com -> New project. Paste this in.
+ *   2. Project Settings (the gear) -> Script Properties -> Add script property
+ *        Property: SHARED_SECRET
+ *        Value:    40+ random characters, generated fresh
+ *   3. Deploy -> New deployment -> Web app
  *        Execute as:      Me
- *        Who has access:  Anyone            <- required; the API is not signed in
- *   4. Authorise it when Google asks (it wants permission to send mail as you).
- *   5. Copy the /exec URL. In Render -> Environment set:
- *        MAIL_RELAY_URL    = that https://script.google.com/macros/s/..../exec
- *        MAIL_RELAY_TOKEN  = the same SHARED_SECRET
- *      and CLEAR SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD, so no send
- *      wastes 24 seconds failing on a blocked port first.
- *   6. Check it: GET /api/health should show route "relay".
+ *        Who has access:  Anyone
+ *   4. Copy the /exec URL.
+ *   5. In Render -> Environment:
+ *        MAIL_RELAY_URL   = that /exec URL
+ *        MAIL_RELAY_TOKEN = the same value as SHARED_SECRET
  *
- * "Anyone" access means anyone with the URL can reach this script, which is why
- * the token is checked before anything is sent - without it, the URL would be
- * an open mail relay. Treat the URL as a secret regardless.
+ * ROTATING THE SECRET. Change the Script Property, redeploy (Manage
+ * deployments -> Edit -> Deploy keeps the same URL), then update
+ * MAIL_RELAY_TOKEN in Render. Mail stops working in between, so do both
+ * quickly.
+ * ---------------------------------------------------------------------------
  *
- * Quota: a free Gmail account may send 100 messages a day through Apps Script.
- * A password reset flow is nowhere near that.
+ * THE SECRET IS NOT IN THIS FILE, ON PURPOSE.
  *
- * THE REPLY MATTERS. Apps Script answers HTTP 200 to everything, including a
- * request it refused, so the API cannot judge success by status code. It
- * requires a body starting with "OK". Every other path here returns something
- * that is deliberately NOT "OK", so a refusal can never read as a sent mail.
+ * It used to be a const at the top, and that is how it leaks: this file gets
+ * pasted into a chat, screenshotted, committed, or shared with someone helping
+ * out, and the token goes with it every time. A Script Property stays in the
+ * project - it is not in the source, so it is not in the copy.
+ *
+ * That matters more here than it looks. The deployment URL has to be reachable
+ * by anyone, because Render calls it from an address that cannot be
+ * predicted. The token is therefore the ONLY thing between this URL and being
+ * an open mail relay that sends as you, from your address, with your
+ * reputation attached.
  */
 
-const SHARED_SECRET = 'replace-this-with-a-long-random-string';
+/** Read once per execution. Throws if unset, rather than defaulting to open. */
+function sharedSecret() {
+  const value = PropertiesService.getScriptProperties().getProperty('SHARED_SECRET');
+  if (!value) {
+    // A missing property must fail closed. Falling back to '' would compare
+    // every request against the empty string and accept the ones that send it.
+    throw new Error('SHARED_SECRET script property is not set');
+  }
+  return value;
+}
 
 function doPost(e) {
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return reply('ERROR empty request');
-    }
+    if (!e || !e.postData || !e.postData.contents) return reply('ERROR empty request');
 
     const body = JSON.parse(e.postData.contents);
 
-    // Compared at full length rather than short-circuiting on the first
-    // differing character. The timing difference is tiny over HTTPS, but this
-    // costs nothing and the URL is public by necessity.
-    if (!constantTimeEquals(String(body.token || ''), SHARED_SECRET)) {
+    if (!constantTimeEquals(String(body.token || ''), sharedSecret())) {
       return reply('FORBIDDEN bad token');
     }
-
-    if (!body.to || !body.subject) {
-      return reply('ERROR missing to/subject');
-    }
+    if (!body.to || !body.subject) return reply('ERROR missing to/subject');
 
     GmailApp.sendEmail(body.to, body.subject, body.text || '', {
       htmlBody: body.html || undefined,
       name: 'MONEVA',
     });
 
+    // Apps Script answers HTTP 200 to everything, including what it refused,
+    // so the API judges success on this word, not the status code.
     return reply('OK sent');
   } catch (err) {
-    // Never echo the request back: it carries a live reset code.
+    // Never echo the request back - it carries a live reset or confirmation
+    // code. The name alone is enough to tell a parse failure from a send
+    // failure, and carries none of the payload.
     return reply('ERROR ' + err.name);
   }
 }
 
-/** A GET is a human checking the URL is alive. It must not send anything. */
 function doGet() {
   return reply('OK relay is up (POST to send)');
 }
 
+/**
+ * Compare two secrets without revealing anything by how long it takes.
+ *
+ * The digests, not the strings. Comparing the raw values had to return early
+ * when the lengths differed, and that early return is itself an answer: an
+ * attacker timing the response learns the token's length, which turns an
+ * impossible search into a merely large one. Two SHA-256 digests are always
+ * 32 bytes, so the loop below runs for exactly the same time whatever is sent.
+ */
 function constantTimeEquals(a, b) {
-  if (a.length !== b.length) return false;
-  let differences = 0;
-  for (let i = 0; i < a.length; i++) {
-    differences |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return differences === 0;
+  const da = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, a);
+  const db = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, b);
+  let diff = 0;
+  for (let i = 0; i < da.length; i++) diff |= da[i] ^ db[i];
+  return diff === 0;
 }
 
 function reply(text) {
-  return ContentService.createTextOutput(text)
-    .setMimeType(ContentService.MimeType.TEXT);
+  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.TEXT);
 }

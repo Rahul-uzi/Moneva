@@ -1,16 +1,35 @@
 # Keeps the Render free service from spinning down.
 #
-# HONEST LIMITATION, because this will look like it works and sometimes will
-# not: GitHub's scheduled workflows are best-effort. The minimum interval is
-# five minutes, but under load runs are commonly delayed ten to twenty, and
-# during busy periods they are occasionally dropped altogether. Render's window
-# is fifteen minutes. So a schedule of ten minutes usually holds and will
-# sometimes miss, and a miss means the next person to open the app waits the
-# full cold start.
+# MEASURED: THIS DOES NOT WORK WELL ENOUGH. Kept as a fallback, and as the
+# record of why something else is needed.
 #
-# For something dependable, use a purpose-built free pinger (cron-job.org and
-# similar hit reliably on the minute). This file exists because it needs no
-# account anywhere and lives with the code.
+# The schedule below asks for a run every ten minutes - about 144 a day.
+# Over the first 12 hours after it was enabled, GitHub ran it FOUR times.
+# Observed gaps between pings, from the Render log: 2h09m, 2h29m, 2h00m,
+# 4h38m.
+#
+# The consequence is the opposite of the intent. Render sleeps a free service
+# 15 minutes after its last request, so each ping does not keep the service
+# awake - it WAKES it, and 15 minutes later it sleeps again:
+#
+#     19:58  ping arrives, service starts
+#     20:13  shutting down
+#     22:27  ping arrives, service starts
+#     22:42  shutting down
+#
+# That is roughly 3 hours awake out of 24. A real user arriving in the other
+# 21 hours still pays the full cold start - measured at 31 seconds on
+# 2026-09-11 at 04:20 UTC.
+#
+# WHY: GitHub throttles scheduled workflows on low-activity repositories. The
+# cron expression is a request, not a promise, and the shortfall here is an
+# order of magnitude - not the ten to twenty minutes the documentation
+# suggests.
+#
+# WHAT TO USE INSTEAD: a purpose-built pinger - cron-job.org or UptimeRobot,
+# both free - pointed at the same URL. They fire on the minute. Or pay for a
+# plan that does not sleep, which also stops this burning the 750 free compute
+# hours a month that keeping one service awake round the clock would consume.
 #
 # And none of it saves the database: Render's free Postgres expires after about
 # thirty days regardless. This buys time, not a solution.
