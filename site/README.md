@@ -114,10 +114,20 @@ Each row is `number · title · description` in three columns, collapsing to two
 at 1020px and one at 560px, with the section's own word set vertically down the
 margin. Hover draws a voltage edge down the row.
 
-The **privacy list** had the same orphan-row fault and is fixed the same way —
-six items in a *fixed* two columns is three even rows with no holes. It drops
-the card chrome for hairlines and an icon badge, so it does not read as a
-second copy of the numbered list above it.
+## The privacy section
+
+It argues that the app earns trust by what it *refuses* to do, so the refusals
+lead: **No ads. No trackers. Nothing sold.** — three flat statements in display
+caps, in a column that stays put (`position: sticky`) while the detail scrolls
+past it.
+
+That column also fixes a waste the earlier version had: the heading sat
+full-width above a grid, so the entire right of the heading block was empty.
+Now the heading *is* the left column and the promises fill the right.
+
+Ten promises in a fixed two columns — five even rows, no orphan cells. They
+carry a plain voltage icon rather than a badge in a box, which keeps this
+section from reading as a second copy of the numbered feature list above it.
 
 Both are a reminder: `repeat(auto-fit, minmax(…))` is only safe when the item
 count divides evenly into whatever column count it lands on. With six items it

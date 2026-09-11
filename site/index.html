@@ -906,46 +906,75 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 
 /* --- security list ------------------------------------------------------ */
 /* --- the promises ------------------------------------------------------
-   Six boxed cards on an auto-fit grid produced the same orphan row as the
-   features did. Six items in a fixed TWO columns is three even rows with no
-   holes, and dropping the card chrome for hairlines keeps this section from
-   looking like a second copy of the numbered list above it. */
-.locks {
+   The section argues that the app earns trust by what it REFUSES to do, so
+   the refusals lead: three flat statements in display caps, held in a column
+   that stays put while the detail scrolls past it. The nine-cell grid this
+   replaces said the same thing nine equal times, and left the whole right of
+   the heading empty while doing it. */
+.trust {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: clamp(22px, 3vw, 52px);
-  margin-top: clamp(28px, 4vh, 50px);
+  grid-template-columns: minmax(0, 25rem) minmax(0, 1fr);
+  gap: clamp(28px, 4.5vw, 76px);
+  align-items: start;
+  margin-top: clamp(26px, 4vh, 46px);
+}
+.trust-side { position: sticky; top: 104px; }
+.trust-no {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: clamp(22px, 3vh, 34px);
+  padding-top: clamp(22px, 3vh, 34px);
   border-top: 1px solid var(--hairline);
 }
-.lock {
+.trust-no span {
+  font-family: var(--display);
+  font-weight: 900;
+  font-stretch: 125%;
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  color: var(--volt);
+}
+
+.trust-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: clamp(22px, 3vw, 56px);
+  border-top: 1px solid var(--hairline);
+}
+.promise {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 15px;
+  gap: 13px;
   align-items: start;
-  padding: clamp(19px, 2.6vh, 27px) 0;
+  padding: clamp(17px, 2.3vh, 24px) 0;
   border-bottom: 1px solid var(--hairline);
 }
-.lock .ico {
-  width: 34px; height: 34px;
-  border-radius: var(--radius-sm);
-  display: grid; place-items: center;
-  background: var(--volt-wash);
+.promise svg {
+  width: 19px; height: 19px;
   color: var(--volt);
-  flex: none;
-  transition: background var(--dur-base) var(--ease-soft), color var(--dur-base) var(--ease-soft);
+  margin-top: 3px;
+  transition: transform var(--dur-base) var(--ease-out);
 }
-.lock:hover .ico { background: var(--volt); color: var(--on-brand); }
-.lock svg { width: 18px; height: 18px; }
-.lock b {
+.promise:hover svg { transform: scale(1.14); }
+.promise b {
   display: block;
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 800;
   font-stretch: 108%;
   letter-spacing: -0.02em;
 }
-.lock p { font-size: 0.86rem; color: var(--ink-3); line-height: 1.6; margin-top: 5px; }
-@media (max-width: 1080px) { .locks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 720px)  { .locks { grid-template-columns: minmax(0, 1fr); } }
+.promise p { font-size: 0.85rem; color: var(--ink-3); line-height: 1.6; margin-top: 5px; }
+
+@media (max-width: 1080px) {
+  .trust { grid-template-columns: minmax(0, 1fr); }
+  .trust-side { position: static; }
+}
+@media (max-width: 640px) {
+  .trust-list { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* --- final cta ---------------------------------------------------------- */
 .final { text-align: center; position: relative; overflow: hidden; }
@@ -2601,54 +2630,66 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
      ==================================================================== -->
 <section class="sec" id="safe">
   <div class="wrap">
-    <div class="sec-head">
-      <div class="eyebrow rv">05 — Safety</div>
-      <h2 class="sec-title rv" style="--d:70ms">Your money.<br>Nobody else's<br>business.</h2>
-      <p class="lead rv" style="--d:140ms">
-        A money app earns trust by what it refuses to do. There are no adverts
-        here, nothing following you around the internet, and nobody being sold
-        a picture of how you spend. Your numbers are yours, and the app is
-        built to keep it that way.
-      </p>
-    </div>
+    <div class="trust">
 
-    <div class="locks">
-      <div class="lock rv">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 11c-2.8 0-5 2.2-5 5v4h10v-4c0-2.8-2.2-5-5-5z"/><path d="M8.5 9.5a3.5 3.5 0 1 1 7 0"/><path d="M12 14v3"/></svg></span>
-        <div><b>Your fingerprint opens it</b><p>The app stays locked behind the phone's own biometric prompt until you unlock it.</p></div>
+      <!-- Stays put while the detail scrolls past it. -->
+      <div class="trust-side rv">
+        <div class="eyebrow">05 — Privacy</div>
+        <h2 class="sec-title" style="margin-top:20px">Your money.<br>Nobody else's<br>business.</h2>
+        <p class="lead" style="margin-top:20px">
+          A money app earns trust by what it refuses to do. Everything below is
+          something MONEVA will not do, or will not do without asking you first.
+        </p>
+        <div class="trust-no" aria-hidden="true">
+          <span>No ads.</span>
+          <span>No trackers.</span>
+          <span>Nothing sold.</span>
+        </div>
       </div>
-      <div class="lock rv" style="--d:60ms">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 10h4M8 14h8"/></svg></span>
-        <div><b>A second lock, if you want it</b><p>An extra code at sign-in, plus spare codes to keep somewhere safe for the day you lose your phone.</p></div>
+
+      <div class="trust-list">
+        <div class="promise rv">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 11c-2.8 0-5 2.2-5 5v4h10v-4c0-2.8-2.2-5-5-5z"/><path d="M8.5 9.5a3.5 3.5 0 1 1 7 0"/><path d="M12 14v3"/></svg>
+          <div><b>Your fingerprint opens it</b><p>The app stays locked behind the phone's own biometric prompt until you unlock it.</p></div>
+        </div>
+        <div class="promise rv" style="--d:40ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 10h4M8 14h8"/></svg>
+          <div><b>A second lock, if you want it</b><p>An extra code at sign-in, plus spare codes to keep somewhere safe for the day you lose your phone.</p></div>
+        </div>
+        <div class="promise rv" style="--d:80ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></svg>
+          <div><b>Password resets that expire</b><p>A reset code works once and only for a few minutes, so an old email cannot be used to get in later.</p></div>
+        </div>
+        <div class="promise rv" style="--d:120ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3.6v4.9c0 4.5-3.2 8.3-8 9.5-4.8-1.2-8-5-8-9.5V6.6z"/><path d="M12 8.5v4M12 15.5h.01"/></svg>
+          <div><b>A copied session gets you both out</b><p>Every time your session renews, the old key stops working. If a copy of it ever turns up, MONEVA ends the session rather than letting two people share it.</p></div>
+        </div>
+        <div class="promise rv" style="--d:160ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/><path d="M12 19H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h6"/></svg>
+          <div><b>Sign out everywhere, at once</b><p>Lost a phone? One tap signs you out of every device you have ever used, instantly.</p></div>
+        </div>
+        <div class="promise rv" style="--d:200ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.3A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 11h7M8.5 14.5h4"/></svg>
+          <div><b>Your messages stay on your phone</b><p>It only ever looks at texts from a bank, never a person, and it uploads the payment it read — never the message itself.</p></div>
+        </div>
+        <div class="promise rv" style="--d:240ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12.5h4l2.5-6 4 12 2.5-6h6"/></svg>
+          <div><b>It says when it stops watching</b><p>A permission you revoked by accident looks exactly like a quiet week. The app tells you it has gone quiet rather than letting you find out later.</p></div>
+        </div>
+        <div class="promise rv" style="--d:280ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 1 9-9"/><path d="M12 12l4.5-4.5"/><path d="M16.5 16.5h5M19 14v5"/></svg>
+          <div><b>Nothing large is ever filed quietly</b><p>Recording without asking is off unless you switch it on, only for small everyday amounts, and only from apps it has watched you approve five times.</p></div>
+        </div>
+        <div class="promise rv" style="--d:320ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3.6v4.9c0 4.5-3.2 8.3-8 9.5-4.8-1.2-8-5-8-9.5V6.6z"/><path d="M9 12.2l2.1 2.1L15.2 10"/></svg>
+          <div><b>The assistant cannot spend</b><p>It can read your numbers and suggest an entry, but it can never record one. That is always your tap.</p></div>
+        </div>
+        <div class="promise rv" style="--d:360ms">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 19h16"/></svg>
+          <div><b>Take it all with you</b><p>Download everything as a spreadsheet whenever you like. Close the account and it really is deleted.</p></div>
+        </div>
       </div>
-      <div class="lock rv" style="--d:120ms">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/><path d="M12 19H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h6"/></svg></span>
-        <div><b>Sign out everywhere, at once</b><p>Lost a phone? One tap signs you out of every device you have ever used, instantly.</p></div>
-      </div>
-      <div class="lock rv" style="--d:180ms">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.2 8.3-8 9-4.8-.7-8-4.5-8-9V7z"/><path d="M9 12.5l2 2 4-4.5"/></svg></span>
-        <div><b>The assistant cannot spend</b><p>It can read your numbers and suggest an entry, but it can never record one. That is always your tap.</p></div>
-      </div>
-      <div class="lock rv" style="--d:240ms">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 19h16"/></svg></span>
-        <div><b>Take it all with you</b><p>Download everything as a spreadsheet whenever you like. Close the account and it really is deleted.</p></div>
-      </div>
-      <div class="lock rv" style="--d:300ms">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></span>
-        <div><b>Password resets that expire</b><p>A reset code works once and only for a few minutes, so an old email cannot be used to get in later.</p></div>
-      </div>
-      <div class="lock rv" style="--d:360ms">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.3A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 11h7M8.5 14.5h4"/></svg></span>
-        <div><b>Your messages stay on your phone</b><p>It only ever looks at texts from a bank, never a person, and it uploads the payment it read — never the message itself.</p></div>
-      </div>
-      <div class="lock rv" style="--d:420ms">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12.5h4l2.5-6 4 12 2.5-6h6"/></svg></span>
-        <div><b>It says when it stops watching</b><p>A permission you revoked by accident looks exactly like a quiet week. The app tells you it has gone quiet rather than letting you find out later.</p></div>
-      </div>
-      <div class="lock rv" style="--d:480ms">
-        <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 1 1 9-9"/><path d="M12 12l4.5-4.5"/><path d="M16.5 16.5h5M19 14v5"/></svg></span>
-        <div><b>Nothing large is ever filed quietly</b><p>Recording without asking is off unless you switch it on, only for small everyday amounts, and only from apps it has watched you approve five times.</p></div>
-      </div>
+
     </div>
   </div>
 </section>
