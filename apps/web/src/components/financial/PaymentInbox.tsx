@@ -139,7 +139,7 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
         transaction_type: decision.transactionType,
         amount_minor: proposal.amountPaise,
         currency: 'INR',
-        description: describeProposal(proposal.merchant, proposal.sources),
+        description: describeProposal(proposal.merchant, proposal.sources, proposal.accountTail),
         transaction_date: new Date(proposal.postedAt).toISOString(),
         device_id: 'android-notification',
       });

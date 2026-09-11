@@ -125,7 +125,7 @@ const fileOne = async (
       transaction_type: proposal.kind === 'debit' ? 'expense' : 'income',
       amount_minor: proposal.amountPaise,
       currency: 'INR',
-      description: describeProposal(proposal.merchant, proposal.sources),
+      description: describeProposal(proposal.merchant, proposal.sources, proposal.accountTail),
       transaction_date: new Date(proposal.postedAt).toISOString(),
       // The marker that makes this row findable and undoable later.
       device_id: AUTO_ADDED_DEVICE_ID,

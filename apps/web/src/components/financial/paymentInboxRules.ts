@@ -95,12 +95,34 @@ export function badgeFor(kind: SmsKind): { label: string; className: string } {
 export function describeProposal(
   merchant: string | undefined,
   sources: readonly string[],
+  accountTail?: string,
 ): string {
   const app = sources.find(isPaymentApp);
 
   if (!merchant) {
-    // Unchanged: with no counterparty, where it was seen is all there is.
-    return `From ${sources.join(', ')}`;
+    /**
+     * With no counterparty, name the RAIL or name nothing - never the
+     * messenger.
+     *
+     * This used to join every source, which produced "From Messages" in the
+     * owner's own ledger for a real payment. That names the app the bank's SMS
+     * happened to arrive in, which is not where the money went and not
+     * something anyone would write down. `isPaymentApp` already draws exactly
+     * this distinction - it returns false for "Messages" for this reason - and
+     * this branch was the one place that ignored it.
+     *
+     * It matters more now than it did. Once SMS capture is on, most captures
+     * arrive through Messages, so the old behaviour would fill a ledger with
+     * identical rows all labelled with the name of the messaging app.
+     *
+     * The account tail is the honest fallback: a bank SMS almost always says
+     * "A/c XX1234" even when it names no payee, and "...1234" at least tells
+     * you which account it left. Failing that, say plainly that nobody was
+     * named, which reads as something to fix rather than as a name.
+     */
+    if (app) return `From ${app}`;
+    if (accountTail) return `Bank payment ···${accountTail}`;
+    return 'Unnamed payment';
   }
   // A brand names itself, and brings a real logo rather than initials.
   if (brandNameIn(merchant)) return merchant;

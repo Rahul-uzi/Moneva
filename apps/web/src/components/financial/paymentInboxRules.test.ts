@@ -129,8 +129,42 @@ describe('naming the row', () => {
     expect(describeProposal('Karan', ['com.example.unknown'])).toBe('Karan');
   });
 
-  it('says where it was seen when nobody is named', () => {
+  it('names the rail when nobody is named', () => {
     expect(describeProposal(undefined, ['Google Pay'])).toBe('From Google Pay');
+  });
+
+  it('never names the messaging app as the payee', () => {
+    /**
+     * The bug, taken from the owner's own ledger: a real payment on 10
+     * September 2026 was filed as "From Messages". That names the app the
+     * bank's SMS arrived in - not where the money went, and not something
+     * anyone would write down themselves.
+     *
+     * It gets worse once SMS capture is switched on, because then MOST
+     * captures arrive that way and the ledger fills with identical rows all
+     * named after the messaging app.
+     */
+    expect(describeProposal(undefined, ['Messages'])).not.toBe('From Messages');
+    expect(describeProposal(undefined, ['Messages'])).toBe('Unnamed payment');
+  });
+
+  it('prefers the account tail to saying nothing', () => {
+    // A bank SMS almost always carries "A/c XX1234" even when it names no
+    // payee. Which account it left is a genuine fact about the payment; the
+    // messaging app it arrived through is not.
+    expect(describeProposal(undefined, ['Messages'], '1234')).toBe('Bank payment ···1234');
+  });
+
+  it('still prefers the rail over the account tail', () => {
+    // "From Google Pay" says how the money moved, which is more use than the
+    // account it came out of - and it is how people describe these payments.
+    expect(describeProposal(undefined, ['Google Pay'], '1234')).toBe('From Google Pay');
+  });
+
+  it('drops the messenger from a merged proposal', () => {
+    // One payment seen twice - the app pushed it and the bank texted about it.
+    // Listing both used to produce "From Google Pay, Messages".
+    expect(describeProposal(undefined, ['Google Pay', 'Messages'])).toBe('From Google Pay');
   });
 
   it('never describes a row as "view"', () => {

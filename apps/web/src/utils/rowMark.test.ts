@@ -36,7 +36,9 @@ const rowFor = (packageName: string, title: string, text: string) => {
   };
   const p = alertToProposal(alert);
   if (!p) throw new Error(`refused: ${title} / ${text}`);
-  const description = describeProposal(p.merchant, p.sources);
+  // Three arguments, as both production call sites pass. Dropping the account
+  // tail here would test a description the app never actually builds.
+  const description = describeProposal(p.merchant, p.sources, p.accountTail);
   return { description, mark: markFor(description) };
 };
 
@@ -93,9 +95,19 @@ describe('rows that get no mark, and why', () => {
     expect(row.mark).toBe('logo');
   });
 
-  it('an unknown app leaves the row with an arrow', () => {
+  it('an unknown app leaves the row with an arrow, and never shows its package name', () => {
+    /**
+     * This used to read "From com.unknown.wallet" - an Android package name,
+     * in a ledger, where a person expects to see who they paid. `isPaymentApp`
+     * already says an unrecognised package name is never worth showing; this
+     * was the one branch that showed it anyway.
+     *
+     * The account tail is a real fact about the payment and survives when the
+     * rail does not, so it is what the row falls back to.
+     */
     const row = rowFor('com.unknown.wallet', 'Wallet', 'Rs.500 debited from A/c XX1111');
-    expect(row.description).toBe('From com.unknown.wallet');
+    expect(row.description).not.toContain('com.unknown.wallet');
+    expect(row.description).toBe('Bank payment ···1111');
     expect(row.mark).toBe('arrow');
   });
 });
