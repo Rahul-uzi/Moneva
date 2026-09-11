@@ -1,0 +1,76 @@
+/* A strip above the content, in the same place as the offline and saved-data
+ * banners - so the app has one line at the top for "something you should know"
+ * rather than three different treatments competing for the same attention. */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--moneva-text-primary);
+  background-color: var(--moneva-overlay-strong);
+  border-bottom: 1px solid var(--moneva-border);
+}
+
+/* Only the required case gets colour. An ordinary update that shouted would
+ * teach people to dismiss the bar without reading it, which is exactly what
+ * you need them not to do on the day it matters. */
+.update-banner.is-required {
+  background-color: rgba(255, 107, 74, 0.14);
+  border-bottom-color: var(--moneva-coral);
+}
+
+.update-banner-icon {
+  flex-shrink: 0;
+  color: var(--moneva-teal);
+}
+
+.update-banner.is-required .update-banner-icon { color: var(--moneva-coral); }
+
+.update-banner-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.update-banner-copy strong { font-weight: 600; }
+
+.update-banner-copy span {
+  font-size: 11.5px;
+  color: var(--moneva-text-secondary);
+  /* The notes are one line from an environment variable and could be any
+     length; truncating beats pushing the button off the edge. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-banner-action {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: var(--moneva-teal);
+  color: var(--moneva-on-brand);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.update-banner-close {
+  flex-shrink: 0;
+  display: flex;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+}
+
+.update-banner-action:focus-visible,
+.update-banner-close:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 2px;
+}

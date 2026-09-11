@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.db.database import engine
 from app.models.models import Base
 from app.routers import (
+    app_release,
     auth,
     accounts,
     categories,
@@ -20,7 +21,8 @@ from app.routers import (
     income,
     notifications,
     profile,
-    ai
+    ai,
+    emis,
 )
 
 app = FastAPI(
@@ -87,6 +89,7 @@ async def startup_event():
     pass
 
 # Register API Routers
+app.include_router(app_release.router, prefix=settings.API_PREFIX)
 app.include_router(auth.router, prefix=settings.API_PREFIX)
 app.include_router(accounts.router, prefix=settings.API_PREFIX)
 app.include_router(categories.router, prefix=settings.API_PREFIX)
@@ -99,6 +102,7 @@ app.include_router(income.router, prefix=settings.API_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_PREFIX)
 app.include_router(profile.router, prefix=settings.API_PREFIX)
 app.include_router(ai.router, prefix=settings.API_PREFIX)
+app.include_router(emis.router, prefix=settings.API_PREFIX)
 
 @app.get("/health", tags=["Health"])
 @app.get("/api/health", tags=["Health"])

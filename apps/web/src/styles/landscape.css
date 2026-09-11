@@ -24,24 +24,64 @@
 
 @media (orientation: landscape) and (max-height: 560px) {
   /* ---------- use the width, but only as much as the cards want ---------- */
-  /* Sideways there is twice the width and half the height, so the shell
-     widens and the cards divide it into two columns instead of sitting in one
-     480px column beside a void.
+  /* Sideways there is twice the width and half the height, so the cards
+     divide the width into two columns instead of sitting in one 480px column
+     beside a void.
      760, not the full 853: minus 12px padding each side and a 12px gutter,
      that lands each column on about 362px - within a few pixels of the 384px
-     these cards are laid out for in portrait. Letting the shell run the whole
-     853 gave columns of 405px and stretched the full-width elements into
-     bands (the Plan metrics strip measured 829x116, a 7:1 ribbon), which is
-     the thing that reads as broken. The ~90px of backdrop left at each side is
-     the price of the cards keeping their proportions. */
+     these cards are laid out for in portrait. Letting the content run the
+     whole 853 gave columns of 405px and stretched the full-width elements into
+     bands (the Plan metrics strip measured 829x116, a 7:1 ribbon).
+
+     The 760 belongs to the CONTENT, not to the shell. Capping the shell was
+     the first attempt and it was measurably wrong on a real phone: the app
+     stopped at 760 of the 853, leaving 47px of page backdrop down BOTH edges.
+     In dark mode that is invisible - backdrop and surface are both near-black,
+     which is why it survived - but in light mode the surface is #FFFFFF
+     against a #F2F1EC page, so the phone showed the app as a white slab with a
+     beige stripe down each side. It reads as the app having failed to load
+     properly, which is exactly what it was reported as.
+
+     A phone held sideways IS the window. The shell fills it, the chrome paints
+     edge to edge, and only the reading column keeps its measure. */
   :root .app-viewport {
-    max-width: min(100%, 760px);
+    max-width: 100%;
+    /* The shadow draws the edge of a phone-shaped shell inside a wider
+       window. On a phone there is no wider window, so it is drawing an edge
+       around the whole screen. */
+    box-shadow: none;
   }
+
+  /* The column the cards were designed for, centred in the screen. */
+  :root .app-content {
+    max-width: 760px;
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  /* The floating bar follows the column rather than stretching to the full
+     853 - a tab bar wider than the content it belongs to reads as detached. */
+  /* The dock's own landscape rule is further down, and it sets `margin` as a
+     shorthand - so its sizing lives THERE, in one place. Splitting it across
+     two rules is what made the first attempt fail silently: this block set
+     `margin-inline: auto`, the later shorthand reset it to 12px, and the bar
+     sat 35px left of the column it belongs to. */
 
   /* ---------- give the content its height back ---------- */
   :root .topbar {
     /* 16/16 down to 8/8: 16px back, which is 4% of the whole screen. */
     padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
+    /* The bar's BACKGROUND now spans the screen, but the logo and the avatar
+       line up with the column beneath them rather than clinging to the two
+       far edges. The safe-area term is what keeps them out from under a
+       camera cutout, which in landscape sits on one of the long sides
+       (measured: 29px on this phone) rather than at the top. */
+    padding-inline: max(
+      16px,
+      env(safe-area-inset-left, 0px),
+      env(safe-area-inset-right, 0px),
+      calc((100% - 760px) / 2)
+    );
   }
 
   :root .app-content {
@@ -52,7 +92,15 @@
   }
 
   :root .dock {
-    margin: 0 12px calc(6px + env(safe-area-inset-bottom, 0px));
+    /* Follows the content column rather than stretching to the full screen -
+       a tab bar wider than the content it belongs to reads as detached.
+       A DEFINITE width, not max-width: the bar is absolutely positioned with
+       left:0 and right:0, so its width is auto, and capping an auto width
+       leaves the box over-constrained - the auto margins resolve to zero and
+       it hugs the left edge. With a real width the auto margins have
+       something to divide, and it centres. */
+    width: min(760px, calc(100% - 24px));
+    margin: 0 auto calc(6px + env(safe-area-inset-bottom, 0px));
     padding: 5px;
   }
 
@@ -147,5 +195,101 @@
     gap: 14px;
     /* Room under the last field once the card can scroll. */
     margin-bottom: 16px;
+  }
+}
+
+/* ===========================================================================
+   SIDEWAYS, PART TWO: THE SHEETS
+
+   The block above reshapes the PAGES. It never touched the modals, and the
+   modals are where the app is actually used sideways - recording a payment is
+   the one thing a person does with the phone already turned, because they are
+   typing.
+
+   Measured on the same 853x384 screen, with the Record Transaction sheet open:
+
+     - the sheet kept its portrait `max-width: 480px`, so 374px of the 854
+       sat empty on either side;
+     - its form is a single column 693px tall inside a 267px window, so the
+       Save button was 426px of scrolling away - on a screen with enough
+       spare width to have shown the whole form at once.
+
+   Not a cosmetic complaint: the field you are filling and the button that
+   commits it are never on screen together, so every entry is type, scroll,
+   lose your place, scroll back.
+   =========================================================================== */
+
+@media (orientation: landscape) and (max-height: 560px) {
+  /* Use the width that is already there. 720 rather than the full 854 keeps
+     each of the two columns below at about 340px - within a few pixels of the
+     width these fields are laid out for in portrait - instead of stretching
+     every input into a band. */
+  :root .modal-container {
+    max-width: min(100%, 720px);
+  }
+
+  /* The fullscreen variant collapses to the same sheet: a form that is 653px
+     tall has nothing to gain from a 384px-tall full screen, and everything to
+     gain from the second column. */
+  :root .modal-fullscreen .modal-container {
+    max-width: min(100%, 720px);
+    height: auto;
+    max-height: 90dvh;
+    border: 1px solid var(--moneva-border);
+    border-radius: var(--radius-lg);
+  }
+
+  /* ---------- two columns of fields ---------- */
+  /* The form is a flat list of field wrappers, which is what makes this
+     possible without touching the markup: the grid pairs them, and the few
+     that must stay whole are told to span both tracks. */
+  :root .quick-add-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 14px;
+    align-items: start;
+  }
+
+  /* What stays full width, and why:
+       - the expense/income/transfer tabs choose what the whole form MEANS,
+         so they read as a header, not as one field of a pair;
+       - the amount is the reason the sheet is open and keeps its emphasis;
+       - a free-text note is the one field people write a sentence in;
+       - the submit button is the target you go to when you have finished, and
+         a half-width button beside a field reads as belonging to that field. */
+  :root .quick-add-form > .type-tabs,
+  :root .quick-add-form > .amount-input-wrapper,
+  :root .quick-add-form > button[type='submit'],
+  :root .quick-add-form > .moneva-btn {
+    grid-column: 1 / -1;
+  }
+
+  /* Kept in a rule of its own, NOT added to the list above. A selector list
+     is all-or-nothing: one selector an engine cannot parse drops the whole
+     rule with it. `:has()` is the newest thing here, and if it were in that
+     list an older WebView would lose the full-width amount and submit button
+     too - leaving a worse layout than the one this file is fixing. Alone, an
+     unsupported `:has()` costs only itself. */
+  :root .quick-add-form > .moneva-form-field:has(textarea) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  /* ---------- give the height back to the form ---------- */
+  /* Sideways, height is the scarce axis and every fixed band spends it. The
+     title bar measured 77px of the 384 - a fifth of the screen to repeat a
+     heading the user just tapped to get here. These are the same paddings,
+     tightened only where the screen is short; nothing moves in portrait. */
+  :root .modal-header {
+    padding-block: 10px;
+  }
+
+  :root .modal-body {
+    padding-block: 14px;
+  }
+
+  :root .quick-add-form {
+    row-gap: 12px;
   }
 }

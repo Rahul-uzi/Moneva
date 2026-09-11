@@ -60,6 +60,23 @@ const APP_NAMES: Record<string, string> = {
   'com.dreamplug.androidapp': 'CRED',
   'com.mobikwik_new': 'MobiKwik',
   'com.freecharge.android': 'Freecharge',
+  'com.samsung.android.spay': 'Samsung Wallet',
+  'com.samsung.android.spaymini': 'Samsung Wallet',
+  'in.slice.android': 'slice',
+  'money.jupiter.app': 'Jupiter',
+  'com.epifi.paisa': 'Fi Money',
+  'com.naviapp': 'Navi',
+  'com.fampay.in': 'FamPay',
+  'com.myairtelapp': 'Airtel Payments Bank',
+  'com.jio.myjio': 'JioPay',
+  'com.hdfcbank.payzapp': 'PayZapp',
+  'com.whizdm.lazypay': 'LazyPay',
+  'com.olacabs.customer': 'Ola Money',
+  // A chat app that also moves money. Named like any other rail, because
+  // by the time a message gets here it has already cleared the receipt
+  // test in PaymentNotificationFilter - see CONVERSATIONAL_PACKAGES.
+  'com.whatsapp': 'WhatsApp Pay',
+  'com.whatsapp.w4b': 'WhatsApp Pay',
   'com.sbi.lotusintouch': 'SBI YONO',
   'com.sbi.SBIFreedomPlus': 'SBI',
   'com.snapwork.hdfc': 'HDFC Bank',
@@ -74,6 +91,11 @@ const APP_NAMES: Record<string, string> = {
   'com.idbibank.mpassbook': 'IDBI',
   'com.bankofindia.boiapp': 'Bank of India',
   'com.unionbankofindia.vyom': 'Union Bank',
+  'com.fss.indus': 'IndusInd Bank',
+  'com.idfcfirstbank.optimus': 'IDFC FIRST Bank',
+  'com.fss.fedmobile': 'Federal Bank',
+  'com.rblbank.mobank': 'RBL Bank',
+  'com.aubank.aubankapp': 'AU Small Finance Bank',
   'com.google.android.apps.messaging': 'Messages',
   'com.samsung.android.messaging': 'Messages',
   'com.android.mms': 'Messages',
@@ -84,14 +106,38 @@ export const appLabel = (packageName: string): string =>
   APP_NAMES[packageName] ?? packageName;
 
 /**
+ * Whether a source label names the app the money actually moved through.
+ *
+ * "Google Pay" is worth saying in a description - it is the rail, and it is
+ * how people describe the payment to themselves. "Messages" is not: a bank's
+ * SMS merely arrives there, and "Messages - SWIGGY" would name the wrong
+ * thing entirely. An unrecognised package name is never worth showing.
+ */
+export const isPaymentApp = (label: string): boolean =>
+  label !== 'Messages' && Object.values(APP_NAMES).includes(label);
+
+/**
  * A notification's whole text.
  *
  * The title carries the sender for an SMS ("VM-HDFCBK") and the headline for
  * an app alert ("Paid ₹250"), and either half can hold the part that decides
  * what this is - so the parser is given both.
  */
-export const alertBody = (alert: PaymentAlert): string =>
-  `${alert.title ?? ''} ${alert.text ?? ''}`.trim();
+export const alertBody = (alert: PaymentAlert): string => {
+  const title = (alert.title ?? '').trim();
+  const text = (alert.text ?? '').trim();
+  if (!title) return text;
+  if (!text) return title;
+
+  // A chat app titles the notification with the sender and then repeats the
+  // name at the start of the message: title "Karan", text "Karan paid you
+  // Rs.45". Joined blindly that reads "Karan Karan paid you Rs.45", and the
+  // payer comes out as "Karan Karan" - which is then the description on the
+  // row and the name the categoriser learns.
+  if (text.toLowerCase().startsWith(title.toLowerCase())) return text;
+
+  return `${title} ${text}`;
+};
 
 /* --------------------------------------------------------------------------
    A deterministic id
@@ -147,11 +193,40 @@ const minuteOf = (ms: number): number => Math.floor(ms / 60000);
  * alerts for one payment often spell differently ("SWIGGY", "Swiggy Ltd",
  * "UPI/SWIGGY/..."), and not the source app, which is exactly what differs.
  */
-const identityOf = (kind: string, amountPaise: number, postedAt: number): string =>
-  `${kind}|${amountPaise}|${minuteOf(postedAt)}`;
+const identityOf = (
+  kind: string,
+  amountPaise: number,
+  postedAt: number,
+  reference?: string,
+  owner = '',
+): string =>
+  // The bank's own reference when there is one. Without it, two genuinely
+  // separate payments of the same amount in the same minute - the same fare
+  // twice, a bill split into equal halves - derive the SAME id, and the server
+  // treats the second as a replay of the first and returns the row it already
+  // has. The client reads that as success. Half the money is simply never
+  // recorded, and the only clue is a total that is quietly too low.
+  //
+  // A reference is unique per payment and shared by every alert describing it,
+  // which is exactly the property this key needs. The minute stays as the
+  // fallback for alerts that quote no reference, where the ambiguity is real
+  // and nothing in the text can settle it.
+  //
+  // `owner` is here for the same reason the import path puts it in its own
+  // basis. client_mutation_id is unique across the WHOLE table, so without an
+  // owner two different people paying the same amount in the same minute
+  // derive the same id - and the second one is answered with a permanent 403
+  // that no retry can clear, so their payment can never be recorded at all.
+  // It also closes an oracle: the id is derived from the payment, so anyone
+  // could construct one for a GUESSED payment and learn from 403-versus-201
+  // whether a stranger had recorded it.
+  `${kind}|${amountPaise}|${minuteOf(postedAt)}|${reference ?? ''}|${owner}`;
 
 /** Reads one alert, or returns null when it is not a completed payment. */
-export const alertToProposal = (alert: PaymentAlert): AlertProposal | null => {
+export const alertToProposal = (
+  alert: PaymentAlert,
+  owner = '',
+): AlertProposal | null => {
   const parsed = parseTransactionSms(alertBody(alert));
   if (!parsed) return null;
 
@@ -166,7 +241,7 @@ export const alertToProposal = (alert: PaymentAlert): AlertProposal | null => {
     sources: [appLabel(alert.packageName)],
     postedAt: alert.postedAt,
     clientMutationId: stableMutationId(
-      identityOf(parsed.kind, parsed.amountPaise, alert.postedAt),
+      identityOf(parsed.kind, parsed.amountPaise, alert.postedAt, parsed.reference, owner),
     ),
   };
 };
@@ -181,6 +256,22 @@ export const alertToProposal = (alert: PaymentAlert): AlertProposal | null => {
  * point where the first risk is largely gone and the second is still remote.
  */
 export const MERGE_WINDOW_MS = 90_000;
+
+/**
+ * Whether two same-amount alerts really describe one payment.
+ *
+ * The window alone cannot tell "one payment announced twice" from "the same
+ * amount paid twice in a minute", and it guesses the first - which merges two
+ * real payments into one row and loses half the money before anything reaches
+ * the server. Where both alerts quote the bank's reference, that guess is not
+ * needed: two references that differ are two payments, whatever the clock says.
+ *
+ * Only a DISAGREEMENT separates them. One alert quoting a reference and
+ * another staying silent is the ordinary case - an app push and a bank SMS for
+ * one payment - and must still merge.
+ */
+const samePayment = (a: AlertProposal, b: AlertProposal): boolean =>
+  !a.reference || !b.reference || a.reference === b.reference;
 
 /**
  * Collapses the several alerts one payment produces into a single proposal.
@@ -213,7 +304,7 @@ export const mergeProposals = (proposals: AlertProposal[]): AlertProposal[] => {
     // within the window of the one before it merge into a single row without
     // limit; anchoring bounds a cluster to the window's width.
     const anchor = bucket[bucket.length - 1];
-    if (p.postedAt - anchor.postedAt <= MERGE_WINDOW_MS) {
+    if (p.postedAt - anchor.postedAt <= MERGE_WINDOW_MS && samePayment(anchor, p)) {
       anchor.alertIds.push(...p.alertIds);
       if (!anchor.sources.includes(p.sources[0])) anchor.sources.push(p.sources[0]);
       // Fill the gaps rather than overwrite: whichever alert knew a thing keeps it.
@@ -231,8 +322,18 @@ export const mergeProposals = (proposals: AlertProposal[]): AlertProposal[] => {
 };
 
 /** The whole pipeline: raw alerts in, proposals to review out. */
-export const proposalsFromAlerts = (alerts: PaymentAlert[]): AlertProposal[] =>
-  mergeProposals(alerts.map(alertToProposal).filter((p): p is AlertProposal => p !== null));
+export const proposalsFromAlerts = (
+  alerts: PaymentAlert[],
+  owner = '',
+): AlertProposal[] =>
+  // Called with an arrow rather than passed by reference: `map` hands its
+  // callback the INDEX as a second argument, so `map(alertToProposal)` would
+  // quietly make every proposal's owner its position in the list.
+  mergeProposals(
+    alerts
+      .map((alert) => alertToProposal(alert, owner))
+      .filter((p): p is AlertProposal => p !== null),
+  );
 
 /** Alerts that read as nothing. Cleared without ever becoming a proposal. */
 export const unreadableAlertIds = (alerts: PaymentAlert[]): string[] =>

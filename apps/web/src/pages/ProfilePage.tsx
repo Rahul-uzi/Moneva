@@ -23,6 +23,8 @@ import {
   Pencil,
   Search,
   MonitorSmartphone,
+  Upload,
+  FileText,
 } from 'lucide-react';
 import { categoryIcon } from '../utils/categoryIcons';
 import { Card } from '../components/ui/Card';
@@ -38,6 +40,9 @@ import { useUiStore } from '../stores/useUiStore';
 import { apiClient, setStoredTokens } from '../services/apiClient';
 import { nativeNotificationService, type PermissionStatus } from '../services/notificationService';
 import { runNotificationSync } from '../services/notificationSync';
+import {
+  loadAutoAddSettings, saveAutoAddSettings, forgetAllTrust,
+} from '../services/autoAddStore';
 import type { User, Category } from '../types/api';
 import { fileToAvatarDataUrl, uploadAvatar, deleteAvatar } from '../services/avatarService';
 import {
@@ -54,8 +59,13 @@ import {
   isCaptureSupported,
   type CaptureStatus,
 } from '../services/notificationCapture';
+import { captureHealth } from '../utils/captureHealth';
 import { markTourPending } from '../services/tourService';
 import { exportBinaryFile } from '../services/exportService';
+import { ImportSheet } from '../components/financial/ImportSheet';
+import { SmsCaptureSection } from '../components/settings/SmsCaptureSection';
+import { LegalSheet } from '../components/settings/LegalSheet';
+import type { Account } from '../types/api';
 import './ProfilePage.css';
 
 export const ProfilePage: React.FC = () => {
@@ -73,14 +83,32 @@ export const ProfilePage: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
 
   // Whether this phone will actually show notifications. The server-side
+  // Read once from this device rather than from the server: see autoAddStore
+  // for why trust that fails towards "ask" has to be local.
+  const [autoAdd, setAutoAdd] = useState(() => loadAutoAddSettings());
+
   // toggles below meant nothing while the OS permission had never been asked.
   const [devicePerm, setDevicePerm] = useState<PermissionStatus>('prompt');
   const [isEnablingPerm, setIsEnablingPerm] = useState<boolean>(false);
 
   // Reading payment alerts. Two states worth telling apart in the copy below:
   // Android has granted access, and the user still wants it used.
-  const [capture, setCapture] = useState<CaptureStatus>({ granted: false, capturing: false });
+  const [capture, setCapture] = useState<CaptureStatus>({
+    granted: false, capturing: false, lastKeptAt: 0, keptCount: 0, enabledAt: 0,
+  });
   const [isPayInboxOpen, setIsPayInboxOpen] = useState<boolean>(false);
+
+  // Derived on render rather than stored: this is a reading of the clock
+  // as much as of the switch, and a stored copy would quietly go stale.
+  const captureState = captureHealth({
+    supported: isCaptureSupported(),
+    granted: capture.granted,
+    capturing: capture.capturing,
+    lastKeptAt: capture.lastKeptAt,
+    keptCount: capture.keptCount,
+    enabledAt: capture.enabledAt,
+    now: Date.now(),
+  });
   useEffect(() => {
     // Re-read when the inbox closes: the user may have granted access, or
     // turned the whole thing off, while it was open.
@@ -148,6 +176,14 @@ export const ProfilePage: React.FC = () => {
 
   // Data Export & Account Deletion State
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  // Bringing history in. The accounts list is fetched when the sheet is
+  // opened rather than on page load: nothing else on this screen needs it,
+  // and a settings page should not pay for a feature nobody opened.
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  // null when closed, so the sheet is unmounted and always reopens on the
+  // tab that was asked for rather than the one last looked at.
+  const [legalTab, setLegalTab] = useState<'privacy' | 'terms' | null>(null);
+  const [importAccounts, setImportAccounts] = useState<Account[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState<boolean>(false);
 
@@ -718,7 +754,7 @@ export const ProfilePage: React.FC = () => {
       <Card variant="surface" className="settings-section-card">
         <div className="section-header">
           <Bell size={18} className="text-teal" />
-          <h2 className="heading-md">Notification Preferences</h2>
+          <h2 className="heading-md">Catching your payments</h2>
         </div>
 
         <div className="toggles-list">
@@ -727,10 +763,10 @@ export const ProfilePage: React.FC = () => {
               <span className="toggle-label">Notifications on this phone</span>
               <span className="toggle-sub">
                 {devicePerm === 'granted'
-                  ? 'On. Reminders arrive even when the app is closed.'
+                  ? 'On, even when the app is closed.'
                   : devicePerm === 'denied'
-                    ? 'Blocked in Android settings. Allow MONEVA to show notifications.'
-                    : 'Off. Turn on to be reminded before bills are due.'}
+                    ? 'Blocked in Android settings.'
+                    : 'Off. Nothing will remind you.'}
               </span>
             </div>
             {devicePerm !== 'granted' && (
@@ -749,16 +785,14 @@ export const ProfilePage: React.FC = () => {
           {/* Reading payment alerts. Only on Android - there is no
               notification shade to read in a browser. */}
           {isCaptureSupported() && (
-            <div className="toggle-row">
+            <div className={`toggle-row${captureState.tone === 'ok' ? '' : ` is-${captureState.tone}`}`}>
               <div className="toggle-info">
-                <span className="toggle-label">Read payment alerts</span>
-                <span className="toggle-sub">
-                  {capture.capturing && capture.granted
-                    ? 'On. Payments from UPI apps and banks appear for you to confirm.'
-                    : capture.capturing && !capture.granted
-                      ? 'Waiting for notification access in Android settings.'
-                      : 'Off. Let MONEVA fill in payments from GPay, PhonePe and bank alerts.'}
-                </span>
+                <span className="toggle-label">{captureState.headline}</span>
+                {/* The subtitle is the health verdict, not a restatement of
+                    the switch. A listener the system has killed still reports
+                    "capturing", so "On." would be a lie in exactly the case
+                    the user most needs to be told about. */}
+                <span className="toggle-sub">{captureState.detail}</span>
               </div>
               <Button
                 variant={capture.capturing && capture.granted ? 'secondary' : 'primary'}
@@ -771,10 +805,74 @@ export const ProfilePage: React.FC = () => {
             </div>
           )}
 
+          {/* The other half of capture. Notification access sees what the
+              phone displays; this sees the banks that text and display
+              nothing. Adjacent because they are one job, not two features. */}
+          <SmsCaptureSection
+            onCaptured={() => setIsPayInboxOpen(true)}
+            onReadPrivacy={() => setLegalTab('privacy')}
+          />
+
+          {/* Only offered once capture is actually working. Offering it while
+              nothing is being captured would be a switch with no effect, and a
+              user who flips it would reasonably believe payments were being
+              handled when none were being seen at all. */}
+          {isCaptureSupported() && capture.capturing && capture.granted && (
+            <label className="toggle-row">
+              <div className="toggle-info">
+                <span className="toggle-label">Add payments without asking</span>
+                {/* When capture has quietly died, "no payments lately" stops
+                    meaning a quiet week and starts meaning nothing is being
+                    recorded at all - and somebody who has been told the app
+                    handles it is exactly the person who will not check. So the
+                    warning is repeated here rather than left to the row above. */}
+                <span className="toggle-sub">
+                  {autoAdd.enabled && captureState.tone !== 'ok'
+                    ? `On, but nothing is reaching MONEVA - so nothing is being added.`
+                    : autoAdd.enabled
+                      ? `On, up to ₹${(autoAdd.ceilingMinor / 100).toLocaleString('en-IN')} from payment apps. Texts, transfers and bigger amounts still ask.`
+                      : `Off. Everything waits for you to tap.`}
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                className="toggle-checkbox"
+                checked={autoAdd.enabled}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  const next = { ...autoAdd, enabled };
+                  setAutoAdd(next);
+                  saveAutoAddSettings(next);
+                  /* Turning it off forgets what was learned. Somebody switching
+                     this off after it got something wrong means "stop, and do
+                     not resume where you left off" - so trust is not merely
+                     paused, it is discarded and has to be earned again. */
+                  if (!enabled) forgetAllTrust();
+                }}
+              />
+            </label>
+          )}
+
+        </div>
+      </Card>
+
+      {/* 4b. Reminders - a separate card, because nudging you is a different
+          job from noticing your payments, and one heading over both made a
+          nine-row wall that nobody reads to the bottom of. */}
+      <Card variant="surface" className="settings-section-card">
+        <div className="section-header">
+          <Bell size={18} className="text-teal" />
+          <h2 className="heading-md">Remind me about</h2>
+        </div>
+
+        {/* No subtitles here on purpose. The heading is "Remind me about" and
+            each label finishes the sentence, so a line underneath repeating it
+            in longer words is noise - which is exactly what "Receive updates
+            when achieving savings goal targets" was. */}
+        <div className="toggles-list">
           <label className="toggle-row">
             <div className="toggle-info">
-              <span className="toggle-label">Upcoming Bill Reminders</span>
-              <span className="toggle-sub">Receive alerts for bills due soon.</span>
+              <span className="toggle-label">Bills that are due soon</span>
             </div>
             <input
               type="checkbox"
@@ -787,8 +885,7 @@ export const ProfilePage: React.FC = () => {
 
           <label className="toggle-row">
             <div className="toggle-info">
-              <span className="toggle-label">Budget Limit Warnings</span>
-              <span className="toggle-sub">Receive alerts when approaching category budget limits.</span>
+              <span className="toggle-label">A budget running out</span>
             </div>
             <input
               type="checkbox"
@@ -801,8 +898,7 @@ export const ProfilePage: React.FC = () => {
 
           <label className="toggle-row">
             <div className="toggle-info">
-              <span className="toggle-label">Savings Goal Milestones</span>
-              <span className="toggle-sub">Receive updates when achieving savings goal targets.</span>
+              <span className="toggle-label">Reaching a savings goal</span>
             </div>
             <input
               type="checkbox"
@@ -815,8 +911,7 @@ export const ProfilePage: React.FC = () => {
 
           <label className="toggle-row">
             <div className="toggle-info">
-              <span className="toggle-label">Salary Reminders</span>
-              <span className="toggle-sub">Remind me when my recurring salary is due.</span>
+              <span className="toggle-label">Payday</span>
             </div>
             <input
               type="checkbox"
@@ -912,12 +1007,87 @@ export const ProfilePage: React.FC = () => {
 
         <p className="text-body text-xs text-muted">
           Download an Excel workbook of your financial records &mdash; a sheet each for
-          transactions, accounts, budgets, goals, bills and recurring income.
+          transactions, accounts, budgets, goals, bills, recurring income and
+          instalment plans.
         </p>
 
         <Button variant="secondary" onClick={handleExportData} isLoading={isExporting}>
           <Download size={14} /> Export to Excel
         </Button>
+
+        <p className="text-body text-xs text-muted" style={{ marginTop: 16 }}>
+          Bring in history from before you installed MONEVA. Payment alerts can
+          only see what happens from now on, so a CSV from your bank is the only
+          way to fill in what came before.
+        </p>
+
+        <Button
+          variant="secondary"
+          onClick={async () => {
+            try {
+              const res = await apiClient.get<Account[]>('/accounts');
+              setImportAccounts(res.data);
+              setIsImportOpen(true);
+            } catch {
+              addToast('Could not load your accounts. Try again in a moment.', 'error');
+            }
+          }}
+        >
+          <Upload size={14} /> Import a statement
+        </Button>
+      </Card>
+
+      {/* 6b. Privacy and terms.
+
+          Above Devices & Advanced rather than buried at the very bottom: this
+          app asks to read the notification shade and the SMS inbox, and the
+          page explaining what happens to that should not be the last thing
+          under a fold. It is also linked from the SMS section itself, so it
+          can be read BEFORE the permission is granted rather than after. */}
+      <Card variant="surface" className="settings-section-card">
+        <div className="section-header">
+          <ShieldCheck size={18} className="text-teal" />
+          <h2 className="heading-md">Privacy &amp; terms</h2>
+        </div>
+
+        <div className="security-feature-row">
+          <div className="security-feature-copy">
+            <span className="sec-label">
+              <ShieldCheck size={14} /> What MONEVA does with your data
+            </span>
+            <span className="text-body">
+              Your messages are never stored or sent anywhere. Read the detail,
+              including the one thing that does leave your phone.
+            </span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="row-action-btn"
+            onClick={() => setLegalTab('privacy')}
+          >
+            Read
+          </Button>
+        </div>
+
+        <div className="security-feature-row">
+          <div className="security-feature-copy">
+            <span className="sec-label">
+              <FileText size={14} /> Terms of use
+            </span>
+            <span className="text-body">
+              What MONEVA is, and what it is not. Short.
+            </span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="row-action-btn"
+            onClick={() => setLegalTab('terms')}
+          >
+            Read
+          </Button>
+        </div>
       </Card>
 
       {/* 7. Devices & Advanced */}
@@ -1336,6 +1506,26 @@ export const ProfilePage: React.FC = () => {
           isOpen
           onClose={() => setIsPayInboxOpen(false)}
           onSuccess={() => addToast('Payment added.', 'success')}
+        />
+      )}
+
+      {/* Same reason as above: it holds a parsed file and the outcome of the
+          last run, and neither should still be on screen the next time it is
+          opened. */}
+      {legalTab && (
+        <LegalSheet
+          isOpen
+          initial={legalTab}
+          onClose={() => setLegalTab(null)}
+        />
+      )}
+
+      {isImportOpen && (
+        <ImportSheet
+          isOpen
+          onClose={() => setIsImportOpen(false)}
+          onImported={() => { void restoreSession(); }}
+          accounts={importAccounts}
         />
       )}
     </div>

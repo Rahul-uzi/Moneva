@@ -50,7 +50,7 @@ async def test_goal_contribution_10_invariants(api_context):
 
     reg_res = await client.post("/api/auth/register", json={
         "email": "invariants_user@example.com",
-        "password": "password123",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "Invariant User"
     })
     token = reg_res.json()["access_token"]
@@ -170,7 +170,7 @@ async def test_bill_payment_idempotency_user_scoping(api_context):
 
     reg_res = await client.post("/api/auth/register", json={
         "email": "bill_user@example.com",
-        "password": "password123",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "Bill User"
     })
     token = reg_res.json()["access_token"]
@@ -218,7 +218,7 @@ async def test_category_and_goal_ownership_isolation(api_context):
     # Create User 1
     reg1_res = await client.post("/api/auth/register", json={
         "email": "user1_idor@example.com",
-        "password": "password123",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "User One"
     })
     headers1 = {"Authorization": f"Bearer {reg1_res.json()['access_token']}"}
@@ -226,7 +226,7 @@ async def test_category_and_goal_ownership_isolation(api_context):
     # Create User 2
     reg2_res = await client.post("/api/auth/register", json={
         "email": "user2_idor@example.com",
-        "password": "password123",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "User Two"
     })
     headers2 = {"Authorization": f"Bearer {reg2_res.json()['access_token']}"}
@@ -267,7 +267,7 @@ async def test_refresh_token_deactivated_user(api_context):
 
     reg_res = await client.post("/api/auth/register", json={
         "email": "deactivated_user@example.com",
-        "password": "password123",
+        "password": "Jhelum-Ferry-1892",
         "display_name": "Deactivated User"
     })
     refresh_token = reg_res.json()["refresh_token"]

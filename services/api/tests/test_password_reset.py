@@ -38,6 +38,7 @@ async def api_context(monkeypatch):
         ratelimit.LOGIN_BY_IP, ratelimit.LOGIN_BY_ACCOUNT,
         ratelimit.FORGOT_BY_IP, ratelimit.FORGOT_BY_ACCOUNT,
         ratelimit.RESET_BY_IP,
+        ratelimit.TOTP_BY_IP, ratelimit.TOTP_BY_ACCOUNT,
     ):
         window._hits.clear()
 
@@ -329,3 +330,140 @@ class TestTheCallerIsNotMadeToWaitForMail:
         # the send off the request path quietly stopped it happening.
         assert seen.get("to") == EMAIL
         assert seen.get("code", "").isdigit() and len(seen["code"]) == 6
+
+
+class TestASecondFactorIsNotACredential:
+    """A live TOTP code must not, on its own, reset a password.
+
+    _consume_second_factor tries TOTP first and returns true WITHOUT burning
+    anything - correct for signing in, where the password has already been
+    checked and this is genuinely the second of two factors. Password reset
+    used it too, which promoted the authenticator into a complete credential:
+    whoever could read it - a photographed enrolment QR, malware with the seed -
+    could set a new password with no password and no access to the inbox, and
+    the token_version bump that follows would sign the real owner out of every
+    device while the attacker signed in. Nothing was burned, so it worked again
+    the next day.
+    """
+
+    async def _enrol(self, api_context):
+        import json as _json
+
+        import pyotp
+
+        from app.core.security import hash_password as _hash
+
+        client, session = api_context
+        secret = pyotp.random_base32()
+        user = await _user(session)
+        user.totp_secret = secret
+        user.totp_enabled = True
+        user.totp_recovery_codes = _json.dumps([_hash("RESCUE-1111"), _hash("RESCUE-2222")])
+        await session.commit()
+        return client, secret, None
+
+    async def test_a_live_totp_code_cannot_reset_the_password(self, api_context):
+        import pyotp
+
+        client, secret, _ = await self._enrol(api_context)
+        live = pyotp.TOTP(secret).now()
+
+        res = await client.post("/api/auth/reset-password", json={
+            "email": EMAIL, "code": live, "new_password": "AttackerChosen1"})
+        assert res.status_code == 400, (
+            "a TOTP code alone reset the password - the second factor is acting "
+            "as a complete credential")
+
+        # And the real password still works.
+        assert (await client.post("/api/auth/login",
+                                  json={"email": EMAIL, "password": PASSWORD})
+                ).status_code in (200, 202)
+
+    async def test_a_recovery_code_still_works(self, api_context):
+        client, _secret, _ = await self._enrol(api_context)
+        res = await client.post("/api/auth/reset-password", json={
+            "email": EMAIL, "code": "RESCUE-1111", "new_password": "ChosenByOwner1"})
+        assert res.status_code == 200, res.text
+
+    async def test_a_recovery_code_is_burned(self, api_context):
+        client, _secret, _ = await self._enrol(api_context)
+        first = await client.post("/api/auth/reset-password", json={
+            "email": EMAIL, "code": "RESCUE-2222", "new_password": "ChosenByOwner1"})
+        assert first.status_code == 200
+        second = await client.post("/api/auth/reset-password", json={
+            "email": EMAIL, "code": "RESCUE-2222", "new_password": "SomeoneElse1"})
+        assert second.status_code == 400, "a recovery code was replayable"
+
+    async def test_signing_in_still_accepts_a_live_totp(self, api_context):
+        """The distinction, not a blanket ban: TOTP is fine as a SECOND factor."""
+        import pyotp
+
+        client, secret, _ = await self._enrol(api_context)
+        challenge = await client.post("/api/auth/login",
+                                      json={"email": EMAIL, "password": PASSWORD})
+        assert challenge.status_code == 200
+        token = challenge.json().get("challenge_token")
+        assert token, challenge.text
+
+        res = await client.post("/api/auth/2fa/verify",
+                                json={"challenge_token": token, "code": pyotp.TOTP(secret).now()})
+        assert res.status_code == 200, res.text
+        assert res.json().get("access_token")
+
+
+class TestTheSecondFactorIsThrottled:
+    """It was the one credential-checking route in the router with no limiter.
+
+    Three codes are live at any instant (valid_window=1) and nothing counted a
+    miss, so six digits were brute-forceable - and a correct password minted a
+    fresh challenge token whenever the last one lapsed, because the login
+    throttle was cleared before the 2FA branch rather than after it.
+    """
+
+    async def _enrol(self, api_context):
+        import json as _json
+
+        import pyotp
+
+        from app.core.security import hash_password as _hash
+
+        client, session = api_context
+        secret = pyotp.random_base32()
+        user = await _user(session)
+        user.totp_secret = secret
+        user.totp_enabled = True
+        user.totp_recovery_codes = _json.dumps([_hash("RESCUE-9999")])
+        await session.commit()
+        return client, secret
+
+    async def test_wrong_codes_are_eventually_refused(self, api_context):
+        client, secret = await self._enrol(api_context)
+        challenge = (await client.post("/api/auth/login",
+                                       json={"email": EMAIL, "password": PASSWORD})).json()
+        token = challenge["challenge_token"]
+
+        statuses = []
+        for i in range(20):
+            r = await client.post("/api/auth/2fa/verify",
+                                  json={"challenge_token": token, "code": f"{i:06d}"})
+            statuses.append(r.status_code)
+            if r.status_code == 429:
+                break
+        assert 429 in statuses, f"the second factor was never throttled: {statuses}"
+
+    async def test_a_correct_password_does_not_clear_its_own_throttle(self, api_context):
+        """Otherwise challenge tokens are unlimited for anyone holding the password."""
+        client, _secret = await self._enrol(api_context)
+        for _ in range(3):
+            await client.post("/api/auth/login", json={"email": EMAIL, "password": "wrong"})
+        before = ratelimit.LOGIN_BY_ACCOUNT.check(EMAIL)
+
+        # A correct password that stops at the 2FA challenge is NOT a completed
+        # login, so it must not reset the counter.
+        assert (await client.post("/api/auth/login",
+                                  json={"email": EMAIL, "password": PASSWORD})
+                ).status_code == 200
+        after = ratelimit.LOGIN_BY_ACCOUNT.check(EMAIL)
+        assert after[1] <= before[1], (
+            "the login throttle was cleared by a password alone, before the "
+            "second factor was supplied")

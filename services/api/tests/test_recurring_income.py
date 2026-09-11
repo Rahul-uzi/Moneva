@@ -111,7 +111,7 @@ async def api_client():
 async def _signed_in(client: AsyncClient):
     res = await client.post("/api/auth/register", json={
         "email": f"salary.{uuid.uuid4().hex[:8]}@example.com",
-        "password": "Salary@2026!!", "display_name": "Tester",
+        "password": "Jhelum-Ferry-1892", "display_name": "Tester",
         "currency": "INR", "timezone": "Asia/Kolkata",
     })
     assert res.status_code == 201, res.text

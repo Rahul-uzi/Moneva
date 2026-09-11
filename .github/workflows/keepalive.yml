@@ -1,0 +1,66 @@
+# Keeps the Render free service from spinning down.
+#
+# MEASURED: THIS DOES NOT WORK WELL ENOUGH. Kept as a fallback, and as the
+# record of why something else is needed.
+#
+# The schedule below asks for a run every ten minutes - about 144 a day.
+# Over the first 12 hours after it was enabled, GitHub ran it FOUR times.
+# Observed gaps between pings, from the Render log: 2h09m, 2h29m, 2h00m,
+# 4h38m.
+#
+# The consequence is the opposite of the intent. Render sleeps a free service
+# 15 minutes after its last request, so each ping does not keep the service
+# awake - it WAKES it, and 15 minutes later it sleeps again:
+#
+#     19:58  ping arrives, service starts
+#     20:13  shutting down
+#     22:27  ping arrives, service starts
+#     22:42  shutting down
+#
+# That is roughly 3 hours awake out of 24. A real user arriving in the other
+# 21 hours still pays the full cold start - measured at 31 seconds on
+# 2026-09-11 at 04:20 UTC.
+#
+# WHY: GitHub throttles scheduled workflows on low-activity repositories. The
+# cron expression is a request, not a promise, and the shortfall here is an
+# order of magnitude - not the ten to twenty minutes the documentation
+# suggests.
+#
+# WHAT TO USE INSTEAD: a purpose-built pinger - cron-job.org or UptimeRobot,
+# both free - pointed at the same URL. They fire on the minute. Or pay for a
+# plan that does not sleep, which also stops this burning the 750 free compute
+# hours a month that keeping one service awake round the clock would consume.
+#
+# And none of it saves the database: Render's free Postgres expires after about
+# thirty days regardless. This buys time, not a solution.
+
+name: Keep API awake
+
+on:
+  schedule:
+    # Every ten minutes, to leave slack inside Render's fifteen-minute window
+    # for the delays described above.
+    - cron: '*/10 * * * *'
+  workflow_dispatch:        # so it can be triggered by hand to warm the API
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the API
+        run: |
+          URL="${{ vars.MONEVA_HEALTH_URL || 'https://moneva.onrender.com/api/health' }}"
+          start=$(date +%s)
+          # A real application route. Render's edge answers /robots.txt itself
+          # while the service is asleep, so pinging that returns 200 without
+          # ever waking anything.
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "$URL")
+          elapsed=$(( $(date +%s) - start ))
+          echo "HTTP $code in ${elapsed}s"
+          # Over ten seconds means it had gone to sleep and this run is what
+          # woke it - the schedule is not keeping up.
+          if [ "$elapsed" -gt 10 ]; then
+            echo "::warning::Service was asleep (${elapsed}s to answer) - a scheduled run was missed or delayed."
+          fi
+          [ "$code" = "200" ] || exit 1

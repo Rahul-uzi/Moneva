@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+
+        <!-- Reads payment alerts out of the notification shade.
+
+             This is the only way to see a Google Pay or PhonePe payment:
+             neither exposes an API, and a UPI payment sends no SMS. It also
+             picks up bank SMS, because a bank's message arrives here as a
+             notification from the Messages app - which is how the app reads
+             bank alerts WITHOUT holding READ_SMS, a permission Play grants
+             only by written exception.
+
+             android:exported must be true - the system binds this service
+             from outside the app, and nothing else can bind it because the
+             permission below is held only by the system.
+
+             Granting access does not start collection: the service checks
+             the app's own switch first, and that defaults to off. -->
+        <service
+            android:name=".TxNotificationListener"
+            android:label="@string/notification_capture_label"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- The live half of SMS capture.
+
+             Plenty of Indian banks send a transaction SMS and post no
+             notification at all, so the listener above cannot see them. This
+             receiver can.
+
+             android:exported must be true - the system delivers this
+             broadcast from outside the app. The receiver holds no data of its
+             own: it applies the same two native gates the backfill uses, and
+             a message that is not a payment is dropped before anything is
+             written. It never aborts the broadcast, so the user's messaging
+             app sees every message exactly as it would otherwise.
+
+             Holding the permission does not start collection: the receiver
+             checks the app's own SMS switch first, and that defaults to off
+             and is separate from the notification switch. -->
+        <receiver
+            android:name=".SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="500">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Reminders are scheduled as inexact alarms on purpose: a "due today"
+         nudge does not need the exact second, and inexact lets Android batch
+         it with other wake-ups. The notifications plugin merges this
+         permission in by default; strip it so the app never appears under
+         "Alarms & reminders" as one that needs special access. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Reading bank SMS: the months before the app was installed, and the
+         banks that text without posting a notification.
+
+         This is the permission the app deliberately avoided for a long time,
+         and the trade is worth stating where it will be read. MONEVA is
+         distributed from its own website rather than Play, so Play's
+         restricted-permission review does not gate it - but the obligation
+         the policy describes is the right line regardless of who enforces
+         it, and the code keeps it: messages are filtered natively by SENDER
+         before their content is examined, only payments are queued, and raw
+         SMS is never uploaded anywhere. Only the parsed transaction leaves
+         the device, and only after the user confirms it.
+
+         See SmsSenderFilter for the gates, which run before anything is
+         stored. -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+    <!-- Held by the SERVICE, not requested from the user: it is what stops
+         any app other than the system binding TxNotificationListener. The
+         access itself is granted by the user in a Settings screen, not by a
+         prompt - there is no runtime dialog for notification access. -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+        tools:ignore="ProtectedPermissions" />
+</manifest>

@@ -58,6 +58,28 @@ const BRANDS: Record<string, { short: string; color: string }> = {
   'google pay': { short: 'GP', color: '#1A63C4' },
   'amazon pay': { short: 'AP', color: '#AA6600' },
   mobikwik: { short: 'MK', color: '#2B3990' },
+  // Rails that carry real payments but ship no logo file. Without an
+  // entry here a payment through any of them wears a bare direction
+  // arrow - the row cannot even say which app it came through. Colours
+  // are each brand's own; inkOn() picks the readable text colour.
+  bhim: { short: 'BH', color: '#C2571A' },
+  cred: { short: 'CR', color: '#2E2E38' },
+  freecharge: { short: 'FC', color: '#C42127' },
+  'samsung wallet': { short: 'SW', color: '#1428A0' },
+  'samsung pay': { short: 'SW', color: '#1428A0' },
+  slice: { short: 'sl', color: '#6C2BD9' },
+  jupiter: { short: 'Ju', color: '#1560BD' },
+  'fi money': { short: 'Fi', color: '#00806B' },
+  navi: { short: 'Nv', color: '#1A5FBF' },
+  fampay: { short: 'Fa', color: '#8A6D0B' },
+  jiopay: { short: 'JP', color: '#0A2885' },
+  payzapp: { short: 'PZ', color: '#004C8F' },
+  lazypay: { short: 'LP', color: '#6C3FB5' },
+  'ola money': { short: 'OM', color: '#3A3A3A' },
+  // Longer than 'whatsapp' on purpose: brandNameIn prefers the longest
+  // match, so a payment reads as the rail rather than as the chat app.
+  'whatsapp pay': { short: 'WA', color: '#128C7E' },
+  'airtel payments bank': { short: 'AB', color: '#B0141E' },
 
   // Merchants
   swiggy: { short: 'Sw', color: '#BA5B0E' },

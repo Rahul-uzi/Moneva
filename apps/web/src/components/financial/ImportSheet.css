@@ -1,0 +1,251 @@
+/* ===========================================================================
+   BRINGING IN A STATEMENT
+
+   The layout follows the risk. A wrong reading here is invisible and bulk -
+   a hundred plausible, wrong rows in one tap - so the middle of this sheet is
+   given over to showing what was understood, and the button sits below it.
+   The user should have to scroll past the evidence to reach the action.
+   =========================================================================== */
+
+.import-file-input {
+  display: none;
+}
+
+.import-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 22px 16px;
+  background: var(--moneva-overlay-weak);
+  border: 1px dashed var(--moneva-border);
+  border-radius: var(--radius-lg);
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+  text-align: center;
+}
+
+.import-drop:active {
+  background: var(--moneva-overlay-strong, var(--moneva-overlay-weak));
+}
+
+.import-drop-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--moneva-text-primary);
+  /* A chosen filename can be long; it must wrap rather than widen the sheet. */
+  overflow-wrap: anywhere;
+}
+
+.import-drop-sub {
+  font-size: 12px;
+  color: var(--moneva-text-muted);
+}
+
+/* ---------- the file could not be understood ---------- */
+
+.import-problem {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--moneva-orange);
+  background: rgba(232, 182, 44, 0.10);
+  color: var(--moneva-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.import-problem svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--moneva-orange);
+}
+
+.import-problem strong {
+  color: var(--moneva-text-primary);
+}
+
+.import-problem p {
+  margin: 4px 0 0;
+}
+
+/* ---------- what was understood ---------- */
+
+.import-read {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--moneva-text-muted);
+}
+
+.import-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--moneva-overlay-weak);
+  border-radius: var(--radius-md);
+}
+
+.import-layout > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 12.5px;
+}
+
+.import-layout dt {
+  color: var(--moneva-text-muted);
+  flex: none;
+}
+
+.import-layout dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--moneva-text-primary);
+  text-align: right;
+  /* Header names are long and arrive verbatim from the bank; wrapping beats
+     truncating, because the exact column name is the thing being checked. */
+  overflow-wrap: anywhere;
+}
+
+.import-count {
+  margin: 12px 0 8px;
+  font-size: 12.5px;
+  color: var(--moneva-text-secondary);
+}
+
+.import-count strong {
+  color: var(--moneva-text-primary);
+}
+
+/* ---------- a few real rows ---------- */
+
+.import-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.import-preview-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--moneva-surface);
+  font-size: 12.5px;
+}
+
+.import-preview-date {
+  flex: none;
+  color: var(--moneva-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.import-preview-desc {
+  flex: 1;
+  min-width: 0;
+  color: var(--moneva-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-preview-amt {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.import-preview-amt.is-debit { color: var(--moneva-text-primary); }
+.import-preview-amt.is-credit { color: var(--moneva-blue); }
+
+.import-more {
+  margin: 0;
+  padding: 8px 12px;
+  background: var(--moneva-surface);
+  font-size: 11.5px;
+  color: var(--moneva-text-muted);
+}
+
+/* ---------- where it goes ---------- */
+
+.import-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 14px 0;
+  font-size: 13px;
+  color: var(--moneva-text-secondary);
+}
+
+.import-account select {
+  flex: 1;
+  max-width: 60%;
+  padding: 9px 10px;
+  background: var(--moneva-surface);
+  color: var(--moneva-text-primary);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.import-note {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--moneva-text-muted);
+}
+
+/* ---------- finished ---------- */
+
+.import-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 4px;
+  text-align: center;
+}
+
+.import-done-icon {
+  color: var(--moneva-blue);
+}
+
+.import-done-line {
+  margin: 0;
+  font-size: 14px;
+  color: var(--moneva-text-secondary);
+}
+
+.import-done-line strong {
+  color: var(--moneva-text-primary);
+}
+
+/* A run that stopped part way. Not an error - some of the file is already
+   saved - but the user has to be told which, or they will believe nothing
+   happened and import again expecting a first run. */
+.import-partial {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--moneva-orange);
+  background: rgba(232, 182, 44, 0.10);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--moneva-text-secondary);
+  text-align: left;
+}

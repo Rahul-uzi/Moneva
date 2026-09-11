@@ -47,3 +47,62 @@
 .offline-state {
   gap: 6px;
 }
+
+/* Actions on an error boundary's fallback.
+ *
+ * The boundary offers up to three ways out ("try again", "go home", "copy
+ * details"), and .state-container stacks its children in a column - three
+ * full-width buttons down the middle read as a menu rather than a recovery.
+ * A wrapping row keeps them as what they are: alternatives. */
+.state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* The app-level boundary has no shell around it, so it has to fill the screen
+ * itself - otherwise it sits squashed against the top edge of a blank page. */
+.state-container.state-fullscreen {
+  min-height: 100dvh;
+  justify-content: center;
+}
+
+/* "Your figures from an hour ago."
+ *
+ * Deliberately quieter than the offline banner: this is not a problem, it is
+ * the app being honest about which numbers are on screen while it waits for
+ * fresher ones. An alarming colour here would train people to distrust a state
+ * that is usually about to resolve itself in a couple of seconds. */
+.saved-data-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--moneva-text-secondary);
+  background-color: var(--moneva-overlay-strong);
+  border-bottom: 1px solid var(--moneva-border);
+}
+
+.saved-data-refresh {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--moneva-blue);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.saved-data-refresh:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 2px;
+  border-radius: 3px;
+}

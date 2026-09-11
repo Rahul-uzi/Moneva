@@ -52,6 +52,32 @@ Thumbs.db
 *.swp
 
 # Mobile
-/apps/web/android/
+#
+# The android/ folder USED to be ignored whole, on the reasoning that Capacitor
+# regenerates it. It does - but it regenerates a STOCK project. It does not
+# bring back the notification listener, the capture plugin, the payment filter,
+# the manifest edits that register them, or the debug network-security config.
+# All of that was hand-written, and none of it was in a single commit; it
+# existed only on one laptop. So the source is tracked and only the genuinely
+# generated parts are ignored.
+/apps/web/android/build/
+/apps/web/android/.gradle/
+/apps/web/android/app/build/
+# Absolute SDK path for one machine.
+/apps/web/android/local.properties
+# Written by `npx cap sync` from the plugins in package.json.
+/apps/web/android/capacitor-cordova-android-plugins/
+# The built web bundle, copied in by `npx cap sync` from apps/web/dist.
+/apps/web/android/app/src/main/assets/public/
+/apps/web/android/app/src/main/assets/capacitor.config.json
+/apps/web/android/app/src/main/assets/capacitor.plugins.json
+
 /apps/web/ios/
 /apps/web/www/
+
+# The release signing key and its password. Neither ever belongs in git: with
+# both, anyone can publish an update that every existing install accepts as
+# genuine. The .example file beside it is committed and holds no secret.
+/apps/web/android/keystore.properties
+*.jks
+*.keystore

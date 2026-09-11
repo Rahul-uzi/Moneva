@@ -20,6 +20,39 @@ export interface Account {
   opening_balance_minor: number;
   balance_paise?: number;
   is_active: boolean;
+
+  /* Credit-card billing terms. Both null on every other kind of account -
+     having both is what makes an account a card. Days are 1-31 as the user
+     gave them, and are clamped into each month when read: a card that closes
+     on the 31st still closes in February. */
+  statement_day?: number | null;
+  due_day?: number | null;
+  credit_limit_minor?: number | null;
+
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * A purchase converted into instalments.
+ *
+ * Entered once rather than read out of the ledger: the bank takes the
+ * instalment whether or not the app saw the alert, so a plan rebuilt from
+ * captured payments would under-report the month a notification went missing.
+ */
+export interface Emi {
+  id: string;
+  user_id: string;
+  /** The card it is charged to, when the user has said. */
+  account_id?: string | null;
+  name: string;
+  monthly_minor: number;
+  months: number;
+  /** ISO date of the first instalment. Everything is counted forward from it. */
+  started_at: string;
+  currency: string;
+  /** Closed by hand. A plan that has simply run its course stays active. */
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }

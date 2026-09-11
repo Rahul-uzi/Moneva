@@ -43,6 +43,25 @@ class User(Base):
     # so revocation is one integer write and needs no lookup table.
     token_version = Column(Integer, default=0, nullable=False)
 
+    # Email ownership.
+    #
+    # Until this exists, an address is only a claim. Anyone could register with
+    # anyone else's email, which squats it so the real owner cannot sign up -
+    # and, far more common and far worse, a typo means the account is attached
+    # to an address the person cannot read. They notice the day they forget
+    # their password, and by then the ledger is unreachable: reset codes go to
+    # a mailbox that is not theirs.
+    #
+    # The gate is soft on purpose. An unverified user may use the app; what
+    # they may not do is change the address, because that is the one action
+    # that turns an unverified account into a permanently stolen one.
+    email_verified = Column(Boolean, default=False, nullable=False)
+    verify_code_hash = Column(String, nullable=True)
+    verify_code_expires_at = Column(DateTime(timezone=True), nullable=True)
+    verify_code_attempts = Column(SmallInteger, default=0, nullable=False)
+    # Throttles resends per account, independently of the IP rate limiter.
+    verify_code_sent_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -53,9 +72,79 @@ class User(Base):
     budgets = relationship("Budget", back_populates="user", cascade="all, delete-orphan")
     savings_goals = relationship("SavingsGoal", back_populates="user", cascade="all, delete-orphan")
     bills = relationship("Bill", back_populates="user", cascade="all, delete-orphan")
+    refresh_sessions = relationship("RefreshSession", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     recurring_incomes = relationship("RecurringIncome", back_populates="user", cascade="all, delete-orphan")
     sync_metadata = relationship("SyncMetadata", back_populates="user", cascade="all, delete-orphan")
+    emis = relationship("Emi", back_populates="user", cascade="all, delete-orphan")
+
+
+class RefreshSession(Base):
+    """One device's signed-in session, and the chain of refresh tokens it used.
+
+    WHY THIS EXISTS AT ALL.
+
+    A refresh token used to be a bearer credential good for sixty days and
+    reusable without limit. Stolen once - off a backed-up device, out of an
+    intercepted response, from storage on a rooted phone - it granted sixty
+    days of quiet access, and nothing anywhere could tell. The account owner
+    stayed signed in throughout, because the thief's use of the token did not
+    disturb theirs. There was no signal to notice and no record to check.
+
+    Rotation fixes the silence rather than the theft. Each refresh mints a new
+    token and retires the one presented, so a stolen token is only good until
+    the real device refreshes next - minutes, normally. What matters more is
+    what happens AFTERWARDS: whoever refreshes second presents a token that has
+    already been used, and a used token coming back is not something a working
+    client ever does. It means two parties hold the same credential.
+
+    At that point the honest response is to disbelieve both. `revoke_family`
+    kills the whole chain, and the real owner signs in again - an inconvenience
+    that tells them something happened, which is strictly better than a thief
+    with sixty silent days.
+
+    The same rows answer a question the app could not answer before: which
+    devices are signed in, and when was each last used. That is the "3 devices"
+    list, and it comes free.
+
+    NOT stored here: the token itself. Only its jti, and only hashed - a leaked
+    database must not hand over live sessions, exactly as with reset codes and
+    recovery codes.
+    """
+
+    __tablename__ = "refresh_sessions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Every token descended from one sign-in shares a family. Reuse anywhere in
+    # the chain condemns all of it, because there is no way to tell which half
+    # of the fork is the honest one.
+    family_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+
+    # sha256 of the jti, not the jti. Indexed because every refresh looks it up.
+    jti_hash = Column(String(64), nullable=False, unique=True, index=True)
+
+    # Set the moment this token is exchanged. A second presentation after that
+    # is the signal the whole design turns on.
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Set when the family is condemned, by reuse or by the user ending the
+    # session deliberately. Either way the row stays, so the event is auditable.
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # Why it ended, for the screen that shows sessions: "you", or "reuse".
+    revoked_reason = Column(String(32), nullable=True)
+
+    # For the session list. Best-effort and self-reported by the client, so it
+    # is a label rather than an identity - never used to make a decision.
+    device_label = Column(String(120), nullable=True)
+    last_ip = Column(String(45), nullable=True)          # 45 fits IPv6
+
+    issued_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    user = relationship("User", back_populates="refresh_sessions")
 
 
 class Account(Base):
@@ -68,6 +157,19 @@ class Account(Base):
     currency = Column(String, default="INR", nullable=False)
     opening_balance_minor = Column(BigInteger, default=0, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Credit-card billing terms. Null on every other kind of account, which is
+    # also how an account is recognised AS a card - both days set. A separate
+    # is_card flag would be a second source of truth able to disagree with the
+    # days it depends on.
+    #
+    # Days are stored as given, 1-31, and clamped into the month at read time:
+    # a card that closes on the 31st still closes in February, and rewriting it
+    # to 28 here would move that card's closing date in every other month.
+    statement_day = Column(SmallInteger, nullable=True)
+    due_day = Column(SmallInteger, nullable=True)
+    credit_limit_minor = Column(BigInteger, nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
@@ -106,6 +208,13 @@ class Transaction(Base):
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     savings_goal_id = Column(UUID(as_uuid=True), ForeignKey("savings_goals.id", ondelete="SET NULL"), nullable=True)
     transaction_type = Column(String, nullable=False)  # income, expense, transfer
+    #: A correction the user made when the running balance had drifted from the
+    #: real one - a missed cash spend, a payment the parser never saw, a wrong
+    #: opening balance. It is a real ledger event, so it MOVES the balance like
+    #: any income or expense, but it is not something the person spent or
+    #: earned, so every spending figure excludes it. Without that exclusion a
+    #: reconciliation would show up as the largest purchase of the month.
+    is_adjustment = Column(Boolean, default=False, nullable=False)
     amount_minor = Column(BigInteger, nullable=False)
     currency = Column(String, nullable=False)
     description = Column(String, nullable=True)
@@ -231,3 +340,51 @@ class SyncMetadata(Base):
 
     # Relationships
     user = relationship("User", back_populates="sync_metadata")
+
+
+class Emi(Base):
+    """A purchase converted into instalments.
+
+    Not a transaction. An EMI is a commitment that shows up nowhere in a
+    month's spending until the month it lands in, which is exactly how people
+    end up with more of them running at once than they meant to - the phone,
+    the laptop and the fridge each looked affordable on its own.
+
+    It is deliberately NOT derived from the ledger. The bank takes the
+    instalment whether or not the app saw the alert, so a plan reconstructed
+    from captured payments would under-report the moment one notification was
+    missed, and tell somebody they owe less than they do. What the user enters
+    once - the instalment, how many, when it started - is the truth, and the
+    calendar does the rest.
+    """
+    __tablename__ = "emis"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Which card or loan account it is charged to. Nullable, because plenty of
+    # people are paying off something on a card they have not added here, and
+    # refusing to record the commitment until they do would lose the very
+    # figure this table exists to keep.
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+
+    name = Column(String, nullable=False)
+    monthly_minor = Column(BigInteger, nullable=False)
+    months = Column(SmallInteger, nullable=False)
+
+    # The first instalment. Progress is counted forward from this date, so it
+    # is the one field that must be right.
+    started_at = Column(DateTime(timezone=True), nullable=False)
+
+    currency = Column(String, default="INR", nullable=False)
+
+    # Closed by hand - a plan settled early, or entered wrong. A finished plan
+    # is not closed: it stays, and is reported as finished from its own dates,
+    # so the history of what was being paid off stays readable.
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="emis")

@@ -1,0 +1,159 @@
+/* Legal text, set to be read rather than scrolled past.
+ *
+ * The usual failure of an in-app policy is that it looks like something to
+ * dismiss: dense, small, grey. If the point is that somebody can actually find
+ * out what the app does with their messages, then the type has to invite
+ * reading - wider line spacing, real headings, and a measure short enough to
+ * track on a phone. */
+
+.legal-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 16px;
+  background: var(--moneva-overlay-strong);
+  border-radius: 10px;
+}
+
+.legal-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.legal-tab.is-active {
+  background: var(--moneva-surface);
+  color: var(--moneva-text-primary);
+}
+
+.legal-tab:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 1px;
+}
+
+.legal-body {
+  /* Bounded so the sheet scrolls internally rather than growing the modal past
+     the screen, which on a phone hides the close button. */
+  max-height: 58vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  font-size: 13.5px;
+  line-height: 1.62;
+  color: var(--moneva-text-secondary);
+}
+
+.legal-lede {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: var(--moneva-text-primary);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--moneva-border);
+}
+
+.legal-body h3 {
+  margin: 20px 0 7px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--moneva-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.legal-body h3:first-of-type { margin-top: 0; }
+
+.legal-body p { margin: 0 0 11px; }
+
+.legal-body ul {
+  margin: 0 0 11px;
+  padding-left: 18px;
+}
+
+.legal-body li { margin-bottom: 7px; }
+
+.legal-body strong { color: var(--moneva-text-primary); font-weight: 600; }
+
+.legal-body a {
+  color: var(--moneva-blue);
+  text-decoration: underline;
+  /* A long address must not push the sheet sideways on a narrow phone. */
+  word-break: break-word;
+}
+
+.legal-updated {
+  margin: 20px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--moneva-border);
+  font-size: 11.5px;
+  color: var(--moneva-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legal-tab { transition: none; }
+}
+
+/* "On this phone, right now."
+ *
+ * Set apart from the prose because it is the only part of the page that is
+ * about THIS reader rather than about the app in general - and it is the
+ * question they opened the page to answer. A policy that buries it reads like
+ * every other policy: a description of what an app could theoretically do. */
+.legal-now {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--moneva-overlay-strong);
+  border: 1px solid var(--moneva-border);
+  font-size: 13px;
+}
+
+.legal-now.is-loading { color: var(--moneva-text-secondary); }
+
+.legal-now > strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--moneva-text-secondary);
+}
+
+.legal-now ul {
+  list-style: none;
+  margin: 0 0 9px;
+  padding: 0;
+}
+
+.legal-now li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  color: var(--moneva-text-primary);
+}
+
+/* A dot rather than a word, so on and off are told apart at a glance and the
+   sentence does not have to carry the whole job. */
+.legal-now li::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--moneva-text-secondary);
+}
+
+.legal-now li.is-on::before { background: var(--moneva-teal); }
+.legal-now li.is-off::before { background: var(--moneva-border); }
+
+.legal-now p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--moneva-text-secondary);
+}

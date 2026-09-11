@@ -13,15 +13,21 @@ databases:
   - name: moneva-db
     databaseName: moneva
     user: moneva
-    # Free plan expires after a limited period; move to a paid plan before
-    # this holds anything you care about.
-    plan: free
+    # Basic, not free. The free database EXPIRES after about 30 days and
+    # takes its contents with it - fine for a smoke test, not for anything
+    # holding a person's financial history.
+    plan: basic-256mb
 
 services:
   - type: web
     name: moneva-api
     runtime: python
-    plan: free
+    # Starter, not free. Measured on the free plan: a cold request answered in
+    # 42.9 seconds, of which 0.14 was the network - it sleeps after 15 idle
+    # minutes and the rest is the wake-up. No amount of client work fixes that;
+    # the client already fetches in parallel behind a skeleton. Starter does
+    # not sleep.
+    plan: starter
     # The API lives in a subdirectory of the repo.
     rootDir: services/api
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
@@ -64,8 +70,18 @@ services:
       # it when SMTP fails. In that case RESET_EMAIL_FROM must be an address
       # that provider may send as - "MONEVA <onboarding@resend.dev>" works on
       # a fresh account - because a gmail.com sender will be rejected there.
+      # THE ROUTE THAT WORKS FROM HERE. An HTTPS relay you host yourself -
+      # services/api/docs/gmail-relay.gs is the ten lines to paste into
+      # script.google.com. Sends from your own Gmail, needs no account with
+      # any third party, and travels over 443 rather than a blocked SMTP port.
+      # Set both of these and leave the SMTP values below empty.
+      - key: MAIL_RELAY_URL
+        sync: false        # https://script.google.com/macros/s/..../exec
+      - key: MAIL_RELAY_TOKEN
+        sync: false        # the same secret as SHARED_SECRET in that script
+
       - key: SMTP_HOST
-        sync: false        # smtp.gmail.com
+        sync: false        # smtp.gmail.com - BLOCKED on Render, see above
       - key: SMTP_PORT
         sync: false        # 587
       - key: SMTP_USER

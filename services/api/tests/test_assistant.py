@@ -48,7 +48,7 @@ async def _signed_in(client: AsyncClient):
     """Registers a user with an account and one fuel expense; returns headers."""
     email = f"assistant.{uuid.uuid4().hex[:8]}@example.com"
     res = await client.post("/api/auth/register", json={
-        "email": email, "password": "Assistant@2026!!", "display_name": "Tester",
+        "email": email, "password": "Jhelum-Ferry-1892", "display_name": "Tester",
         "currency": "INR", "timezone": "Asia/Kolkata",
     })
     assert res.status_code == 201, res.text
@@ -214,7 +214,7 @@ async def _with_spread(client: AsyncClient):
     """A user with several categories used, plus a named second account."""
     email = f"spread.{uuid.uuid4().hex[:8]}@example.com"
     res = await client.post("/api/auth/register", json={
-        "email": email, "password": "Spread@2026!!", "display_name": "Tester",
+        "email": email, "password": "Jhelum-Ferry-1892", "display_name": "Tester",
         "currency": "INR", "timezone": "Asia/Kolkata",
     })
     headers = {"Authorization": f"Bearer {res.json()['access_token']}"}

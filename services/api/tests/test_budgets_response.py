@@ -44,7 +44,7 @@ async def api_client():
 async def _signed_in(client: AsyncClient):
     email = f"budget.{uuid.uuid4().hex[:8]}@example.com"
     res = await client.post("/api/auth/register", json={
-        "email": email, "password": "Budget@2026!!", "display_name": "Tester",
+        "email": email, "password": "Jhelum-Ferry-1892", "display_name": "Tester",
         "currency": "INR", "timezone": "Asia/Kolkata",
     })
     assert res.status_code == 201, res.text

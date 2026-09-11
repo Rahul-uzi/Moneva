@@ -17,6 +17,7 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { formatMonetaryCompact } from '../utils/money';
 import { parseApiDate } from '../utils/datetime';
+import { cardCycle } from '../utils/cardCycle';
 
 export interface ReminderBill {
   id: string;
@@ -39,9 +40,29 @@ export interface ReminderPrefs {
   notif_salary: boolean;
 }
 
+/**
+ * A credit card, reduced to what a reminder needs.
+ *
+ * The amount is passed in rather than derived here: what is owed comes from
+ * the ledger, which this module deliberately knows nothing about. The two
+ * days come along so the due date is computed by the same function the card
+ * screen uses - one place where that arithmetic lives, so a reminder can
+ * never disagree with the screen it points at.
+ */
+export interface ReminderCard {
+  id: string;
+  name: string;
+  statement_day: number;
+  due_day: number;
+  /** Still owed on the statement that closed. Nothing owed, nothing to say. */
+  outstanding_minor: number;
+}
+
 export interface ReminderInput {
   bills: ReminderBill[];
   salaryStreams: ReminderSalaryStream[];
+  /** Optional so a caller with no card data still plans bills and salary. */
+  cards?: ReminderCard[];
   prefs: ReminderPrefs;
   now: Date;
   /** Local hour reminders fire at. 9am: after people wake, before they spend. */
@@ -55,7 +76,7 @@ export interface PlannedReminder {
   title: string;
   body: string;
   at: Date;
-  channelId: 'bills' | 'salary';
+  channelId: 'bills' | 'salary' | 'cards';
   route: string;
 }
 
@@ -93,6 +114,11 @@ const nextSlot = (now: Date, hour: number): Date => {
 export const buildReminderPlan = (input: ReminderInput): PlannedReminder[] => {
   const { bills, salaryStreams, prefs, now } = input;
   const hour = input.hour ?? 9;
+  // A second slot on the due day itself. Someone who opens the app at noon on
+  // the day a card is due has already missed the morning reminder, and the
+  // next one would land the morning after - by which time the interest has
+  // started. Evening still leaves time to pay.
+  const lateHour = Math.min(23, hour + 9);
   const out: PlannedReminder[] = [];
 
   const push = (r: Omit<PlannedReminder, 'id'>) => {
@@ -143,6 +169,88 @@ export const buildReminderPlan = (input: ReminderInput): PlannedReminder[] => {
           });
         }
       });
+  }
+
+  /* A credit card is the reminder that pays for itself.
+
+     Interest on an Indian card runs 36-46 percent a year, backdated to the
+     purchase date, with a late fee on top - and people miss these on cards
+     they have the money to pay. Everything else here is a nudge; this one is
+     the difference between owing what you spent and owing half again.
+
+     Three days of warning rather than one, because paying a card usually
+     means moving money first, and a reminder that arrives after the transfer
+     window has closed is just an apology. */
+  if (prefs.notif_bills) {
+    (input.cards ?? []).forEach((c) => {
+      // Nothing owed, nothing to chase. Nagging somebody about a card they
+      // have already paid is worse than silence: it teaches them to ignore
+      // the next one, which will be the one that matters.
+      if (c.outstanding_minor <= 0) return;
+
+      const cycle = cardCycle(
+        { statementDay: c.statement_day, dueDay: c.due_day }, now.getTime(),
+      );
+      const due = new Date(cycle.dueAt);
+      const amount = formatMonetaryCompact(c.outstanding_minor);
+      const onDue = atHour(due, hour);
+      const dayLabel = due.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+      if (onDue > now) {
+        const daysOut = (n: number) => {
+          const d = new Date(due);
+          d.setDate(d.getDate() - n);
+          return atHour(d, hour);
+        };
+        push({
+          key: `card:${c.id}:t3:${dayKey(due)}`,
+          title: `${c.name} payment due in 3 days`,
+          body: `${amount} due ${dayLabel}. Move the money now if it needs to come from elsewhere.`,
+          at: daysOut(3),
+          channelId: 'cards',
+          route: '/accounts',
+        });
+        push({
+          key: `card:${c.id}:t1:${dayKey(due)}`,
+          title: `${c.name} payment due tomorrow`,
+          body: `${amount} due ${dayLabel}.`,
+          at: daysOut(1),
+          channelId: 'cards',
+          route: '/accounts',
+        });
+        push({
+          key: `card:${c.id}:due:${dayKey(due)}`,
+          title: `${c.name} payment due today`,
+          body: `${amount} due today. Interest is backdated to the purchase, so a day late costs more than a day.`,
+          at: onDue,
+          channelId: 'cards',
+          route: '/accounts',
+        });
+      } else if (!cycle.isOverdue) {
+        // Still the due day, but past the morning slot - one more chance
+        // tonight rather than nothing until it is already late.
+        push({
+          key: `card:${c.id}:duelate:${dayKey(due)}`,
+          title: `${c.name} payment due today`,
+          body: `${amount} still due today.`,
+          at: atHour(due, lateHour),
+          channelId: 'cards',
+          route: '/accounts',
+        });
+      } else {
+        // Re-planned on every launch, so this keeps returning each morning
+        // until the payment lands and the amount owed reaches zero.
+        const slot = nextSlot(now, hour);
+        push({
+          key: `card:${c.id}:overdue:${dayKey(slot)}`,
+          title: `${c.name} payment is overdue`,
+          body: `${amount} was due ${dayLabel}. Interest is accruing on the whole balance.`,
+          at: slot,
+          channelId: 'cards',
+          route: '/accounts',
+        });
+      }
+    });
   }
 
   if (prefs.notif_salary) {

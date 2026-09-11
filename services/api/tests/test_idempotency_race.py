@@ -132,42 +132,64 @@ def _outcomes(results):
 
 @pytest.mark.asyncio
 async def test_concurrent_transaction_submits_charge_once(api):
-    """A double-tap creates one transaction and no errors."""
+    """A double-tap creates one transaction and no errors.
+
+    Retried, because the thing under test is a RACE. Whether any request
+    actually loses it is up to the scheduler: often every loser is absorbed by
+    the cheap duplicate check at the top of the handler and the recovery branch
+    is never entered. Asserting on a single burst made this fail about one run
+    in six - and a test that fails at random teaches people to ignore failures,
+    which is worse than not having it.
+
+    So the burst is repeated with a fresh mutation id until the branch is
+    genuinely reached. Every round still asserts the properties that must hold
+    whether or not anyone lost: exactly one transaction, and nobody sees an
+    error.
+    """
     client, headers, ids = api
-    body = {
-        "account_id": ids["account"],
-        "client_mutation_id": str(uuid.uuid4()),
-        "device_id": "race-device",
-        "transaction_type": "expense",
-        "amount_minor": 12500,
-        "currency": "INR",
-        "description": "Concurrent double-tap",
-        "transaction_date": datetime.now(timezone.utc).isoformat(),
-    }
-
     module = "app/routers/transactions.py"
-    with LineWatch(module) as watch:
-        results = await asyncio.gather(
-            *[client.post("/api/transactions", headers=headers, json=body)
-              for _ in range(CONCURRENCY)],
-            return_exceptions=True,
-        )
 
-    codes = _outcomes(results)
-    assert all(isinstance(c, int) and c < 400 for c in codes), codes
+    reached = False
+    for attempt in range(6):
+        body = {
+            "account_id": ids["account"],
+            "client_mutation_id": str(uuid.uuid4()),
+            "device_id": "race-device",
+            "transaction_type": "expense",
+            "amount_minor": 12500,
+            "currency": "INR",
+            "description": f"Concurrent double-tap {attempt}",
+            "transaction_date": datetime.now(timezone.utc).isoformat(),
+        }
 
-    listing = await client.get("/api/transactions", headers=headers)
-    rows = listing.json()
-    rows = rows if isinstance(rows, list) else rows.get("items", rows)
-    assert len(rows) == 1, f"charged {len(rows)} times, not once"
+        with LineWatch(module) as watch:
+            results = await asyncio.gather(
+                *[client.post("/api/transactions", headers=headers, json=body)
+                  for _ in range(CONCURRENCY)],
+                return_exceptions=True,
+            )
 
-    # The assertion that gives the test its meaning. If the duplicate check
-    # absorbed every loser, the recovery branch was never tried and the rest
-    # of this test proves nothing about it.
-    assert watch.ran("except IntegrityError:", module), (
-        "no request lost the race, so the recovery branch was never exercised")
-    assert watch.ran("existing_race_tx = fallback_res", module), (
-        "the recovery branch was entered but did not complete - it raised")
+        codes = _outcomes(results)
+        assert all(isinstance(c, int) and c < 400 for c in codes), codes
+
+        listing = await client.get("/api/transactions", headers=headers)
+        rows = listing.json()
+        rows = rows if isinstance(rows, list) else rows.get("items", rows)
+        # One row per round, however many requests were fired in it.
+        assert len(rows) == attempt + 1, (
+            f"round {attempt}: charged {len(rows) - attempt} times, not once")
+
+        if watch.ran("except IntegrityError:", module):
+            reached = True
+            # Entered is not enough - it must also have come out the other side.
+            assert watch.ran("existing_race_tx = fallback_res", module), (
+                "the recovery branch was entered but did not complete - it raised")
+            break
+
+    assert reached, (
+        "six concurrent bursts and not one request lost the race, so the "
+        "recovery branch was never exercised. Either the scheduler is "
+        "serialising them or the duplicate check now absorbs every loser.")
 
 
 @pytest.mark.asyncio

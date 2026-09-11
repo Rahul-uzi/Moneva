@@ -19,12 +19,25 @@ import {
   type AlertProposal,
   type PaymentAlert,
 } from '../utils/paymentAlert';
+import { getCachedUser } from './apiClient';
 
 export interface CaptureStatus {
   /** The OS has granted notification access. Only the user can change this. */
   granted: boolean;
   /** The app's own switch. Off by default, even once access is granted. */
   capturing: boolean;
+  /* Health. `capturing: true` only says what the user asked for - a listener
+     the system has since killed still reports true - so these carry what the
+     service has actually been doing. See captureHealth.ts.
+     Defaulted rather than optional: an older build of the native side simply
+     returns nothing for them, and a missing number must not read as "zero
+     payments, silent forever". */
+  /** Epoch ms of the last alert kept; 0 when none ever was. */
+  lastKeptAt: number;
+  /** How many alerts have ever been kept, across the app's whole life. */
+  keptCount: number;
+  /** Epoch ms when capture was last switched on; 0 when never. */
+  enabledAt: number;
 }
 
 interface NotificationCapturePlugin {
@@ -46,12 +59,23 @@ const plugin = registerPlugin<NotificationCapturePlugin>('NotificationCapture');
 export const isCaptureSupported = (): boolean =>
   Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
-const OFF: CaptureStatus = { granted: false, capturing: false };
+const OFF: CaptureStatus = {
+  granted: false, capturing: false, lastKeptAt: 0, keptCount: 0, enabledAt: 0,
+};
+
+/** Fills in anything an older native build does not send back. */
+const withHealth = (raw: Partial<CaptureStatus>): CaptureStatus => ({
+  granted: raw.granted ?? false,
+  capturing: raw.capturing ?? false,
+  lastKeptAt: raw.lastKeptAt ?? 0,
+  keptCount: raw.keptCount ?? 0,
+  enabledAt: raw.enabledAt ?? 0,
+});
 
 export const getCaptureStatus = async (): Promise<CaptureStatus> => {
   if (!isCaptureSupported()) return OFF;
   try {
-    return await plugin.checkPermission();
+    return withHealth(await plugin.checkPermission());
   } catch {
     return OFF;
   }
@@ -77,7 +101,7 @@ export const openNotificationAccessSettings = async (): Promise<void> => {
 export const setCapturing = async (enabled: boolean): Promise<CaptureStatus> => {
   if (!isCaptureSupported()) return OFF;
   try {
-    return await plugin.setCapturing({ enabled });
+    return withHealth(await plugin.setCapturing({ enabled }));
   } catch {
     return OFF;
   }
@@ -111,7 +135,12 @@ export const drainProposals = async (): Promise<AlertProposal[]> => {
     }
   }
 
-  return proposalsFromAlerts(items);
+  /* Scoped to whoever is signed in. The id is derived from the payment, and
+     client_mutation_id is unique across the whole table - so two people paying
+     the same amount in the same minute would otherwise collide, and the second
+     of them would be refused permanently. Empty when signed out, which is
+     harmless: nothing is filed without a session anyway. */
+  return proposalsFromAlerts(items, getCachedUser()?.id ?? '');
 };
 
 /**

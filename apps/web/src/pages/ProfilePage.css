@@ -732,3 +732,65 @@
   justify-content: center;
   white-space: nowrap;
 }
+
+/* ---------------------------------------------------------------------------
+   CAPTURE HEALTH
+
+   The only capture failure a person cannot see for themselves. A listener the
+   system has killed produces nothing, which looks exactly like a quiet week -
+   so when this row has something to say, it has to be able to say it louder
+   than an ordinary settings line.
+
+   Two levels, deliberately restrained:
+     is-warn  - probably stopped, but silence has innocent explanations too
+     is-bad   - the OS permission is off, so nothing can arrive at all
+
+   Amber is the app's reserved warning colour; the rail is 3px so the row still
+   reads as a settings row rather than an error banner.
+   --------------------------------------------------------------------------- */
+
+.toggle-row.is-warn,
+.toggle-row.is-bad {
+  padding-left: 12px;
+  border-radius: var(--radius-md);
+}
+
+/* Explicit rgba rather than color-mix(). Both work in this WebView - an
+   earlier note here claimed color-mix computed to transparent, which was a
+   bad measurement (read in the same tick that added the class, before style
+   recalc). Kept as rgba anyway: the alpha is legible at a glance, and it does
+   not depend on color-mix support in whatever WebView a given phone ships. */
+.toggle-row.is-warn {
+  border-left: 3px solid var(--moneva-orange);
+  background: rgba(232, 182, 44, 0.10);
+}
+
+.toggle-row.is-bad {
+  border-left: 3px solid var(--moneva-figure-expense);
+  background: rgba(224, 90, 71, 0.10);
+}
+
+/* Light mode carries more contrast against a near-white surface, so the same
+   tint reads as heavier - dialled back rather than reused. */
+:root[data-theme='light'] .toggle-row.is-warn {
+  background: rgba(168, 119, 0, 0.08);
+}
+
+:root[data-theme='light'] .toggle-row.is-bad {
+  background: rgba(178, 58, 42, 0.07);
+}
+
+/* The headline carries the state, so it should not read as a quiet label. */
+.toggle-row.is-warn .toggle-label,
+.toggle-row.is-bad .toggle-label {
+  color: var(--moneva-text-primary);
+}
+
+/* This subtitle is a sentence explaining what to do, not a two-word hint, so
+   it needs to wrap properly rather than being clipped to one line. */
+.toggle-row.is-warn .toggle-sub,
+.toggle-row.is-bad .toggle-sub {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}

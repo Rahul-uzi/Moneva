@@ -13,3 +13,38 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* ---------------------------------------------------------------------------
+   CREDIT-CARD TERMS
+
+   Set apart from the fields above because they answer a different question.
+   Everything above describes the account; these two dates describe its billing
+   cycle, and they are the only reason the card screen can say anything useful.
+   --------------------------------------------------------------------------- */
+
+.account-modal-card-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--moneva-border);
+}
+
+.account-modal-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--moneva-text-muted);
+}
+
+.account-modal-days {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 360px) {
+  .account-modal-days {
+    grid-template-columns: 1fr;
+  }
+}

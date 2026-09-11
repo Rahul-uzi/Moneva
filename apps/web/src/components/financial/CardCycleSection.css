@@ -1,0 +1,287 @@
+/* ===========================================================================
+   CARD CYCLES AND INSTALMENTS
+
+   A card panel is not an account card. An account card answers "how much is in
+   there"; this one answers "what do I owe and when", which is two figures that
+   have to be readable at a glance and one supporting line that does not
+   compete with them.
+
+   So: the owed amount and the due date share one row at full weight, the
+   breakdown of how that number was reached sits beneath in muted text, and
+   the limit ring stays small - it is context, not the headline.
+   =========================================================================== */
+
+.cardcycle-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.cardcycle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardcycle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+}
+
+/* Late and still owing. A left edge rather than a red panel: the fact needs to
+   be unmissable, but a person a day late does not need to be shouted at. */
+.cardcycle-card.is-overdue {
+  border-left: 3px solid var(--moneva-coral);
+}
+
+.cardcycle-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.cardcycle-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--moneva-overlay-weak);
+  color: var(--moneva-text-muted);
+}
+
+.cardcycle-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cardcycle-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--moneva-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardcycle-meta {
+  font-size: 11.5px;
+  color: var(--moneva-text-muted);
+}
+
+/* --- the limit ring --- */
+
+.cardcycle-ring {
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+
+.cardcycle-ring-track,
+.cardcycle-ring-fill {
+  fill: none;
+  stroke-width: 4;
+}
+
+.cardcycle-ring-track {
+  stroke: var(--moneva-border);
+}
+
+.cardcycle-ring-fill {
+  stroke: var(--moneva-teal);
+  stroke-linecap: round;
+  /* Start at twelve o'clock rather than three - a gauge people read as
+     "how full" is read clockwise from the top. */
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+/* Past about three quarters of the limit the figure stops being neutral
+   information - what is left to spend has become the point. The ring is the
+   only thing that changes; the number beside it is already the whole story. */
+.cardcycle-ring.is-tight .cardcycle-ring-fill {
+  stroke: var(--moneva-orange);
+}
+
+.cardcycle-ring.is-spent .cardcycle-ring-fill {
+  stroke: var(--moneva-coral);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cardcycle-ring-fill {
+    transition: none;
+  }
+}
+
+.cardcycle-ring-text {
+  fill: var(--moneva-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- what is owed, and when --- */
+
+/* The pill drops to its own line rather than squeezing the label into two.
+   A phone at a larger system font size runs out of width here first, and the
+   label wrapping mid-phrase is what looks broken. */
+.cardcycle-owed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.cardcycle-owed-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cardcycle-owed-figure .number-md {
+  font-variant-numeric: tabular-nums;
+}
+
+.cardcycle-due {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--moneva-overlay-weak);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--moneva-text-muted);
+}
+
+.cardcycle-due.is-late {
+  color: var(--moneva-coral);
+}
+
+.cardcycle-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--moneva-border);
+  font-size: 11.5px;
+  color: var(--moneva-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardcycle-breakdown .is-paid {
+  color: var(--moneva-teal);
+}
+
+/* --- instalments --- */
+
+.cardcycle-emi-head {
+  margin-top: 22px;
+}
+
+.cardcycle-add {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--moneva-teal);
+  cursor: pointer;
+}
+
+.cardcycle-empty,
+.cardcycle-load {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--moneva-text-muted);
+}
+
+.cardcycle-load {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--moneva-text-primary);
+}
+
+.cardcycle-emi {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-lg);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cardcycle-emi-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardcycle-emi-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--moneva-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardcycle-emi-amount {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardcycle-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--moneva-border);
+  overflow: hidden;
+}
+
+.cardcycle-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--moneva-teal);
+}
+
+.cardcycle-emi-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--moneva-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardcycle-emi:focus-visible,
+.cardcycle-add:focus-visible {
+  outline: 2px solid var(--moneva-teal);
+  outline-offset: 2px;
+}

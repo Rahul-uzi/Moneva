@@ -14,6 +14,7 @@ import type { Transaction, Account, Category } from '../types/api';
 import './ActivityPage.css';
 
 import { parseApiDate } from '../utils/datetime';
+import { revokeTrustForDeletedRow } from '../services/autoAddStore';
 interface OutletContextType {
   refreshTrigger?: number;
 }
@@ -188,6 +189,12 @@ export const ActivityPage: React.FC = () => {
     setIsDeleting(true);
     try {
       await apiClient.delete(`/transactions/${deleteTx.id}`);
+
+      /* Deleting a row that was filed without asking is the strongest thing
+         the user can say about the pattern that filed it - it already wrote
+         something they did not want. So that pattern stops being trusted, and
+         has to earn it again. Rows they entered themselves are untouched. */
+      revokeTrustForDeletedRow(deleteTx, Date.now());
       addToast('Entry deleted. Balances updated.', 'success');
       setDeleteTx(null);
       void fetchActivityData(true);

@@ -77,6 +77,41 @@ FORGOT_BY_ACCOUNT = SlidingWindow(limit=4, window_seconds=3600, name="forgot-acc
 # real defence; this stops the noise before it reaches the database at all.
 RESET_BY_IP = SlidingWindow(limit=20, window_seconds=900, name="reset-ip")
 
+# Bringing a statement in. Keyed by ACCOUNT rather than by address: these
+# routes need a signed-in user, so the thing being limited is one account
+# doing too much, not an anonymous flood.
+#
+# Generous by design - a decade of history is fifty chunks of two hundred
+# rows, and a person doing that should not be stopped half way. It is here to
+# bound the damage from a loop that has gone wrong, or an account being used
+# to hammer the database, not to police normal use.
+IMPORT_BY_ACCOUNT = SlidingWindow(limit=120, window_seconds=3600, name="import-account")
+
+# Converting a spreadsheet costs far more than storing rows: a decompress and
+# an XML parse, on a shared instance. Held much tighter for that reason.
+SHEET_BY_ACCOUNT = SlidingWindow(limit=30, window_seconds=3600, name="sheet-account")
+
+# Writing instalment plans. A person enters these by hand, one at a time,
+# after buying something - a handful in a busy hour is already unusual, and
+# nobody legitimate approaches this. It is here so that a client stuck in a
+# retry loop, or a stolen token, cannot hammer the table: the sixty-plan cap
+# bounds what gets STORED, but without this each rejected attempt still costs
+# a query, and nothing bounded how many of those could arrive.
+EMI_WRITES_BY_ACCOUNT = SlidingWindow(limit=90, window_seconds=3600, name="emi-account")
+
+# The second factor. This was the ONE credential-checking route in the router
+# with no limiter at all, which made a six-digit code brute-forceable: pyotp is
+# asked with valid_window=1, so three codes are live at any instant, and nothing
+# counted or capped a wrong guess. An attacker holding only the password could
+# mint a fresh challenge token from /auth/login whenever the last one expired
+# and simply keep going.
+#
+# Tighter than login, because a person reads six digits off a screen and types
+# them. Ten tries per account in fifteen minutes is generous for that and
+# nowhere near a million.
+TOTP_BY_IP = SlidingWindow(limit=30, window_seconds=900, name="totp-ip")
+TOTP_BY_ACCOUNT = SlidingWindow(limit=10, window_seconds=900, name="totp-account")
+
 
 def client_ip(request: Request) -> str:
     """

@@ -60,9 +60,75 @@ def _smtp_settings() -> Optional[dict]:
     }
 
 
+def _scrub(text: str, *addresses: Optional[str]) -> str:
+    """
+    Text from outside, with any address we know about replaced by its mask.
+
+    Written for exception messages. A library is under no obligation to keep a
+    recipient out of the string it raises, and smtplib does not: it puts the
+    whole envelope in there. Masking the address in one log argument achieves
+    nothing if the next argument spells it out.
+
+    Belt and braces: the local part is replaced on its own too, so a message
+    that quotes only "victim" rather than the full address is caught as well.
+    """
+    cleaned = text
+    for address in addresses:
+        if not address:
+            continue
+        cleaned = cleaned.replace(address, masked(address))
+        local = address.partition("@")[0]
+        if len(local) > 2:
+            cleaned = cleaned.replace(local, f"{local[0]}{'*' * (len(local) - 2)}{local[-1]}")
+    return cleaned
+
+
+def _relay_settings() -> Optional[dict]:
+    """A self-hosted HTTPS relay, or None when it is not set."""
+    url = (os.getenv("MAIL_RELAY_URL") or "").strip()
+    if not url.startswith("https://"):
+        # Plain HTTP would put the reset code on the wire in clear.
+        return None
+    return {"url": url, "token": (os.getenv("MAIL_RELAY_TOKEN") or "").strip()}
+
+
+# Whether the last attempt actually delivered. None until one is tried.
+#
+# `delivery_configured()` answers "is a route set up", which is what the health
+# check wants. It is the wrong question to put to a person: on a host that
+# blocks SMTP, every variable is set, so the app told them "a reset code is on
+# its way" for a code that could never leave. This remembers what happened last
+# time, so the screen can say something true.
+_last_send_succeeded: Optional[bool] = None
+
+
+def _remember_send(succeeded: bool) -> None:
+    global _last_send_succeeded
+    _last_send_succeeded = succeeded
+
+
 def delivery_configured() -> bool:
-    """True when a real email can actually be sent, by either route."""
-    return _smtp_settings() is not None or bool((os.getenv("RESEND_API_KEY") or "").strip())
+    """True when a real email can actually be sent, by any route."""
+    return (
+        _smtp_settings() is not None
+        or _relay_settings() is not None
+        or bool((os.getenv("RESEND_API_KEY") or "").strip())
+    )
+
+
+def delivery_working() -> bool:
+    """
+    What to tell the person waiting on the screen.
+
+    Configured AND not known to be broken. Before a first attempt there is
+    nothing to go on, so a configured route is taken at its word; once one has
+    failed, the app stops promising an email that is not coming, and says
+    plainly that mail is not switched on here. It flips back on its own the
+    moment a send succeeds.
+    """
+    if not delivery_configured():
+        return False
+    return _last_send_succeeded is not False
 
 
 def delivery_status() -> dict:
@@ -90,13 +156,29 @@ def delivery_status() -> dict:
 
     if _smtp_settings():
         route = "smtp"
+    elif _relay_settings():
+        route = "relay"
     elif (os.getenv("RESEND_API_KEY") or "").strip():
         route = "resend"
     else:
         route = "none"
 
+    # NOT published here: delivery_working() and _last_send_succeeded.
+    #
+    # They were, and it recreated the very oracle that was just removed from
+    # /auth/forgot-password. Both move only when send_password_reset runs, and
+    # that is queued only after the endpoint confirms the address has an active
+    # account. /api/health needs no authentication and is not rate limited, so:
+    # read health, probe an address, read health again - a changed value says
+    # the account exists. Relocating a leak from one unauthenticated endpoint to
+    # another is not a fix.
+    #
+    # Everything below depends on CONFIGURATION only, which no attacker-supplied
+    # address can influence. Whether a send actually worked is answerable from
+    # the service log, which is not public.
     return {
         "configured": delivery_configured(),
+        "relay_set": _relay_settings() is not None,
         "route": route,
         "smtp_host_set": bool(host),
         "smtp_user_set": bool(user),
@@ -161,7 +243,8 @@ def probe_smtp_ports(host: Optional[str] = None, timeout: float = 4.0) -> dict:
             "any_open": any(v["open"] for v in results.values())}
 
 
-def _send_over_smtp(settings: dict, to_email: str, text: str, html: str) -> bool:
+def _send_over_smtp(settings: dict, to_email: str, text: str, html: str,
+                    subject: str = "Your MONEVA password reset code") -> bool:
     """
     Blocking send. Called from a worker thread - see send_password_reset.
 
@@ -177,7 +260,7 @@ def _send_over_smtp(settings: dict, to_email: str, text: str, html: str) -> bool
     from email.message import EmailMessage
 
     message = EmailMessage()
-    message["Subject"] = "Your MONEVA password reset code"
+    message["Subject"] = subject
     message["From"] = settings["from"]
     message["To"] = to_email
     message.set_content(text)
@@ -242,6 +325,39 @@ def _body(code: str, minutes: int) -> tuple[str, str]:
     return text, html
 
 
+def _verify_body(code: str, minutes: int) -> tuple[str, str]:
+    """Deliberately not the reset wording.
+
+    A reset email has to end with "if this was not you, ignore it" because an
+    unexpected one means somebody tried to take the account. An unexpected
+    verification email means somebody typed the address by mistake, which needs
+    the opposite advice - ignoring it is exactly right, and there is nothing to
+    worry about. Reusing the reset copy would alarm people over a typo.
+    """
+    text = (
+        f"Your MONEVA confirmation code is {code}\n\n"
+        f"Type it into the app to confirm this email address. It expires in "
+        f"{minutes} minutes.\n\n"
+        "Confirming matters for one reason: if you ever forget your password, "
+        "this is the address the reset code goes to.\n\n"
+        "If you were not expecting this, someone probably mistyped their own "
+        "address. You can ignore it - no account of yours is affected."
+    )
+    html = (
+        '<div style="font-family:system-ui,-apple-system,sans-serif;max-width:420px">'
+        '<p style="font-size:15px;color:#333">Your MONEVA confirmation code is</p>'
+        f'<p style="font-size:32px;font-weight:800;letter-spacing:.18em;margin:16px 0">{code}</p>'
+        f'<p style="font-size:14px;color:#555">Type it into the app to confirm this email '
+        f'address. It expires in {minutes} minutes.</p>'
+        '<p style="font-size:14px;color:#555">Confirming matters for one reason: if you ever '
+        'forget your password, this is the address the reset code goes to.</p>'
+        '<p style="font-size:13px;color:#888">If you were not expecting this, someone probably '
+        'mistyped their own address. You can ignore it - no account of yours is affected.</p>'
+        '</div>'
+    )
+    return text, html
+
+
 def _log_code_if_stranded(to_email: str, code: str) -> None:
     """
     Last resort when a CONFIGURED mail route fails: put the code in the log.
@@ -278,6 +394,26 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
     would confirm the address exists.
     """
     text, html = _body(code, minutes)
+    return await _deliver(to_email, "Your MONEVA password reset code", text, html, code)
+
+
+async def send_email_verification(to_email: str, code: str, minutes: int = 30) -> bool:
+    """
+    Sends the code that proves someone owns the address they signed up with.
+
+    Until this existed an address was only a claim, and the failure that
+    actually bites is not impersonation - it is a typo. An account attached to
+    a mailbox its owner cannot read looks completely normal until the day they
+    forget their password, and at that point the reset code goes somewhere
+    else and the ledger is unreachable for good.
+
+    Same delivery chain as the reset code, and the same refusal to raise.
+    """
+    text, html = _verify_body(code, minutes)
+    return await _deliver(to_email, "Confirm your MONEVA email address", text, html, code)
+
+
+async def _deliver(to_email: str, subject: str, text: str, html: str, code: str) -> bool:
 
     # SMTP first when it is configured: it is the explicit choice, and a host
     # that has both set almost certainly means the one it just set up.
@@ -287,13 +423,21 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             import asyncio
             # smtplib blocks, and blocking here would stall the whole event
             # loop for the length of an SMTP conversation.
-            await asyncio.to_thread(_send_over_smtp, smtp, to_email, text, html)
+            await asyncio.to_thread(_send_over_smtp, smtp, to_email, text, html, subject)
+            _remember_send(True)
             return True
         except Exception as exc:  # noqa: BLE001 - delivery must not break the request
-            # Type and message only. An SMTP error can quote the envelope but
-            # never the password, and the password is never interpolated here.
+            # The message is scrubbed, not merely truncated. The old comment
+            # here reasoned only about the password - "an SMTP error can quote
+            # the envelope but never the password" - and the envelope was the
+            # problem. smtplib puts the recipient IN the exception:
+            #   str(SMTPRecipientsRefused({'victim@example.com': (550, ...)}))
+            #     == "{'victim@example.com': (550, b'No such user')}"
+            # so the address the same log line carefully masked came straight
+            # back on the next argument, on the path most likely to fire.
             logger.error("Reset email over SMTP failed for %s: %s: %s",
-                         masked(to_email), type(exc).__name__, str(exc)[:160])
+                         masked(to_email), type(exc).__name__,
+                         _scrub(str(exc), to_email)[:160])
             # Fall through to the HTTP provider rather than giving up here.
             # Many hosts - Render among them - block outbound SMTP ports to
             # deter spam, so a correct username and a correct password still
@@ -302,24 +446,73 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             # and is the one that will actually deliver. Returning False here
             # meant a working provider was never even tried.
 
+    # An HTTPS relay you host yourself. Port 443 is not blocked anywhere, and
+    # unlike a mail provider this needs no account with anyone: a Google Apps
+    # Script web app calling GmailApp.sendEmail is about ten lines, runs under
+    # the Gmail account you already have, and is reached by one POST.
+    relay = _relay_settings()
+    if relay:
+        try:
+            # follow_redirects is NOT optional here. A Google Apps Script /exec
+            # endpoint answers every POST with a 302 to a one-time
+            # script.googleusercontent.com URL and does the work there; httpx
+            # does not follow redirects by default, so without this the relay
+            # returns a bodiless 302 and every send is recorded as refused.
+            #
+            # This is exactly how it shipped broken: the local check that
+            # "proved" the relay worked passed follow_redirects=True, and the
+            # server code did not. Verify with the client you deploy.
+            async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+                res = await client.post(relay["url"], json={
+                    "token": relay["token"],
+                    "to": to_email,
+                    "subject": subject,
+                    "text": text,
+                    "html": html,
+                })
+            # The status code is NOT enough. Google Apps Script answers 200 to
+            # everything, including a request it rejected, so a wrong shared
+            # token would read as a successful send and we would be back to
+            # mail silently not arriving. The relay must SAY it sent.
+            body = (res.text or "").strip()
+            if res.status_code >= 400 or not body.upper().startswith("OK"):
+                logger.error("Mail relay did not confirm the send: %s %s",
+                             res.status_code, body[:200])
+            else:
+                _remember_send(True)
+                return True
+        except Exception as exc:  # noqa: BLE001 - delivery must not break the request
+            logger.error("Mail relay failed for %s: %s", masked(to_email), type(exc).__name__)
+
     api_key = (os.getenv("RESEND_API_KEY") or "").strip()
 
     if not api_key:
-        if smtp:
-            # SMTP was configured, was attempted, and failed. Say so plainly -
-            # the generic "not set" warning below would be a lie here.
+        if smtp or relay:
+            # A route WAS configured, was attempted, and failed. The generic
+            # "not set" warning below would be a lie here - and, worse, it
+            # writes the code and the full address into the log in clear.
+            #
+            # `relay` belongs in this test as much as `smtp` does. Without it a
+            # failing relay fell through to that warning and put a live reset
+            # code in a production log, which is the one thing
+            # _log_code_if_stranded exists to prevent.
             logger.error(
-                "Reset email could not be delivered for %s: SMTP failed and no "
-                "HTTPS mail provider is configured as a fallback.", masked(to_email),
+                "Reset email could not be delivered for %s: every configured "
+                "route failed and no HTTPS mail provider remains as a fallback.",
+                masked(to_email),
             )
             _log_code_if_stranded(to_email, code)
+            _remember_send(False)
             return False
-        # The code is logged, not sent. Fine for development, and the warning
-        # is deliberately loud so this cannot be mistaken for working delivery.
-        logger.warning(
-            "RESEND_API_KEY is not set - no email sent. Password reset code for %s: %s",
-            to_email, code,
-        )
+        # Nothing at all is configured. The code goes to the log so the flow can
+        # be exercised before anyone signs up for a provider - but through
+        # _log_code_if_stranded, which refuses to do that in production. Writing
+        # it directly here meant a misconfigured production deployment printed
+        # live reset codes next to full email addresses.
+        logger.warning("No mail route is configured - nothing was sent for %s.",
+                       masked(to_email))
+        _log_code_if_stranded(to_email, code)
+        _remember_send(False)
         return False
 
     try:
@@ -330,7 +523,7 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
                 json={
                     "from": os.getenv("RESET_EMAIL_FROM", DEFAULT_FROM),
                     "to": [to_email],
-                    "subject": "Your MONEVA password reset code",
+                    "subject": subject,
                     "text": text,
                     "html": html,
                 },
@@ -339,10 +532,15 @@ async def send_password_reset(to_email: str, code: str, minutes: int = 30) -> bo
             # The body can name the cause (unverified domain, bad key). It does
             # not contain the key, but it is truncated regardless.
             logger.error("Reset email rejected: %s %s", res.status_code, res.text[:200])
+            _log_code_if_stranded(to_email, code)
+            _remember_send(False)
             return False
+        _remember_send(True)
         return True
     except Exception as exc:  # noqa: BLE001 - delivery must never break the request
         logger.error("Reset email could not be sent: %s", type(exc).__name__)
+        _log_code_if_stranded(to_email, code)
+        _remember_send(False)
         return False
 
 

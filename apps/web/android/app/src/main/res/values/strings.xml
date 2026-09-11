@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MONEVA</string>
+    <string name="title_activity_main">MONEVA</string>
+    <string name="package_name">com.moneva.app</string>
+    <string name="custom_url_scheme">com.moneva.app</string>
+    <!-- Shown against the switch in Settings > Notification access. -->
+    <string name="notification_capture_label">MONEVA payment alerts</string>
+</resources>

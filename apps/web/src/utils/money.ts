@@ -95,6 +95,44 @@ export function paiseToRupeesString(paise: Paise): string {
 }
 
 /**
+ * Puts Indian digit grouping on an already-plain number string.
+ *
+ * "6500.00" becomes "6,500.00" and "1234567.89" becomes "12,34,567.89" - the
+ * last three digits, then twos, which is how the figure is read aloud here and
+ * so how it is recognised at a glance.
+ *
+ * Takes a string and returns one, never touching a float: a rupee amount can
+ * exceed what a double represents exactly, and the point of keeping money in
+ * paise is undone the moment it is converted to a Number to be displayed.
+ */
+export function groupIndianDigits(plain: string): string {
+  const negative = plain.startsWith('-');
+  const body = negative ? plain.slice(1) : plain;
+  const dot = body.indexOf('.');
+  const intPart = dot === -1 ? body : body.slice(0, dot);
+  const decPart = dot === -1 ? '' : body.slice(dot);
+
+  let grouped = intPart;
+  if (intPart.length > 3) {
+    const last3 = intPart.slice(-3);
+    let rest = intPart.slice(0, -3);
+    const chunks: string[] = [];
+    while (rest.length > 2) {
+      chunks.unshift(rest.slice(-2));
+      rest = rest.slice(0, -2);
+    }
+    if (rest) chunks.unshift(rest);
+    grouped = chunks.join(',') + ',' + last3;
+  }
+  return (negative ? '-' : '') + grouped + decPart;
+}
+
+/** The same string with the grouping taken back off, ready to be parsed. */
+export function ungroupDigits(text: string): string {
+  return text.split(',').join('');
+}
+
+/**
  * Formats integer minor units (paise) into a human-readable display string.
  * Uses Indian numbering format (e.g., ₹1,250.50). DISPLAY ONLY.
  */
