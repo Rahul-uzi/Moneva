@@ -24,6 +24,7 @@ import {
   Search,
   MonitorSmartphone,
   Upload,
+  FileText,
 } from 'lucide-react';
 import { categoryIcon } from '../utils/categoryIcons';
 import { Card } from '../components/ui/Card';
@@ -42,7 +43,6 @@ import { runNotificationSync } from '../services/notificationSync';
 import {
   loadAutoAddSettings, saveAutoAddSettings, forgetAllTrust,
 } from '../services/autoAddStore';
-import { CONFIRMATIONS_TO_TRUST, DEFAULT_CEILING_MINOR } from '../utils/autoAdd';
 import type { User, Category } from '../types/api';
 import { fileToAvatarDataUrl, uploadAvatar, deleteAvatar } from '../services/avatarService';
 import {
@@ -64,6 +64,7 @@ import { markTourPending } from '../services/tourService';
 import { exportBinaryFile } from '../services/exportService';
 import { ImportSheet } from '../components/financial/ImportSheet';
 import { SmsCaptureSection } from '../components/settings/SmsCaptureSection';
+import { LegalSheet } from '../components/settings/LegalSheet';
 import type { Account } from '../types/api';
 import './ProfilePage.css';
 
@@ -179,6 +180,9 @@ export const ProfilePage: React.FC = () => {
   // opened rather than on page load: nothing else on this screen needs it,
   // and a settings page should not pay for a feature nobody opened.
   const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  // null when closed, so the sheet is unmounted and always reopens on the
+  // tab that was asked for rather than the one last looked at.
+  const [legalTab, setLegalTab] = useState<'privacy' | 'terms' | null>(null);
   const [importAccounts, setImportAccounts] = useState<Account[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState<boolean>(false);
@@ -750,7 +754,7 @@ export const ProfilePage: React.FC = () => {
       <Card variant="surface" className="settings-section-card">
         <div className="section-header">
           <Bell size={18} className="text-teal" />
-          <h2 className="heading-md">Notification Preferences</h2>
+          <h2 className="heading-md">Catching your payments</h2>
         </div>
 
         <div className="toggles-list">
@@ -759,10 +763,10 @@ export const ProfilePage: React.FC = () => {
               <span className="toggle-label">Notifications on this phone</span>
               <span className="toggle-sub">
                 {devicePerm === 'granted'
-                  ? 'On. Reminders arrive even when the app is closed.'
+                  ? 'On, even when the app is closed.'
                   : devicePerm === 'denied'
-                    ? 'Blocked in Android settings. Allow MONEVA to show notifications.'
-                    : 'Off. Turn on to be reminded before bills are due.'}
+                    ? 'Blocked in Android settings.'
+                    : 'Off. Nothing will remind you.'}
               </span>
             </div>
             {devicePerm !== 'granted' && (
@@ -804,7 +808,10 @@ export const ProfilePage: React.FC = () => {
           {/* The other half of capture. Notification access sees what the
               phone displays; this sees the banks that text and display
               nothing. Adjacent because they are one job, not two features. */}
-          <SmsCaptureSection onCaptured={() => setIsPayInboxOpen(true)} />
+          <SmsCaptureSection
+            onCaptured={() => setIsPayInboxOpen(true)}
+            onReadPrivacy={() => setLegalTab('privacy')}
+          />
 
           {/* Only offered once capture is actually working. Offering it while
               nothing is being captured would be a switch with no effect, and a
@@ -821,10 +828,10 @@ export const ProfilePage: React.FC = () => {
                     warning is repeated here rather than left to the row above. */}
                 <span className="toggle-sub">
                   {autoAdd.enabled && captureState.tone !== 'ok'
-                    ? `On - but no payments are reaching MONEVA right now, so nothing is being added. ${captureState.detail}`
+                    ? `On, but nothing is reaching MONEVA - so nothing is being added.`
                     : autoAdd.enabled
-                      ? `On for payments up to ₹${(autoAdd.ceilingMinor / 100).toLocaleString('en-IN')} from a payment app, once you have confirmed that kind ${CONFIRMATIONS_TO_TRUST} times. Texts, transfers and larger amounts still ask.`
-                      : `Off. Payments you confirm ${CONFIRMATIONS_TO_TRUST} times can go in on their own - never from a text message, never a transfer, never above ₹${(DEFAULT_CEILING_MINOR / 100).toLocaleString('en-IN')}.`}
+                      ? `On, up to ₹${(autoAdd.ceilingMinor / 100).toLocaleString('en-IN')} from payment apps. Texts, transfers and bigger amounts still ask.`
+                      : `Off. Everything waits for you to tap.`}
                 </span>
               </div>
               <input
@@ -846,10 +853,26 @@ export const ProfilePage: React.FC = () => {
             </label>
           )}
 
+        </div>
+      </Card>
+
+      {/* 4b. Reminders - a separate card, because nudging you is a different
+          job from noticing your payments, and one heading over both made a
+          nine-row wall that nobody reads to the bottom of. */}
+      <Card variant="surface" className="settings-section-card">
+        <div className="section-header">
+          <Bell size={18} className="text-teal" />
+          <h2 className="heading-md">Remind me about</h2>
+        </div>
+
+        {/* No subtitles here on purpose. The heading is "Remind me about" and
+            each label finishes the sentence, so a line underneath repeating it
+            in longer words is noise - which is exactly what "Receive updates
+            when achieving savings goal targets" was. */}
+        <div className="toggles-list">
           <label className="toggle-row">
             <div className="toggle-info">
-              <span className="toggle-label">Upcoming Bill Reminders</span>
-              <span className="toggle-sub">Receive alerts for bills due soon.</span>
+              <span className="toggle-label">Bills that are due soon</span>
             </div>
             <input
               type="checkbox"
@@ -862,8 +885,7 @@ export const ProfilePage: React.FC = () => {
 
           <label className="toggle-row">
             <div className="toggle-info">
-              <span className="toggle-label">Budget Limit Warnings</span>
-              <span className="toggle-sub">Receive alerts when approaching category budget limits.</span>
+              <span className="toggle-label">A budget running out</span>
             </div>
             <input
               type="checkbox"
@@ -876,8 +898,7 @@ export const ProfilePage: React.FC = () => {
 
           <label className="toggle-row">
             <div className="toggle-info">
-              <span className="toggle-label">Savings Goal Milestones</span>
-              <span className="toggle-sub">Receive updates when achieving savings goal targets.</span>
+              <span className="toggle-label">Reaching a savings goal</span>
             </div>
             <input
               type="checkbox"
@@ -890,8 +911,7 @@ export const ProfilePage: React.FC = () => {
 
           <label className="toggle-row">
             <div className="toggle-info">
-              <span className="toggle-label">Salary Reminders</span>
-              <span className="toggle-sub">Remind me when my recurring salary is due.</span>
+              <span className="toggle-label">Payday</span>
             </div>
             <input
               type="checkbox"
@@ -1015,6 +1035,59 @@ export const ProfilePage: React.FC = () => {
         >
           <Upload size={14} /> Import a statement
         </Button>
+      </Card>
+
+      {/* 6b. Privacy and terms.
+
+          Above Devices & Advanced rather than buried at the very bottom: this
+          app asks to read the notification shade and the SMS inbox, and the
+          page explaining what happens to that should not be the last thing
+          under a fold. It is also linked from the SMS section itself, so it
+          can be read BEFORE the permission is granted rather than after. */}
+      <Card variant="surface" className="settings-section-card">
+        <div className="section-header">
+          <ShieldCheck size={18} className="text-teal" />
+          <h2 className="heading-md">Privacy &amp; terms</h2>
+        </div>
+
+        <div className="security-feature-row">
+          <div className="security-feature-copy">
+            <span className="sec-label">
+              <ShieldCheck size={14} /> What MONEVA does with your data
+            </span>
+            <span className="text-body">
+              Your messages are never stored or sent anywhere. Read the detail,
+              including the one thing that does leave your phone.
+            </span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="row-action-btn"
+            onClick={() => setLegalTab('privacy')}
+          >
+            Read
+          </Button>
+        </div>
+
+        <div className="security-feature-row">
+          <div className="security-feature-copy">
+            <span className="sec-label">
+              <FileText size={14} /> Terms of use
+            </span>
+            <span className="text-body">
+              What MONEVA is, and what it is not. Short.
+            </span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="row-action-btn"
+            onClick={() => setLegalTab('terms')}
+          >
+            Read
+          </Button>
+        </div>
       </Card>
 
       {/* 7. Devices & Advanced */}
@@ -1439,6 +1512,14 @@ export const ProfilePage: React.FC = () => {
       {/* Same reason as above: it holds a parsed file and the outcome of the
           last run, and neither should still be on screen the next time it is
           opened. */}
+      {legalTab && (
+        <LegalSheet
+          isOpen
+          initial={legalTab}
+          onClose={() => setLegalTab(null)}
+        />
+      )}
+
       {isImportOpen && (
         <ImportSheet
           isOpen

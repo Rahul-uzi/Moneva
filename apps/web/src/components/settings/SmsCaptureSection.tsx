@@ -35,11 +35,13 @@ import './SmsCaptureSection.css';
 interface Props {
   /** Called after a backfill so the Payment Inbox can pick up what arrived. */
   onCaptured?: () => void;
+  /** Opens the privacy page. Offered here, before the permission dialog. */
+  onReadPrivacy?: () => void;
 }
 
 const BACKFILL_MONTHS = 12;
 
-export const SmsCaptureSection: React.FC<Props> = ({ onCaptured }) => {
+export const SmsCaptureSection: React.FC<Props> = ({ onCaptured, onReadPrivacy }) => {
   const [status, setStatus] = useState<SmsStatus>({
     supported: false,
     granted: false,
@@ -128,8 +130,8 @@ export const SmsCaptureSection: React.FC<Props> = ({ onCaptured }) => {
           </span>
           <span className="toggle-sub">
             {on
-              ? 'On. Bank and UPI messages become payments for you to confirm — including from banks that send a text but no notification.'
-              : 'Off. Many Indian banks text a transaction and post no notification, so those payments are invisible without this.'}
+              ? 'On. Catches banks that text you but send no notification.'
+              : 'Off. Many banks only text — those payments are invisible without this.'}
           </span>
         </div>
         <Button
@@ -150,10 +152,20 @@ export const SmsCaptureSection: React.FC<Props> = ({ onCaptured }) => {
         <p className="sms-promise">
           <ShieldCheck size={14} />
           <span>
-            MONEVA checks who sent a message before reading it, and only ever
-            keeps bank and UPI alerts. Messages from people are not opened, one-time
-            codes are discarded, and no message ever leaves your phone — only the
-            payment you confirm.
+            MONEVA checks who sent a message before reading it. Messages from
+            people are never opened, one-time codes are thrown away, and no
+            message ever leaves your phone — only the payment you confirm.
+            {onReadPrivacy && (
+              <>
+                {' '}
+                {/* Before the dialog, not after. Somebody weighing up access to
+                    their own inbox should be able to read what happens to it
+                    without first agreeing to it. */}
+                <button type="button" className="sms-promise-link" onClick={onReadPrivacy}>
+                  Read the detail
+                </button>
+              </>
+            )}
           </span>
         </p>
       )}
@@ -169,8 +181,8 @@ export const SmsCaptureSection: React.FC<Props> = ({ onCaptured }) => {
             </span>
             <span className="toggle-sub">
               {status.backfilledTo > 0
-                ? `Already read back to ${new Date(status.backfilledTo).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}. Running it again picks up anything missed.`
-                : `Reads the last ${BACKFILL_MONTHS} months of bank messages on this phone. Nothing is saved until you confirm it in the Payment Inbox.`}
+                ? `Read back to ${new Date(status.backfilledTo).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}. Run again to catch anything missed.`
+                : `Reads the last ${BACKFILL_MONTHS} months. Nothing is saved until you confirm it.`}
             </span>
           </div>
           <Button
