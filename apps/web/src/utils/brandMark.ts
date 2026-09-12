@@ -274,6 +274,36 @@ export const isKnownBrand = (name: string): boolean =>
   Object.prototype.hasOwnProperty.call(BRANDS, name.trim().toLowerCase());
 
 /**
+ * Text cut into lowercase words, for whole-word matching.
+ *
+ * Everything that is not a letter or digit separates two words and becomes a
+ * space - a slash, a dot, an asterisk, the rupee sign - because that is what
+ * those characters do in "UPI/ZOMATO ONLINE/9812".
+ *
+ * The apostrophe is the exception, and it cannot be settled one way, because
+ * it does two entirely different jobs in the same table:
+ *
+ *   - part of the name: "McDonald's" IS the brand "mcdonalds"
+ *   - a possessive on a name that has none: "Swiggy's order" is "swiggy"
+ *
+ * Splitting on it - what this did originally - reads the second and misses
+ * the first, which is why a payment to McDonald's wore a monogram while the
+ * logo file sat in src/assets/brands the whole time. Only a bank's SMS
+ * shouting "MCDONALDS" ever matched. But dropping it instead merely swaps
+ * which half is broken: "swiggys order" then matches nothing.
+ *
+ * So the caller asks for one reading at a time, and tries both.
+ */
+const wordsOf = (text: string, apostrophe: 'drop' | 'split'): string =>
+  text
+    .toLowerCase()
+    // Straight quote, typographic apostrophe (what phones actually insert),
+    // modifier letter apostrophe, backtick.
+    .replace(/['’ʼ`]/g, apostrophe === 'drop' ? '' : ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+/**
  * The brand named ANYWHERE inside a piece of text, or null.
  *
  * Exact matching on the whole string is close to useless against real data:
@@ -281,30 +311,40 @@ export const isKnownBrand = (name: string): boolean =>
  * arrives as "UPI/ZOMATO ONLINE/9812". This looks for a brand inside the text
  * instead.
  *
- * Two rules keep it honest:
+ * Three rules keep it honest:
  *
- *   - **Word boundaries.** Everything but letters and digits becomes a space
- *     and the search is padded, so "Motorola" is not Ola and "Nykaa" is not
- *     "Nyka". Substring matching on a table containing "Vi" and "Ola" would
- *     otherwise put a phone-network logo on half the ledger.
+ *   - **Word boundaries.** Both sides are cut into words by wordsOf and the
+ *     search is padded, so "Motorola" is not Ola and "Nykaa" is not "Nyka".
+ *     Substring matching on a table containing "Vi" and "Ola" would otherwise
+ *     put a phone-network logo on half the ledger.
  *   - **Longest wins.** "Amazon Pay ICICI Card" contains both "amazon" and
  *     "amazon pay"; the longer name is the more specific reading.
+ *   - **Both readings of an apostrophe**, because the character means two
+ *     opposite things. A hit in either reading is a hit. The split reading is
+ *     exactly what this function always did, so consulting the other one can
+ *     add a match but can never take one away.
  */
 export const brandNameIn = (text: string): string | null => {
   if (!text) return null;
-  const hay = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+  const hays = [
+    ` ${wordsOf(text, 'drop')} `,
+    ` ${wordsOf(text, 'split')} `,
+  ];
   let best: string | null = null;
   let bestLen = 0;
 
   const consider = (needle: string, brand: string) => {
-    if (!hay.includes(` ${needle} `)) return;
-    if (needle.length > bestLen) {
+    // Catalogue names carry no apostrophe, so both readings spell them the
+    // same; 'drop' is named here only because one of the two had to be.
+    const word = wordsOf(needle, 'drop');
+    if (!hays.some((hay) => hay.includes(` ${word} `))) return;
+    if (word.length > bestLen) {
       best = brand;
-      bestLen = needle.length;
+      bestLen = word.length;
     }
   };
 
-  for (const key of Object.keys(BRANDS)) consider(key.replace(/[^a-z0-9]+/g, ' '), key);
+  for (const key of Object.keys(BRANDS)) consider(key, key);
   for (const name of EXTRA_BRANDS) consider(name, name);
   // Everything that has a logo file, generated from the files themselves. A
   // brand discovered by scripts/discover-brands.mjs is only recognised

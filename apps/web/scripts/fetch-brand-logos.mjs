@@ -15,6 +15,7 @@
  *
  * Re-runnable: it overwrites what it can improve and leaves the rest.
  */
+import { createHash } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -173,7 +174,30 @@ const get = async (url, ms = 15_000) =>
 /** An SVG is perfect at any size, so it needs no dimension test. */
 const isSvg = (buf) => buf.slice(0, 400).toString('utf8').toLowerCase().includes('<svg');
 
+/**
+ * Marks that are real logos, but not of the brand we asked for.
+ *
+ * A site built on a CMS and never given a favicon of its own serves the CMS's
+ * instead, and every check above passes: it is a genuine PNG, it is big
+ * enough, it downloads cleanly. byjus.com does exactly this, so BYJU'S
+ * shipped with the WordPress logo on it - and nobody saw, because the
+ * apostrophe in "BYJU'S" meant the brand never matched anything and the
+ * wrong mark was never drawn. Fixing the matcher is what made it visible.
+ *
+ * Keyed by hash because there is nothing else to go on: the bytes are the
+ * only thing that says this is Automattic's mark and not a tutoring company's.
+ * Add an entry whenever the sheet shows a logo that belongs to someone else.
+ */
+const NOT_THE_BRANDS_OWN = new Map([
+  ['7ebbf3f7075aa008a892b1ac497a2d847fcfbc7e760ecb2ee915d6e6e914bcd3',
+    'the WordPress default favicon'],
+]);
+
 const accept = (buf, ext) => {
+  const digest = createHash('sha256').update(buf).digest('hex');
+  const borrowed = NOT_THE_BRANDS_OWN.get(digest);
+  // Before the size checks: this one is wrong at every size.
+  if (borrowed) return { error: `${borrowed}, not the brand's own mark` };
   if (buf.length > MAX_BYTES) return { error: `${buf.length} bytes, too large` };
   if (ext === 'svg' || isSvg(buf)) return { buf, ext: 'svg', size: { w: 'vector', h: '' } };
   const size = pngSize(buf);

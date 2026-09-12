@@ -20,7 +20,6 @@ export const BRANDS_WITH_LOGOS: readonly string[] = [
   'bookmyshow',
   'box8',
   'burger king',
-  'byjus',
   'canara bank',
   'chai point',
   'cleartrip',

@@ -194,3 +194,65 @@ describe('brands discovered by the logo script', () => {
     expect(brandNameIn('Ramesh Kumar')).toBeNull();
   });
 });
+
+describe('brands with an apostrophe in the name', () => {
+  /*
+   * A payment of Rs 161.70 to McDonald's showed a monogram, and the logo file
+   * had been sitting in src/assets/brands the whole time.
+   *
+   * Every non-alphanumeric character used to become a space, which is right
+   * for a slash and wrong for an apostrophe: "McDonald's" turned into the two
+   * words "mcdonald s", and the catalogue entry "mcdonalds" was never found.
+   * A bank's SMS shouting "MCDONALDS" matched, so the brand looked like it
+   * worked - it only failed in the form a person or a payment app writes.
+   */
+
+  it('matches the possessive form a payment app actually posts', () => {
+    expect(brandNameIn("₹161.70 to McDonald's")).toBe('mcdonalds');
+    expect(brandNameIn("McDonald's")).toBe('mcdonalds');
+  });
+
+  it('matches the typographic apostrophe a phone inserts', () => {
+    // U+2019, not U+0027. Android, iOS and Google Pay all substitute it, so
+    // this is the form that arrives far more often than the straight quote.
+    expect(brandNameIn('’')).toBeNull(); // sanity: the character alone is nothing
+    expect(brandNameIn('Paid ‘McDonald’s’ today')).toBe('mcdonalds');
+  });
+
+  it('was never only about one brand', () => {
+    // Same shape, same silent failure. These are the rest of the catalogue's
+    // possessives, and all of them were missed.
+    expect(brandNameIn("Domino's Pizza")).toBe('dominos');
+    expect(brandNameIn("Haldiram's")).toBe('haldirams');
+    expect(brandNameIn("BYJU'S renewal")).toBe('byjus');
+  });
+
+  it('still reads the shouted form a bank sends', () => {
+    // The form that always worked has to keep working: removing the
+    // apostrophe must not disturb text that never had one.
+    expect(brandNameIn('Rs.161.70 at MCDONALDS on ****4471')).toBe('mcdonalds');
+  });
+
+  it('still reads a possessive on a brand that has no apostrophe', () => {
+    /*
+     * The other half, and the reason both readings are tried rather than one
+     * being chosen. Here the apostrophe is a possessive suffix, not part of
+     * the name, so the word to find is "swiggy" and not "swiggys".
+     *
+     * Simply deleting the apostrophe - the obvious fix for McDonald's - broke
+     * every one of these. The two cases want opposite things from the same
+     * character, which is why neither reading can be the only one.
+     */
+    expect(brandNameIn("Swiggy's order")).toBe('swiggy');
+    expect(brandNameIn("Zomato's delivery")).toBe('zomato');
+    expect(brandNameIn("Ola's driver")).toBe('ola');
+  });
+
+  it('does not manufacture a brand out of ordinary text', () => {
+    // Removing a character rather than splitting on it joins what was either
+    // side of it. Neither reading may invent a name that was never written.
+    expect(brandNameIn("that'll be fine")).toBeNull();
+    expect(brandNameIn("Ramesh's shop")).toBeNull();
+    expect(brandNameIn("Mum's groceries")).toBeNull();
+  });
+});
