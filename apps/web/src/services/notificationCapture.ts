@@ -38,10 +38,29 @@ export interface CaptureStatus {
   keptCount: number;
   /** Epoch ms when capture was last switched on; 0 when never. */
   enabledAt: number;
+  /**
+   * Whether Android has the listener BOUND right now. A fact the service
+   * reported, not an inference from silence - which is what lets the screen
+   * say "Android stopped the listener" instead of "nothing for ten days,
+   * something is probably wrong".
+   */
+  connected: boolean;
+  /** Epoch ms when the listener last connected or disconnected; 0 if never. */
+  connectedAt: number;
+  /**
+   * Whether the app is exempt from battery optimisation. Without this,
+   * Samsung's sleeping-apps policy kills the listener after a few days
+   * unopened - the single most common reason payments go unnoticed.
+   */
+  batteryExempt: boolean;
+  /** Lower-cased; "samsung" gets phone-specific guidance. */
+  manufacturer: string;
 }
 
 interface NotificationCapturePlugin {
   checkPermission(): Promise<CaptureStatus>;
+  requestBatteryExemption(): Promise<{ exempt: boolean; opened?: boolean }>;
+  reconnect(): Promise<{ requested: boolean }>;
   openSettings(): Promise<void>;
   setCapturing(options: { enabled: boolean }): Promise<CaptureStatus>;
   getCaptured(): Promise<{ items: PaymentAlert[] }>;
@@ -61,15 +80,27 @@ export const isCaptureSupported = (): boolean =>
 
 const OFF: CaptureStatus = {
   granted: false, capturing: false, lastKeptAt: 0, keptCount: 0, enabledAt: 0,
+  connected: false, connectedAt: 0, batteryExempt: false, manufacturer: '',
 };
 
-/** Fills in anything an older native build does not send back. */
+/**
+ * Fills in anything an older native build does not send back.
+ *
+ * The defaults for the new fields are chosen so an old native side reads as
+ * SAFE, not alarming: `connectedAt: 0` means "never reported", which the
+ * health logic treats as waiting rather than disconnected, and `batteryExempt`
+ * defaulting to false only ever adds an advisory, never an error.
+ */
 const withHealth = (raw: Partial<CaptureStatus>): CaptureStatus => ({
   granted: raw.granted ?? false,
   capturing: raw.capturing ?? false,
   lastKeptAt: raw.lastKeptAt ?? 0,
   keptCount: raw.keptCount ?? 0,
   enabledAt: raw.enabledAt ?? 0,
+  connected: raw.connected ?? false,
+  connectedAt: raw.connectedAt ?? 0,
+  batteryExempt: raw.batteryExempt ?? false,
+  manufacturer: raw.manufacturer ?? '',
 });
 
 export const getCaptureStatus = async (): Promise<CaptureStatus> => {
@@ -78,6 +109,41 @@ export const getCaptureStatus = async (): Promise<CaptureStatus> => {
     return withHealth(await plugin.checkPermission());
   } catch {
     return OFF;
+  }
+};
+
+/**
+ * Ask Android to leave MONEVA out of battery optimisation.
+ *
+ * The one change that stops Samsung killing the listener after a few days
+ * unopened. Opens the system's own dialog; the user decides. Resolves to the
+ * state BEFORE the dialog - re-read status after the app regains focus to
+ * learn the answer.
+ */
+export const requestBatteryExemption = async (): Promise<boolean> => {
+  if (!isCaptureSupported()) return false;
+  try {
+    const res = await plugin.requestBatteryExemption();
+    return !!res.exempt;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Try to get a listener that Android dropped bound again.
+ *
+ * The plugin already attempts this on every status check, so this exists for
+ * the case where that attempt did not take and the person wants to try again
+ * from a button rather than from a settings screen.
+ */
+export const reconnectListener = async (): Promise<boolean> => {
+  if (!isCaptureSupported()) return false;
+  try {
+    const res = await plugin.reconnect();
+    return !!res.requested;
+  } catch {
+    return false;
   }
 };
 

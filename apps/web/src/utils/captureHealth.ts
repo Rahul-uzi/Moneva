@@ -30,6 +30,22 @@ export interface CaptureFacts {
   keptCount: number;
   /** Epoch ms when capture was last switched on, 0 when never. */
   enabledAt: number;
+  /**
+   * Whether Android has the listener BOUND right now. A fact the service
+   * reported - not an inference from silence.
+   */
+  connected: boolean;
+  /**
+   * Epoch ms when the listener last connected or disconnected; 0 if it has
+   * never reported at all. That zero matters: a listener that has never
+   * connected is one Android has not got round to yet, which is patience, not
+   * a fault.
+   */
+  connectedAt: number;
+  /** Whether the app is exempt from battery optimisation. */
+  batteryExempt: boolean;
+  /** Lower-cased. Samsung gets phone-specific guidance. */
+  manufacturer: string;
   now: number;
 }
 
@@ -38,6 +54,7 @@ export type CaptureState =
   | 'blocked'    // the OS permission is off - nothing can arrive
   | 'off'        // the user switched it off, which is a choice, not a fault
   | 'waiting'    // on, but nothing has arrived yet
+  | 'disconnected' // Android has dropped the listener - a fact, not a guess
   | 'healthy'
   | 'quiet'      // a while with nothing; probably fine
   | 'stalled';   // long enough that something is likely wrong
@@ -49,6 +66,12 @@ export interface CaptureHealth {
   detail: string;
   /** Whole days since the last alert, or null when none has ever arrived. */
   daysSilent: number | null;
+  /**
+   * Capture is wanted and permitted but the app can still be killed for
+   * battery. Advisory rather than a state: it applies even while healthy,
+   * because it is about what will go wrong, not what has.
+   */
+  needsBatteryExemption: boolean;
 }
 
 const DAY = 86_400_000;
@@ -70,7 +93,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 export function captureHealth(facts: CaptureFacts): CaptureHealth {
   if (!facts.supported) {
     return {
-      state: 'unsupported', tone: 'ok', daysSilent: null,
+      state: 'unsupported', tone: 'ok', daysSilent: null, needsBatteryExemption: false,
       headline: 'Not available here',
       detail: 'Reading payment alerts needs the Android app.',
     };
@@ -78,7 +101,7 @@ export function captureHealth(facts: CaptureFacts): CaptureHealth {
 
   if (!facts.granted) {
     return {
-      state: 'blocked', tone: 'bad', daysSilent: null,
+      state: 'blocked', tone: 'bad', daysSilent: null, needsBatteryExemption: false,
       headline: 'Payment alerts are switched off',
       detail: 'Android has notification access turned off for MONEVA, so no '
             + 'payments can be noticed. Nothing is being missed quietly - '
@@ -88,9 +111,38 @@ export function captureHealth(facts: CaptureFacts): CaptureHealth {
 
   if (!facts.capturing) {
     return {
-      state: 'off', tone: 'ok', daysSilent: null,
+      state: 'off', tone: 'ok', daysSilent: null, needsBatteryExemption: false,
       headline: 'Not reading payment alerts',
       detail: 'You turned this off. Payments can still be added by hand.',
+    };
+  }
+
+  const needsBatteryExemption = !facts.batteryExempt;
+  const samsung = facts.manufacturer === 'samsung';
+
+  /**
+   * Android has dropped the listener. Known, not inferred.
+   *
+   * `connectedAt > 0` is the guard: it means the service has reported at least
+   * once in its life, so its absence now is a disconnect and not a first
+   * enable that Android has not yet bound. Without that guard every fresh
+   * switch-on would flash this warning for the seconds before binding.
+   *
+   * The plugin has already asked for a rebind by the time this renders. The
+   * button offers a second try; the Samsung line names the setting that stops
+   * it happening again, because that is the phone this was observed on.
+   */
+  if (!facts.connected && facts.connectedAt > 0) {
+    return {
+      state: 'disconnected', tone: 'bad', daysSilent: null, needsBatteryExemption,
+      headline: 'Android stopped the listener',
+      detail: 'MONEVA is allowed to read alerts, but Android has unbound the '
+            + 'service that does it - usually to save battery. Nothing is '
+            + 'being noticed until it reconnects.'
+            + (samsung
+                ? ' On Samsung, add MONEVA to Never sleeping apps under '
+                  + 'Battery, then it will stop happening.'
+                : ''),
     };
   }
 
@@ -103,7 +155,7 @@ export function captureHealth(facts: CaptureFacts): CaptureHealth {
   if (facts.keptCount === 0) {
     const waited = days ?? 0;
     return {
-      state: 'waiting', tone: 'ok', daysSilent: days,
+      state: 'waiting', tone: 'ok', daysSilent: days, needsBatteryExemption,
       headline: 'Watching for payments',
       detail: waited >= STALLED_AFTER_DAYS
         ? `Nothing noticed in ${waited} days. If you have paid for anything in `
@@ -118,7 +170,7 @@ export function captureHealth(facts: CaptureFacts): CaptureHealth {
 
   if (days === null || days < QUIET_AFTER_DAYS) {
     return {
-      state: 'healthy', tone: 'ok', daysSilent: days,
+      state: 'healthy', tone: 'ok', daysSilent: days, needsBatteryExemption,
       headline: 'Reading payment alerts',
       detail: days === 0
         ? `${seen}, including today.`
@@ -128,7 +180,7 @@ export function captureHealth(facts: CaptureFacts): CaptureHealth {
 
   if (days < STALLED_AFTER_DAYS) {
     return {
-      state: 'quiet', tone: 'ok', daysSilent: days,
+      state: 'quiet', tone: 'ok', daysSilent: days, needsBatteryExemption,
       headline: 'Nothing new lately',
       detail: `${seen}, but none in ${days} days. That is normal if you have `
             + 'not paid for anything.',
@@ -136,12 +188,12 @@ export function captureHealth(facts: CaptureFacts): CaptureHealth {
   }
 
   return {
-    state: 'stalled', tone: 'warn', daysSilent: days,
+    state: 'stalled', tone: 'warn', daysSilent: days, needsBatteryExemption,
     headline: 'Nothing noticed in a while',
     detail: `No payment has been noticed in ${days} days, though ${n} `
           + `${plural(n, 'was', 'were')} noticed before that. If you have been `
           + 'paying for things as usual, MONEVA has probably stopped receiving '
-          + 'the alerts - switching notification access off and on again '
-          + 'usually brings it back.',
+          + 'the alerts. Opening the app reconnects it; letting it run in the '
+          + 'background stops it happening.',
   };
 }

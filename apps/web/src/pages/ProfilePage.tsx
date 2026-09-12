@@ -57,6 +57,8 @@ import { PaymentInbox } from '../components/financial/PaymentInbox';
 import {
   getCaptureStatus,
   isCaptureSupported,
+  reconnectListener,
+  requestBatteryExemption,
   type CaptureStatus,
 } from '../services/notificationCapture';
 import { captureHealth } from '../utils/captureHealth';
@@ -95,6 +97,7 @@ export const ProfilePage: React.FC = () => {
   // Android has granted access, and the user still wants it used.
   const [capture, setCapture] = useState<CaptureStatus>({
     granted: false, capturing: false, lastKeptAt: 0, keptCount: 0, enabledAt: 0,
+    connected: false, connectedAt: 0, batteryExempt: false, manufacturer: '',
   });
   const [isPayInboxOpen, setIsPayInboxOpen] = useState<boolean>(false);
 
@@ -107,6 +110,10 @@ export const ProfilePage: React.FC = () => {
     lastKeptAt: capture.lastKeptAt,
     keptCount: capture.keptCount,
     enabledAt: capture.enabledAt,
+    connected: capture.connected,
+    connectedAt: capture.connectedAt,
+    batteryExempt: capture.batteryExempt,
+    manufacturer: capture.manufacturer,
     now: Date.now(),
   });
   useEffect(() => {
@@ -115,6 +122,16 @@ export const ProfilePage: React.FC = () => {
     if (isPayInboxOpen) return;
     void getCaptureStatus().then(setCapture);
   }, [isPayInboxOpen]);
+  useEffect(() => {
+    // And when the app comes back. The battery-exemption dialog and the
+    // notification-access screen are both other Activities, so the answer
+    // to "did they allow it" only exists once we are in front again.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void getCaptureStatus().then(setCapture);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
   useEffect(() => {
     const timer = setTimeout(() => {
       void nativeNotificationService.checkPermission().then(setDevicePerm);
@@ -794,13 +811,56 @@ export const ProfilePage: React.FC = () => {
                     the user most needs to be told about. */}
                 <span className="toggle-sub">{captureState.detail}</span>
               </div>
+              {captureState.state === 'disconnected' ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="row-action-btn"
+                  onClick={() => {
+                    void reconnectListener().then(() =>
+                      // Binding is asynchronous on Android's side; give it a
+                      // beat before reading whether it took.
+                      setTimeout(() => void getCaptureStatus().then(setCapture), 1500));
+                  }}
+                >
+                  Reconnect
+                </Button>
+              ) : (
+                <Button
+                  variant={capture.capturing && capture.granted ? 'secondary' : 'primary'}
+                  size="sm"
+                  className="row-action-btn"
+                  onClick={() => setIsPayInboxOpen(true)}
+                >
+                  {capture.capturing && capture.granted ? 'Manage' : 'Set up'}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* The thing that stops the listener dying in the first place.
+
+              Shown only while capture is wanted and permitted, because that
+              is when a battery kill costs something. It sits directly under
+              the health row so cause and effect are next to each other: "it
+              stopped" above, "here is what stops that" below. */}
+          {isCaptureSupported() && capture.granted && capture.capturing && captureState.needsBatteryExemption && (
+            <div className="toggle-row is-warn">
+              <div className="toggle-info">
+                <span className="toggle-label">Keep it running in the background</span>
+                <span className="toggle-sub">
+                  {capture.manufacturer === 'samsung'
+                    ? 'Samsung puts apps to sleep after a few days unopened, and a sleeping app notices nothing. Allow this, then add MONEVA to Never sleeping apps under Battery.'
+                    : 'Android can stop MONEVA to save battery, and a stopped app notices nothing. Allowing this keeps the listener alive.'}
+                </span>
+              </div>
               <Button
-                variant={capture.capturing && capture.granted ? 'secondary' : 'primary'}
+                variant="primary"
                 size="sm"
                 className="row-action-btn"
-                onClick={() => setIsPayInboxOpen(true)}
+                onClick={() => void requestBatteryExemption()}
               >
-                {capture.capturing && capture.granted ? 'Manage' : 'Set up'}
+                Allow
               </Button>
             </div>
           )}

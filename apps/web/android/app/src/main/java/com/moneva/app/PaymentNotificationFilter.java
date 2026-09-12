@@ -34,10 +34,15 @@ final class PaymentNotificationFilter {
     private PaymentNotificationFilter() {}
 
     /**
-     * Apps whose notifications may be examined. Anything not on this list is
-     * dropped without being read.
+     * Apps that exist to move money, and post nothing else.
+     *
+     * Split out from the messaging apps below because the two deserve
+     * different tests. Everything Google Pay puts in the shade is about a
+     * payment; most of what the Messages app puts there is not. Treating them
+     * the same meant one rule had to serve both, and it was tuned for the
+     * dangerous one - which is why a plain Google Pay receipt was thrown away.
      */
-    static final Set<String> DEFAULT_PACKAGES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+    static final Set<String> PAYMENT_APPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             // UPI and wallets
             "com.google.android.apps.nbu.paisa.user",  // Google Pay (India)
             "com.phonepe.app",
@@ -79,16 +84,33 @@ final class PaymentNotificationFilter {
             "com.idfcfirstbank.optimus",               // IDFC FIRST
             "com.fss.fedmobile",                       // Federal Bank
             "com.rblbank.mobank",                      // RBL
-            "com.aubank.aubankapp",                    // AU Small Finance
+            "com.aubank.aubankapp"                     // AU Small Finance
+    )));
 
-            // The SMS apps. A bank's SMS shows up here, which is how bank
-            // alerts are read without the READ_SMS permission. Everything from
-            // these packages still has to pass looksFinancial().
+    /**
+     * The messaging apps. A bank's SMS shows up here, which is how bank alerts
+     * are read without holding READ_SMS.
+     *
+     * These keep the STRICT test. Their notifications carry other people's
+     * conversation, so a message has to look like a receipt - an amount and a
+     * verb saying money moved - before it is written down. The leniency added
+     * for payment apps deliberately does not reach here: "500 to Karan" from a
+     * friend must stay unread.
+     */
+    static final Set<String> SMS_PACKAGES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "com.google.android.apps.messaging",
             "com.samsung.android.messaging",
             "com.android.mms",
             "com.textra"
     )));
+
+    /** Everything watched at all, for isWatchedPackage. */
+    static final Set<String> DEFAULT_PACKAGES;
+    static {
+        Set<String> all = new HashSet<>(PAYMENT_APPS);
+        all.addAll(SMS_PACKAGES);
+        DEFAULT_PACKAGES = Collections.unmodifiableSet(all);
+    }
 
     /**
      * An amount, in any of the ways money is written here.
@@ -155,15 +177,36 @@ final class PaymentNotificationFilter {
             Pattern.CASE_INSENSITIVE);
 
     /**
-     * Things that quote an amount but are not a payment. Cheap to check here,
-     * and it keeps one-time passwords - which are sensitive and useless to
-     * this app - from ever being stored.
+     * Proof that no money moved. Always vetoes, whatever else the text says.
+     *
+     * Every word here describes something that has NOT happened: a code to
+     * type, a request waiting, a debit scheduled for later. There is no
+     * wording in which these sit beside a completed payment, so refusing
+     * outright loses nothing - and one-time passwords, which are sensitive
+     * and useless to this app, never reach storage.
      */
-    private static final Pattern NOT_A_PAYMENT = Pattern.compile(
+    private static final Pattern NEVER_A_PAYMENT = Pattern.compile(
             "\\b(otp|one[\\s-]?time\\s?password|verification code|do not share|"
                     + "requested money|collect request|payment request|is requesting|"
-                    + "will be debited|due on|scheduled for|pre-?approved|apply now|"
-                    + "cashback up to|loan up to|offer|reward points)\\b",
+                    + "will be debited|due on|scheduled for|pre-?approved|apply now)\\b",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Marketing. Vetoes only when nothing says a payment actually happened.
+     *
+     * These used to sit on the list above and veto unconditionally, which
+     * threw away real receipts: Google Pay staples a scratch card to ordinary
+     * payments, so a genuine "You paid Rs.161.70 to McDonald's - you won a
+     * scratch card offer!" was rejected on the strength of the advertisement
+     * rather than read on the strength of the payment. Found from a real miss
+     * on the owner's own phone.
+     *
+     * An advertisement that merely quotes a figure still carries no payment
+     * verb and no receipt shape, so it is still refused - see looksFinancial.
+     */
+    private static final Pattern MARKETING = Pattern.compile(
+            "\\b(cashback up to|loan up to|offer|reward points|scratch card|"
+                    + "earn up to|limited time)\\b",
             Pattern.CASE_INSENSITIVE);
 
     /**
@@ -206,35 +249,83 @@ final class PaymentNotificationFilter {
     /**
      * True when this text is worth handing to the parser, for a given app.
      *
-     * A conversational app has to clear a much higher bar than a bank does,
-     * because almost everything it posts is nobody's business.
+     * Three tiers, because what an app POSTS decides how much benefit of the
+     * doubt its notifications have earned:
+     *
+     *   - A conversational app (WhatsApp) must look like a receipt. Almost
+     *     everything it posts is nobody's business.
+     *   - A messaging app carrying bank SMS must show an amount AND a verb
+     *     saying money moved. "500 to Karan" from a friend stays unread.
+     *   - A dedicated payment app only has to show an amount. Everything
+     *     Google Pay puts in the shade is about a payment, and demanding a
+     *     verb of it is what lost a real one - see below.
      */
     static boolean looksFinancial(String packageName, String title, String text) {
         if (packageName != null && CONVERSATIONAL_PACKAGES.contains(packageName)) {
             String body = ((title == null ? "" : title) + " " + (text == null ? "" : text)).trim();
             if (body.isEmpty() || body.length() > 2000) return false;
             String lower = body.toLowerCase(Locale.ROOT);
-            if (NOT_A_PAYMENT.matcher(lower).find()) return false;
+            if (NEVER_A_PAYMENT.matcher(lower).find()) return false;
             return PAYMENT_RECEIPT.matcher(lower).find();
         }
-        return looksFinancial(title, text);
+        boolean fromPaymentApp = packageName != null && PAYMENT_APPS.contains(packageName);
+        return looksFinancial(title, text, fromPaymentApp);
     }
 
     /**
-     * True when this text is worth handing to the parser.
+     * The strict test: an amount and a verb saying money moved.
      *
-     * Deliberately lenient about WHICH transaction it is - that is the parser's
-     * job, and it refuses far more than this does. This only has to be strict
-     * about one thing: text that is nobody's business does not get stored.
+     * This is what a message from an SMS app has to pass, and it is the one
+     * SmsSenderFilter uses for the inbox. It stays strict on purpose - these
+     * carry other people's conversation.
      */
     static boolean looksFinancial(String title, String text) {
+        return looksFinancial(title, text, false);
+    }
+
+    /**
+     * @param fromPaymentApp true for an app that posts nothing but payments,
+     *                       which buys leniency about PHRASING - never about
+     *                       what is read.
+     */
+    private static boolean looksFinancial(String title, String text, boolean fromPaymentApp) {
         String body = ((title == null ? "" : title) + " " + (text == null ? "" : text)).trim();
         if (body.isEmpty()) return false;
         if (body.length() > 2000) return false;          // not a payment alert
         String lower = body.toLowerCase(Locale.ROOT);
-        if (NOT_A_PAYMENT.matcher(lower).find()) return false;
+
+        // Proof that nothing moved. Beats everything else in the method.
+        if (NEVER_A_PAYMENT.matcher(lower).find()) return false;
+
+        // No figure, no payment. Unchanged, and the reason an advertisement
+        // with no number never gets this far.
         if (!AMOUNT.matcher(lower).find()) return false;
-        return MOVEMENT.matcher(lower).find() || WALLET_LOAD.matcher(lower).find();
+
+        /*
+         * A verb saying money moved settles it - INCLUDING over marketing.
+         *
+         * This ordering is the fix for the second half of the McDonald's miss.
+         * Google Pay attaches scratch cards to ordinary payments, and checking
+         * the marketing words first meant the advertisement overrode the
+         * receipt it was stapled to.
+         */
+        if (MOVEMENT.matcher(lower).find() || WALLET_LOAD.matcher(lower).find()) return true;
+
+        // No verb. Now marketing language decides it is an advertisement
+        // quoting a figure rather than a receipt.
+        if (MARKETING.matcher(lower).find()) return false;
+
+        /*
+         * A terse receipt from a payment app: an amount, no verb, nothing
+         * selling anything. "Rs.161.70 to McDonald's" is the shape Google Pay
+         * uses most, and requiring a verb threw it away - a real payment on 11
+         * September that had to be typed in by hand.
+         *
+         * Only for payment apps. An SMS app reaching this line is a message
+         * with a number in it and no evidence money moved, which is exactly
+         * the private text this whole filter exists to leave alone.
+         */
+        return fromPaymentApp;
     }
 
     /** True when notifications from this package may be examined at all. */

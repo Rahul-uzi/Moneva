@@ -25,6 +25,10 @@ const facts = (over: Partial<CaptureFacts> = {}): CaptureFacts => ({
   lastKeptAt: daysAgo(0),
   keptCount: 12,
   enabledAt: daysAgo(60),
+  connected: true,
+  connectedAt: daysAgo(60),
+  batteryExempt: true,
+  manufacturer: 'google',
   now: NOW,
   ...over,
 });
@@ -84,7 +88,10 @@ describe('when it goes quiet', () => {
     expect(h.daysSilent).toBe(14);
     // Conditional, not an accusation - the app cannot see whether they spent.
     expect(h.detail).toMatch(/if you have been paying/i);
-    expect(h.detail).toMatch(/notification access/i);
+    // The remedy it names is the one the app now performs itself. It used to
+    // say "notification access", pointing the user at a manual toggle; that
+    // toggle is what the reconnect logic does for them.
+    expect(h.detail).toMatch(/opening the app/i);
   });
 });
 
@@ -123,5 +130,81 @@ describe('before the first payment ever arrives', () => {
     const h = captureHealth(facts({ keptCount: 0, lastKeptAt: 0, enabledAt: daysAgo(12) }));
     expect(h.state).toBe('waiting');
     expect(h.detail).toMatch(/may not be reaching MONEVA/i);
+  });
+});
+
+
+describe('when Android has dropped the listener', () => {
+  /**
+   * The failure that produced this whole change. On a Samsung, an app left
+   * unopened for a few days has its process killed to save battery, Android
+   * does not reliably rebind the notification listener afterwards, and every
+   * payment until the next launch goes unnoticed - with nothing anywhere able
+   * to say so. This state is the app SAYING so, from a fact the service
+   * reported rather than from silence.
+   */
+  it('says so as a fact, not a guess', () => {
+    const h = captureHealth(facts({ connected: false, connectedAt: daysAgo(1) }));
+    expect(h.state).toBe('disconnected');
+    expect(h.tone).toBe('bad');
+    expect(h.headline).toMatch(/android stopped/i);
+  });
+
+  it('outranks a recent payment', () => {
+    // A payment came in this morning and the listener died at noon. The
+    // silence arithmetic would call this healthy; the fact says otherwise.
+    const h = captureHealth(facts({ connected: false, connectedAt: NOW - 3600_000, lastKeptAt: daysAgo(0) }));
+    expect(h.state).toBe('disconnected');
+  });
+
+  it('names the Samsung setting on a Samsung', () => {
+    const h = captureHealth(facts({ connected: false, connectedAt: daysAgo(1), manufacturer: 'samsung' }));
+    expect(h.detail).toMatch(/never sleeping apps/i);
+  });
+
+  it('does not lecture other phones about Samsung', () => {
+    const h = captureHealth(facts({ connected: false, connectedAt: daysAgo(1), manufacturer: 'google' }));
+    expect(h.detail).not.toMatch(/samsung/i);
+  });
+
+  it('is patient with a listener that has never connected yet', () => {
+    /**
+     * The guard. Right after capture is switched on, Android has not bound
+     * the service yet: connected is false and connectedAt is 0 because the
+     * service has never reported anything. That is a first enable, not a
+     * disconnect, and flashing "Android stopped the listener" at that moment
+     * would be the app crying wolf on every fresh switch-on.
+     */
+    const h = captureHealth(facts({ connected: false, connectedAt: 0, keptCount: 0, lastKeptAt: 0, enabledAt: NOW - 5000 }));
+    expect(h.state).toBe('waiting');
+    expect(h.tone).toBe('ok');
+  });
+});
+
+describe('the battery advisory', () => {
+  it('is raised even while healthy, because it is about what will go wrong', () => {
+    const h = captureHealth(facts({ batteryExempt: false }));
+    expect(h.state).toBe('healthy');
+    expect(h.needsBatteryExemption).toBe(true);
+  });
+
+  it('is silent once the app is exempt', () => {
+    expect(captureHealth(facts({ batteryExempt: true })).needsBatteryExemption).toBe(false);
+  });
+
+  it('is not raised when capture is off anyway', () => {
+    // A battery kill costs nothing if nothing was meant to be listening.
+    expect(captureHealth(facts({ capturing: false, batteryExempt: false })).needsBatteryExemption).toBe(false);
+    expect(captureHealth(facts({ granted: false, batteryExempt: false })).needsBatteryExemption).toBe(false);
+  });
+});
+
+describe('what the stalled advice no longer says', () => {
+  it('does not tell the user to toggle notification access by hand', () => {
+    // That was the workaround for a failure the app now handles itself. Telling
+    // people to do it would mean the reconnect logic is not trusted to work.
+    const h = captureHealth(facts({ lastKeptAt: daysAgo(14) }));
+    expect(h.state).toBe('stalled');
+    expect(h.detail).not.toMatch(/off and on/i);
   });
 });

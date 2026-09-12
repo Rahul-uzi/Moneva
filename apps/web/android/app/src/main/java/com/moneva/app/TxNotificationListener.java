@@ -1,6 +1,7 @@
 package com.moneva.app;
 
 import android.app.Notification;
+import android.content.ComponentName;
 import android.os.Bundle;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
@@ -35,6 +36,23 @@ import java.util.Locale;
 public class TxNotificationListener extends NotificationListenerService {
 
     private static final String TAG = "MonevaNotif";
+
+    /**
+     * Whether Android currently has this listener bound. THE live truth.
+     *
+     * Static and in-process on purpose. If Samsung kills the app to save
+     * battery, the process dies and this resets to false - and when the app
+     * next runs (the user opens it, or the watchdog wakes it) reading false
+     * here is proof the listener was not rebound. The store cannot tell you
+     * that: a hard kill never calls onListenerDisconnected, so anything
+     * written to disk would still say "connected" about a service that is
+     * gone. Memory forgets, which is exactly the property needed.
+     */
+    private static volatile boolean alive = false;
+
+    static boolean isAlive() {
+        return alive;
+    }
 
     private CapturedNotificationStore store;
 
@@ -119,6 +137,44 @@ public class TxNotificationListener extends NotificationListenerService {
             // stops delivering. Never let one malformed notification do that.
             Log.w(TAG, "capture failed: " + t.getClass().getSimpleName());
         }
+    }
+
+    @Override
+    public void onListenerConnected() {
+        super.onListenerConnected();
+        alive = true;
+        if (store != null) store.markListenerStateChanged();
+        Log.d(TAG, "listener connected");
+    }
+
+    /**
+     * Android has unbound the listener - low memory, battery policy, or a
+     * settings sweep. Ask to be bound again immediately.
+     *
+     * This is the moment that used to be fatal. The system frequently does
+     * NOT rebind a listener it dropped under pressure until notification
+     * access is switched off and on by hand, and the previous version of this
+     * app knew that: its health screen told the USER to do the toggle.
+     * requestRebind is the official way to ask without them.
+     */
+    @Override
+    public void onListenerDisconnected() {
+        super.onListenerDisconnected();
+        alive = false;
+        if (store != null) store.markListenerStateChanged();
+        Log.d(TAG, "listener disconnected; requesting rebind");
+        try {
+            requestRebind(new ComponentName(this, TxNotificationListener.class));
+        } catch (Throwable t) {
+            // Nothing to do here but let the watchdog try again later.
+            Log.w(TAG, "rebind request failed: " + t.getClass().getSimpleName());
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        alive = false;
+        super.onDestroy();
     }
 
     @Override

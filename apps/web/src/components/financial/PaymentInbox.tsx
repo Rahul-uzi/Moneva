@@ -45,6 +45,7 @@ interface Props {
 export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) => {
   const [status, setStatus] = useState<CaptureStatus>({
     granted: false, capturing: false, lastKeptAt: 0, keptCount: 0, enabledAt: 0,
+    connected: false, connectedAt: 0, batteryExempt: false, manufacturer: '',
   });
   const [proposals, setProposals] = useState<AlertProposal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);

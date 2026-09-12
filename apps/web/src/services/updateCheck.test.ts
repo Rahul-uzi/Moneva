@@ -83,7 +83,18 @@ describe('dismissing an update', () => {
      * difference decides whether the prompt still works on the day a release
      * actually matters.
      */
+    /**
+     * The clock is pinned BEFORE dismissing, and that is the whole test.
+     *
+     * `dismissUpdate` stamps Date.now(). The first version of this test
+     * hardcoded `now` to the day it was written and then compared against a
+     * real-clock stamp - so it passed that day and failed the next, once the
+     * real date had drifted past the constant. A test that only passes on
+     * the date it was written is measuring the calendar, not the code.
+     */
     const now = Date.UTC(2026, 8, 11, 12, 0, 0);
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
     dismissUpdate(10203);
     expect(wasRecentlyDismissed(10203, now + 2 * 24 * 3600_000)).toBe(true);
     expect(wasRecentlyDismissed(10203, now + 4 * 24 * 3600_000)).toBe(false);

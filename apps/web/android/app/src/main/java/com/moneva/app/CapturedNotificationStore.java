@@ -45,6 +45,17 @@ final class CapturedNotificationStore {
     private static final String KEY_SMS_ENABLED = "sms_enabled";
     private static final String KEY_SMS_BACKFILLED_TO = "sms_backfilled_to";
 
+    /* When the listener last reported connecting or disconnecting.
+
+       The LIVE truth about whether Android has the listener bound is the
+       static flag in TxNotificationListener - it lives in this process, so a
+       killed process resets it, which is exactly the case to detect. This is
+       only the timestamp of the last change, kept so the app can say "stopped
+       2 hours ago" rather than merely "stopped". Stored separately from the
+       silence counters because it is a FACT the service reported, not an
+       inference drawn from nothing arriving. */
+    private static final String KEY_LISTENER_STATE_AT = "listener_state_at";
+
     /** Roughly a fortnight of alerts for a busy account; older ones fall off. */
     private static final int CAPACITY = 200;
 
@@ -115,6 +126,15 @@ final class CapturedNotificationStore {
 
     void setSmsBackfilledTo(long epochMs) {
         prefs.edit().putLong(KEY_SMS_BACKFILLED_TO, epochMs).apply();
+    }
+
+    /** Epoch ms when the listener last connected or disconnected; 0 if never. */
+    long listenerStateAt() {
+        return prefs.getLong(KEY_LISTENER_STATE_AT, 0L);
+    }
+
+    void markListenerStateChanged() {
+        prefs.edit().putLong(KEY_LISTENER_STATE_AT, System.currentTimeMillis()).apply();
     }
 
     /** Epoch ms of the last alert kept, or 0 if none has ever been kept. */

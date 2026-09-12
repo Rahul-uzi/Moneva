@@ -116,6 +116,22 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
+    <!-- Lets the app ASK to be left out of battery optimisation. Holding this
+         grants nothing on its own: it only permits showing the system's own
+         dialog, and the user decides.
+
+         Why it is needed: the notification listener is started by Android and
+         runs with the app closed - but Samsung's battery policy kills the
+         process of any app unopened for a few days, and Android does not
+         reliably rebind the listener afterwards. Payments then go unnoticed
+         for as long as the app stays closed, silently. Exemption is what stops
+         the kill in the first place.
+
+         Google Play restricts this permission for store listings. MONEVA is
+         installed from its own site, and in any case an app whose purpose is
+         to keep listening is the case the exemption exists for. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- Held by the SERVICE, not requested from the user: it is what stops
          any app other than the system binding TxNotificationListener. The
          access itself is granted by the user in a Settings screen, not by a

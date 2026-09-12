@@ -18,6 +18,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NotificationCapturePlugin.class);
         registerPlugin(SmsCapturePlugin.class);
         super.onCreate(savedInstanceState);
+        // The listener watchdog. Idempotent, so every launch may call it; the
+        // one that matters is the first launch after an update that added it,
+        // for a user who switched capture on long before the watchdog existed.
+        CaptureWatchdogWorker.schedule(this);
         disablePageZoom();
     }
 
