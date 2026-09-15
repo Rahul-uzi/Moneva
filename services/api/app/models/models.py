@@ -37,6 +37,11 @@ class User(Base):
     reset_code_hash = Column(String, nullable=True)
     reset_code_expires_at = Column(DateTime(timezone=True), nullable=True)
     reset_code_attempts = Column(SmallInteger, default=0, nullable=False)
+    #: When the last reset code went out, so a second one inside the cooldown
+    #: can be refused. A column rather than the in-memory limiter because the
+    #: limiter's counters die with the worker, and a free instance that sleeps
+    #: when idle restarts the allowance every time it wakes.
+    reset_code_sent_at = Column(DateTime(timezone=True), nullable=True)
 
     # Bumped to invalidate every token already issued for this account. Cheaper
     # than a server-side session store: the version is a claim inside the token,

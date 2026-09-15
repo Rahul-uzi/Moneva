@@ -137,6 +137,14 @@ class ForgotPasswordResponse(BaseModel):
     """
     message: str
     delivery_configured: bool
+    # Seconds until another send is allowed, so the screen can count down and
+    # disable its own button instead of letting someone tap into a refusal.
+    #
+    # Always the FULL cooldown, never the time actually remaining. The
+    # remaining time would differ between an address that was just sent a code
+    # and one that has no account at all, which is precisely the difference
+    # every other field here is careful not to reveal.
+    retry_after_seconds: int = 0
 
 
 class VerifyEmailRequest(BaseModel):

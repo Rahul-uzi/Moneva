@@ -66,6 +66,11 @@ from app.schemas.schemas import (
 # is slow to sync mail, short enough that a code sitting in an old inbox is not
 # a standing key to the account.
 RESET_CODE_TTL_MINUTES = 30
+#: The shortest gap between two reset emails to one account.
+#:
+#: Matches VERIFY_RESEND_SECONDS below, because the two are the same promise
+#: to the same inbox and a person has no reason to expect them to differ.
+RESET_RESEND_SECONDS = 60
 
 # How long a confirmation code is good for, and how long before another may
 # be sent. The resend gap is per account and deliberately short: the usual
@@ -340,9 +345,15 @@ async def forgot_password(
     #
     # The honest "is mail actually working" signal lives on /api/health, which
     # is not scoped to an address and therefore gives nothing away.
+    # retry_after_seconds is the FULL cooldown on every reply, never the time
+    # actually left. The remaining time would be one number for an address
+    # that was just sent a code and a different one for an address with no
+    # account, which is exactly the difference every other branch here is
+    # built to hide.
     same_answer = ForgotPasswordResponse(
         message="If that email has an account, a reset code is on its way.",
         delivery_configured=delivery_configured(),
+        retry_after_seconds=RESET_RESEND_SECONDS,
     )
 
     res = await db.execute(select(User).where(User.email == email))
@@ -350,11 +361,35 @@ async def forgot_password(
     if not user or not user.is_active:
         return same_answer
 
+    now = datetime.now(timezone.utc)
+
+    # A minimum gap between sends, which this endpoint had no form of. Four an
+    # hour was the only limit, and nothing stopped those four arriving within
+    # four seconds - which is what filled a real person's inbox.
+    #
+    # Three things pushed in the same direction. The client retries a
+    # forgot-password that timed out, on purpose, because a sleeping instance
+    # takes longer to wake than the request takes to give up - so one tap
+    # could already post twice. The screen had no countdown, so a person
+    # seeing nothing arrive taps again. And every send REPLACED the previous
+    # code, so the code in the first email stopped working, which invites yet
+    # another tap.
+    #
+    # Returning early also leaves the existing code ALIVE, so the mail already
+    # sitting in the inbox is still the one that works.
+    last_sent = user.reset_code_sent_at
+    if last_sent is not None:
+        if last_sent.tzinfo is None:
+            last_sent = last_sent.replace(tzinfo=timezone.utc)
+        if (now - last_sent).total_seconds() < RESET_RESEND_SECONDS:
+            return same_answer
+
     # Six digits, from a generator meant for secrets rather than randint.
     code = f"{secrets.randbelow(1_000_000):06d}"
     user.reset_code_hash = hash_password(code)
-    user.reset_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=RESET_CODE_TTL_MINUTES)
+    user.reset_code_expires_at = now + timedelta(minutes=RESET_CODE_TTL_MINUTES)
     user.reset_code_attempts = 0
+    user.reset_code_sent_at = now
     await db.commit()
 
     # Committed before sending: an email that arrives with a code the database
