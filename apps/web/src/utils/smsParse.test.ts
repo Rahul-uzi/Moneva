@@ -520,3 +520,96 @@ describe('what the new payee rules must not drag in', () => {
     expect(who('Sent Rs.500.00 From HDFC Bank A/C x1234 To RAHUL On 08-09-26')).toBe('RAHUL');
   });
 });
+
+describe("the abbreviation half of India's banks use", () => {
+  /*
+   * A real payment of Rs 10 to Rahul Dhima, 15 September 2026, Canara Bank.
+   * It never became an expense. The Android filter kept the notification -
+   * "UPI: 625820566755" and "Acct XXXX4489" are both machine marks - so the
+   * message reached this parser, and this parser could not tell which way the
+   * money went.
+   *
+   * The reason is one abbreviation. Canara writes "Dr." for debit and "Cr."
+   * for credit, and so do Union Bank, PNB and Bank of Baroda. No rule in
+   * DIRECTION covers either, so parseTransactionSms returned null and the
+   * payment was silently dropped between the filter and the inbox.
+   */
+
+  const CANARA_DEBIT =
+    'Dear Customer, Acct XXXX4489 Dr. INR 10.00 on 15/09/26 to Rahul  Dhima; '
+    + 'UPI: 625820566755; Bal INR 50900.Not you?SMS BLOCKUPI to 9901771222-CanaraBank';
+
+  it('reads the message that went missing', () => {
+    const parsed = parseTransactionSms(CANARA_DEBIT);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.kind).toBe('debit');
+    expect(parsed?.amountPaise).toBe(1000);
+  });
+
+  it('takes the account and the reference from it too', () => {
+    const parsed = parseTransactionSms(CANARA_DEBIT);
+    expect(parsed?.accountTail).toBe('4489');
+    expect(parsed?.reference).toBe('625820566755');
+  });
+
+  it('reads Cr. as money arriving', () => {
+    const parsed = parseTransactionSms(
+      'Dear Customer, Acct XXXX4489 Cr. INR 2500.00 on 15/09/26 by UPI: 625820566756; Bal INR 53400-CanaraBank');
+    expect(parsed?.kind).toBe('credit');
+    expect(parsed?.amountPaise).toBe(250000);
+  });
+
+  it('never reads the block-UPI helpline as the reference', () => {
+    /*
+     * The trap inside this exact message. It ends "SMS BLOCKUPI to
+     * 9901771222", so a rule keying on the letters "upi" near a long number
+     * has a phone number sitting right there to grab. References are what
+     * stop two payments merging into one row, so a wrong one loses money in a
+     * way a missing one does not.
+     */
+    const parsed = parseTransactionSms(CANARA_DEBIT);
+    expect(parsed?.reference).not.toBe('9901771222');
+    expect(parsed?.reference).toBe('625820566755');
+  });
+
+  it('will not read a reference out of the middle of a word', () => {
+    /*
+     * "BLOCKUPI" ends in the rail's name. In the real Canara message the
+     * word "to" happens to sit between it and the helpline number and stops
+     * the match by itself - but that is luck, not a rule, and banks write the
+     * instruction both ways. A helpline number read as a reference is the
+     * worst kind of wrong: references decide whether two alerts are one
+     * payment, so a number shared by every message merges unrelated payments.
+     */
+    expect(parseTransactionSms('Rs 10.00 debited. Not you? SMS BLOCKUPI 9901771222')?.reference)
+      .toBeUndefined();
+  });
+
+  it('reads the rail reference with or without the colon', () => {
+    // Banks write both. An earlier version demanded the colon; a mutation
+    // showed no test could tell, and the reason was that the demand was wrong.
+    expect(parseTransactionSms('Rs 10.00 debited. UPI: 625820566755')?.reference)
+      .toBe('625820566755');
+    expect(parseTransactionSms('Rs 10.00 debited. UPI 625820566755')?.reference)
+      .toBe('625820566755');
+  });
+
+  it('will not take a short or wordy run as a reference', () => {
+    // What actually holds this rule in: six alphanumerics with a digit among
+    // them. Below that it reaches a date fragment; without a digit, a word.
+    expect(parseTransactionSms('Rs 500 debited via UPI 12')?.reference).toBeUndefined();
+    expect(parseTransactionSms('Rs 500 debited by UPI on 15/09/26')?.reference).toBeUndefined();
+    expect(parseTransactionSms('Rs 500 debited, UPI transaction pending')?.reference)
+      .toBeUndefined();
+  });
+
+  it('does not read the abbreviation out of an ordinary word', () => {
+    /*
+     * "Dr" is also a title and the first two letters of a great many words.
+     * Without a boundary and a trailing full stop, "Dr Mehta" and "drop" both
+     * turn every message they appear in into a debit.
+     */
+    expect(parseTransactionSms('Rs 500 to Dr Mehta for the appointment')).toBeNull();
+    expect(parseTransactionSms('INR 200.00 dropped from the total')).toBeNull();
+  });
+});

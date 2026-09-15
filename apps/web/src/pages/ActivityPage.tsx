@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { ChevronDown, Pencil, Search, Trash2 } from 'lucide-react';
+import { ChevronDown, Pencil, Search, StickyNote, Trash2 } from 'lucide-react';
 import { TransactionRow } from '../components/financial/TransactionRow';
 import { TransactionDetailModal } from '../components/financial/TransactionDetailModal';
 import { TransactionEditModal } from '../components/financial/TransactionEditModal';
@@ -36,6 +36,10 @@ export const ActivityPage: React.FC = () => {
   // Long-press target: the sheet offers edit or delete for any entry here.
   const [actionTx, setActionTx] = useState<Transaction | null>(null);
   const [editTx, setEditTx] = useState<Transaction | null>(null);
+  // Whether the editor should open with the note field focused. Long-press
+  // offers 'Note' as its own action, and landing on the amount instead
+  // would make the user hunt for the field they just asked for.
+  const [editOnNote, setEditOnNote] = useState<boolean>(false);
   const [deleteTx, setDeleteTx] = useState<Transaction | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
@@ -338,7 +342,14 @@ export const ActivityPage: React.FC = () => {
           <div className="modal-container tx-action-sheet" onClick={(e) => e.stopPropagation()}>
             <span className="tx-action-title">{actionTx.description || 'Transaction'}</span>
             <span className="tx-action-amount">{formatMonetaryValue(actionTx.amount_minor, actionTx.currency)}</span>
-            <button type="button" className="tx-action-btn" onClick={() => { setEditTx(actionTx); setActionTx(null); }}>
+            <button
+              type="button"
+              className="tx-action-btn"
+              onClick={() => { setEditOnNote(true); setEditTx(actionTx); setActionTx(null); }}
+            >
+              <StickyNote size={16} /> {actionTx.notes ? 'Edit note' : 'Add a note'}
+            </button>
+            <button type="button" className="tx-action-btn" onClick={() => { setEditOnNote(false); setEditTx(actionTx); setActionTx(null); }}>
               <Pencil size={16} /> Edit
             </button>
             <button type="button" className="tx-action-btn is-danger" onClick={() => { setDeleteTx(actionTx); setActionTx(null); }}>
@@ -352,6 +363,7 @@ export const ActivityPage: React.FC = () => {
       )}
 
       <TransactionEditModal
+        focusNotes={editOnNote}
         transaction={editTx}
         categories={categories}
         onClose={() => setEditTx(null)}

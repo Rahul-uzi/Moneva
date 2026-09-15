@@ -134,6 +134,17 @@ const DIRECTION: Array<{ id: string; kind: SmsKind; test: RegExp }> = [
 
   { id: 'debited', kind: 'debit', test: /\bdebited\b/i },
   { id: 'credited', kind: 'credit', test: /\bcredited\b/i },
+  // "Acct XXXX4489 Dr. INR 10.00" - Canara's way of saying debited, and
+  // Union Bank's, PNB's and Bank of Baroda's too. A real Rs 10 payment was
+  // dropped here: the Android filter kept the message, this table could not
+  // say which way the money went, and the parser returned null.
+  //
+  // The amount has to follow the abbreviation, which is what makes this safe.
+  // "Dr" on its own is a title, and "Paid Rs 500 to Dr. Mehta" would become a
+  // debit on the strength of the doctor rather than the payment - the reading
+  // is only unambiguous when the very next thing is the sum of money.
+  { id: 'dr-abbrev', kind: 'debit', test: /\bdr\b\.?\s*(?:rs\.?|inr|₹)\s?[0-9]/i },
+  { id: 'cr-abbrev', kind: 'credit', test: /\bcr\b\.?\s*(?:rs\.?|inr|₹)\s?[0-9]/i },
   // "used for" is how a card alert says it was spent.
   { id: 'spent', kind: 'debit', test: /\b(spent|paid|withdrawn|purchase of|used for)\b/i },
   // "Thank you for using your HDFC Bank Card XX7781 for Rs.899.00 at NETFLIX".
@@ -194,6 +205,35 @@ const ACCOUNT_TAIL = /(?:a\/c|ac|acct|account|card)\s*(?:no\.?|ending|xx+)?\s*[x
  *      bank invents next.
  */
 const REFERENCE = /(?:upi(?:\/| )?ref(?:erence)?|ref(?:erence)?|txn(?: id)?|transaction id|imps ref)(?:\s*(?:no|number)\.?)?\s*[:.# ]?\s*(?=[A-Za-z0-9]*[0-9])([A-Za-z0-9]{4,25})\b/i;
+
+/**
+ * "UPI: 625820566755" - the rail's name, a colon, and the number, with the
+ * word "reference" nowhere in it. Canara writes this, and it is why a real
+ * Rs 10 payment arrived with no reference to identify it by.
+ *
+ * Tried only after REFERENCE, because it is the weaker reading: above, the
+ * word "ref" announces that a reference follows, whereas here only position
+ * does. Two things carry the safety, and a third does not:
+ *
+ *   - `\bupi\b` keeps it out of the middle of a word. The same Canara message
+ *     ends "SMS BLOCKUPI to 9901771222" - a HELPLINE NUMBER two characters
+ *     after the rail's name. In that exact wording the word "to" blocks the
+ *     match anyway, but banks write the instruction both ways, and a number
+ *     shared by every message is worse than no reference at all: references
+ *     decide whether two alerts are one payment, so a constant merges
+ *     unrelated payments into one row and loses the difference.
+ *   - six alphanumerics with a digit among them. Rail references are twelve;
+ *     a shorter run reaches a date fragment or an amount, and a run with no
+ *     digit is an English word.
+ *
+ * The separator is deliberately NOT required, and was at first. A mutation
+ * proved no test could tell the difference, and the reason turned out to be
+ * that requiring it is simply wrong: banks write "UPI 625820566755" as
+ * readily as "UPI: 625820566755", and insisting on the colon refuses a real
+ * reference to guard against nothing the two rules above do not already stop.
+ */
+const BARE_RAIL_REFERENCE =
+  /\b(?:upi|imps|neft|rtgs)\b\s*[:#-]?\s*(?=[A-Za-z0-9]*[0-9])([A-Za-z0-9]{6,25})\b/i;
 
 /**
  * The other party: the payee on a debit, the payer on a credit.
@@ -446,7 +486,8 @@ export function parseTransactionSms(body: string): ParsedSms | null {
   const tail = ACCOUNT_TAIL.exec(body);
   if (tail) parsed.accountTail = tail[1];
 
-  const reference = REFERENCE.exec(body);
+  // The labelled form first; the bare "UPI: 12345678" only where it found none.
+  const reference = REFERENCE.exec(body) ?? BARE_RAIL_REFERENCE.exec(body);
   if (reference) parsed.reference = reference[1];
 
   const merchant = findMerchant(body, direction.kind);

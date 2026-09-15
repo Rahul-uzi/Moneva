@@ -154,6 +154,7 @@ async def create_transaction(
         amount_minor=payload.amount_minor,
         currency=payload.currency or current_user.currency,
         description=payload.description,
+        notes=(payload.notes or "").strip() or None,
         transaction_date=payload.transaction_date,
         device_id=payload.device_id,
         sync_status=payload.sync_status or "synced"
@@ -223,6 +224,12 @@ async def update_transaction(
         tx.amount_minor = payload.amount_minor
     if payload.description is not None:
         tx.description = payload.description
+    if payload.notes is not None:
+        # Emptied means cleared, and is stored as NULL rather than "". A blank
+        # string would be a second spelling of "no note", and every reader
+        # would then have to test for both.
+        note = payload.notes.strip()
+        tx.notes = note or None
     if payload.transaction_date is not None:
         tx.transaction_date = payload.transaction_date
 

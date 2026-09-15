@@ -218,6 +218,12 @@ class Transaction(Base):
     amount_minor = Column(BigInteger, nullable=False)
     currency = Column(String, nullable=False)
     description = Column(String, nullable=True)
+    #: Free text the person wrote - "split with Anita, she owes me half".
+    #: Deliberately NOT the description: that one is usually written by the
+    #: parser, is what the row is titled by, and is what the categoriser and
+    #: the brand-logo matcher both read. A note put there would rename the
+    #: payment and could recategorise it. Nothing parses this field.
+    notes = Column(String, nullable=True)
     transaction_date = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)

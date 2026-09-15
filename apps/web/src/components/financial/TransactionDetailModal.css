@@ -68,3 +68,18 @@
   font-size: 11px;
   color: var(--moneva-text-muted);
 }
+
+/* A note is prose, not a value: it wraps to as many lines as it needs and
+   keeps the line breaks the person typed. Every other detail-val is a short
+   single-line figure, so this one stops sharing their layout. */
+.detail-row.is-note {
+  align-items: flex-start;
+}
+
+.tx-detail-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: right;
+  line-height: 1.5;
+  max-width: 62%;
+}

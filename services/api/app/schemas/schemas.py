@@ -320,6 +320,9 @@ class TransactionBase(BaseModel):
     amount_minor: int = Field(ge=1, le=100_000_000_000)
     currency: str = "INR"
     description: Optional[str] = Field(default=None, max_length=500)
+    #: The person's own note. Separate from description because that one is
+    #: parser-written and drives the title, the category and the logo.
+    notes: Optional[str] = Field(default=None, max_length=1000)
     transaction_date: UtcDateTime
     client_mutation_id: uuid.UUID
     device_id: str
@@ -408,6 +411,7 @@ class TransactionUpdate(BaseModel):
     savings_goal_id: Optional[uuid.UUID] = None
     amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
     description: Optional[str] = Field(default=None, max_length=500)
+    notes: Optional[str] = Field(default=None, max_length=1000)
     transaction_date: Optional[UtcDateTime] = None
     expected_version: Optional[int] = None
 

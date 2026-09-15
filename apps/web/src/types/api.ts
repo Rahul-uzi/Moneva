@@ -80,6 +80,8 @@ export interface Transaction {
   amount_minor: number;
   currency: string;
   description?: string | null;
+  /** The person's own note. Never parsed, categorised or logo-matched. */
+  notes?: string | null;
   transaction_date: string;
   client_mutation_id: string;
   device_id: string;

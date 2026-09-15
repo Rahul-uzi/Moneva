@@ -123,6 +123,16 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             <span className="detail-val">{transaction.description || 'No description provided'}</span>
           </div>
 
+          {/* Only when there is one. An empty "Note" row on every transaction
+              would push the rows that always carry something further down, to
+              say nothing on almost every screen it appeared on. */}
+          {transaction.notes && (
+            <div className="detail-row is-note">
+              <span className="detail-label">Note</span>
+              <span className="detail-val tx-detail-note">{transaction.notes}</span>
+            </div>
+          )}
+
           <div className="detail-row">
             <span className="detail-label">Mutation ID</span>
             <span className="detail-val text-mono">{transaction.client_mutation_id}</span>

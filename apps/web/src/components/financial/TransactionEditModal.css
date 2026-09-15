@@ -13,3 +13,27 @@
 .tx-edit-actions > button {
   flex: 1;
 }
+
+/* A note runs to a sentence or two, so it gets height and wraps. Resize is
+   vertical only: a textarea that can be dragged wider than the sheet it sits
+   in pushes the Save button off the screen on a phone. */
+.tx-edit-notes {
+  min-height: 76px;
+  resize: vertical;
+  line-height: 1.45;
+  font-family: inherit;
+}
+
+.tx-edit-optional {
+  font-weight: 400;
+  opacity: 0.55;
+  font-size: 0.85em;
+  margin-left: 4px;
+}
+
+.tx-edit-note-hint {
+  font-size: 0.78rem;
+  opacity: 0.6;
+  margin-top: 5px;
+  line-height: 1.4;
+}

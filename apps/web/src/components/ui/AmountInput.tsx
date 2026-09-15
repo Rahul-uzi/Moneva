@@ -10,6 +10,15 @@ interface AmountInputProps {
   currencySymbol?: string;
   label?: string;
   error?: string;
+  /**
+   * Whether a minus sign is a legitimate answer here.
+   *
+   * Off by default, because almost every amount in the app is a sum of money
+   * moving and "-200 spent" is meaningless. A BALANCE is the exception: a
+   * credit card or an overdrawn account really does hold less than nothing,
+   * and refusing the minus there makes the correct figure untypeable.
+   */
+  allowNegative?: boolean;
 }
 
 export const AmountInput: React.FC<AmountInputProps> = ({
@@ -18,6 +27,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   currencySymbol = '₹',
   label = 'Amount',
   error,
+  allowNegative = false,
 }) => {
   const [displayVal, setDisplayVal] = useState<string>(() => {
     try {
@@ -75,9 +85,18 @@ export const AmountInput: React.FC<AmountInputProps> = ({
       return;
     }
 
+    // A lone "-" is half-typed, not wrong, and has to be judged BEFORE the
+    // parse: rupeesToPaise throws on it, so leaving this until after would
+    // land in the catch below and accuse the user of a bad amount the instant
+    // they reached for the minus key.
+    if (allowNegative && val.trim() === '-') {
+      setLocalError(null);
+      return;
+    }
+
     try {
       const paise = rupeesToPaise(ungroupDigits(val));
-      if (paise < 0) {
+      if (paise < 0 && !allowNegative) {
         setLocalError('Amount cannot be negative');
       } else {
         setLocalError(null);

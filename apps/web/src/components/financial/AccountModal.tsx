@@ -25,6 +25,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [name, setName] = useState<string>('');
   const [accountType, setAccountType] = useState<'asset' | 'liability'>('asset');
   const [openingBalancePaise, setOpeningBalancePaise] = useState<number>(0);
+  // What the account really holds, for an account that already exists. Kept
+  // apart from the opening balance because they are different questions: the
+  // opening balance is where the ledger starts, this is where it should end.
+  const [currentBalancePaise, setCurrentBalancePaise] = useState<number>(0);
+  const [balanceAtOpen, setBalanceAtOpen] = useState<number>(0);
+  const [balanceNote, setBalanceNote] = useState<string>('');
   // Kept as strings so the fields can be empty. A number state would have to
   // pick a stand-in for "not filled in", and every candidate is a real day.
   const [statementDay, setStatementDay] = useState<string>('');
@@ -41,6 +47,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         setName(accountToEdit.name);
         setAccountType(accountToEdit.account_type);
         setOpeningBalancePaise(accountToEdit.opening_balance_minor || 0);
+        // Remembered as well as shown: the correction is only sent if the
+        // figure actually CHANGED, and without the original there is nothing
+        // to compare against. Reopening the form and saving would otherwise
+        // post a reconcile of zero difference every time.
+        const live = accountToEdit.balance_paise ?? accountToEdit.opening_balance_minor ?? 0;
+        setCurrentBalancePaise(live);
+        setBalanceAtOpen(live);
+        setBalanceNote('');
         setStatementDay(accountToEdit.statement_day ? String(accountToEdit.statement_day) : '');
         setDueDay(accountToEdit.due_day ? String(accountToEdit.due_day) : '');
         setCreditLimitPaise(accountToEdit.credit_limit_minor || 0);
@@ -48,6 +62,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         setName('');
         setAccountType('asset');
         setOpeningBalancePaise(0);
+        setCurrentBalancePaise(0);
+        setBalanceAtOpen(0);
+        setBalanceNote('');
         setStatementDay('');
         setDueDay('');
         setCreditLimitPaise(0);
@@ -99,7 +116,34 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           account_type: accountType,
           ...cardTerms,
         });
-        addToast('Account updated successfully!', 'success');
+
+        /*
+         * The balance is corrected through /reconcile, NOT by writing a new
+         * opening balance. A balance here is derived - the opening figure plus
+         * every transaction - so overwriting it would leave two numbers that
+         * can disagree, and the next transaction would recompute the old one
+         * back. Reconcile writes the difference as a real ledger row instead,
+         * flagged so no budget or category counts it as spending, and the
+         * correction stays visible in history.
+         *
+         * Sent only when the figure actually changed, so simply renaming an
+         * account does not litter the ledger with zero-value corrections.
+         */
+        if (currentBalancePaise !== balanceAtOpen) {
+          const { data } = await apiClient.post<{ message?: string }>(
+            `/accounts/${accountToEdit.id}/reconcile`,
+            {
+              actual_balance_minor: currentBalancePaise,
+              ...(balanceNote.trim() ? { note: balanceNote.trim() } : {}),
+            },
+          );
+          // The server says what it did and by how much - more use than a
+          // generic success, because the size of the drift is the interesting
+          // part of a reconciliation.
+          addToast(data?.message || 'Balance corrected.', 'success');
+        } else {
+          addToast('Account updated successfully!', 'success');
+        }
       } else {
         await apiClient.post<Account>('/accounts', {
           name: name.trim(),
@@ -151,6 +195,36 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             onChangePaise={setOpeningBalancePaise}
             label="Opening / Starting Balance"
           />
+        )}
+
+        {/* Only once the account exists, because before that the opening
+            balance above IS the balance and asking twice would be two ways to
+            set one number. */}
+        {isEditing && (
+          <div className="account-modal-balance">
+            <AmountInput
+              valuePaise={currentBalancePaise}
+              onChangePaise={setCurrentBalancePaise}
+              label="Current balance"
+              // A credit card or an overdrawn account really is below zero.
+              allowNegative
+            />
+            <p className="account-modal-hint">
+              Put in what the account actually holds right now. The difference
+              is added to your history as a correction, so nothing you have
+              already recorded is lost or overwritten.
+            </p>
+            {currentBalancePaise !== balanceAtOpen && (
+              <FormField
+                label="Why? (optional)"
+                type="text"
+                maxLength={140}
+                placeholder="e.g. some cash spends were never recorded"
+                value={balanceNote}
+                onChange={(e) => setBalanceNote(e.target.value)}
+              />
+            )}
+          </div>
         )}
 
         {/* Only for a liability, and optional even then: a loan has no
