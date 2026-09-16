@@ -16,8 +16,8 @@ ext {
      * automatically and nothing updates itself. Raise them here, and the About
      * screen, the crash records and the update check all follow.
      */
-    monevaVersionCode = 10000
-    monevaVersionName = '1.0.0'
+    monevaVersionCode = 10001
+    monevaVersionName = '1.0.1'
 
     minSdkVersion = 24
     compileSdkVersion = 36
