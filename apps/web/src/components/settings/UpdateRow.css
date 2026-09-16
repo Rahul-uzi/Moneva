@@ -1,0 +1,38 @@
+/* The download bar.
+
+   Sits under the explanatory line rather than beside the button, so it can run
+   the full width of the copy - a 40px sliver next to a button reads as
+   decoration, and this one is the only evidence that a slow download is
+   actually moving. */
+.update-row-bar {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.22);
+  overflow: hidden;
+}
+
+.update-row-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent, #C6F432);
+  /* Eased, because progress arrives in jumps - a 3 MB file over a slow link
+     reports whole percent steps, and an unanimated bar twitches. */
+  transition: width 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-row-bar-fill { transition: none; }
+}
+
+.update-row-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.76rem;
+  opacity: 0.6;
+  line-height: 1.4;
+}

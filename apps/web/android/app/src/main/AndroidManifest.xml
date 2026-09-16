@@ -89,6 +89,16 @@
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Lets the app open Android's installer on an update it has downloaded.
+         It does NOT let the app install anything by itself: the system still
+         shows its own confirmation, and the user taps Install. Without this
+         the only route to a new build is a browser, a downloads folder and a
+         file manager, which is where most people give up.
+
+         Play restricts this permission; MONEVA is installed from its own site,
+         so that policy does not apply here. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Reminders are scheduled as inexact alarms on purpose: a "due today"
          nudge does not need the exact second, and inexact lets Android batch

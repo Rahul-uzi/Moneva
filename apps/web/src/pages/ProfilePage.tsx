@@ -30,6 +30,7 @@ import { categoryIcon } from '../utils/categoryIcons';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
+import { UpdateRow } from '../components/settings/UpdateRow';
 import {
   getStoredThemeMode,
   setThemeMode as persistThemeMode,
@@ -1156,6 +1157,10 @@ export const ProfilePage: React.FC = () => {
           <MonitorSmartphone size={18} className="text-violet" />
           <h2 className="heading-md">Devices &amp; Advanced</h2>
         </div>
+
+        {/* First on this card on purpose: an update changes what every other
+            setting here does, and it is the one row people come looking for. */}
+        <UpdateRow />
 
         {/* Revoke every other session */}
         <div className="security-feature-row">

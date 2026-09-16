@@ -17,6 +17,7 @@ public class MainActivity extends BridgeActivity {
         // there, and anything added afterwards is not in it.
         registerPlugin(NotificationCapturePlugin.class);
         registerPlugin(SmsCapturePlugin.class);
+        registerPlugin(AppUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
         // The listener watchdog. Idempotent, so every launch may call it; the
         // one that matters is the first launch after an update that added it,
