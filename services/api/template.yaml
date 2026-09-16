@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+# The MONEVA API on Lambda.
+#
+# Deploy with:  sam build && sam deploy --guided
+#
+# THREE CHOICES HERE ARE DELIBERATE AND WORTH KNOWING ABOUT.
+#
+# No VPC. A Lambda placed in a VPC has no route to the internet without a NAT
+# gateway, which costs about as much per month as everything else here put
+# together, and this function needs the internet: it calls the mail relay and
+# the Gemini API. Staying out of a VPC keeps that free, and means the database
+# must be reachable over the public internet - a serverless Postgres with a
+# pooled endpoint, or RDS with public access and tight security groups.
+#
+# A Function URL, not API Gateway. The app already handles its own CORS, auth
+# and routing, so API Gateway would be a second router in front of the one that
+# already works, at its own per-request cost. A Function URL gives an HTTPS
+# endpoint and nothing else, which is what is wanted. API Gateway earns its
+# place when you want WAF, usage plans or a custom domain with mTLS.
+#
+# A short timeout. Lambda bills by the millisecond, so a request that hangs is
+# a request that costs. Twenty seconds is generous for this API and short
+# enough that a stuck outbound call is cut off rather than billed for.
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: >-
+      Postgres URL, async driver, POOLED endpoint.
+      postgresql+asyncpg://user:pass@host/db
+      Must be pooled: each execution environment holds up to ten connections of
+      its own, so fifty concurrent Lambdas is five hundred against the server.
+  JwtSecret:
+    Type: String
+    NoEcho: true
+  MailRelayUrl:
+    Type: String
+    Default: ''
+    Description: >-
+      HTTPS mail relay. Strongly preferred over SMTP here: Starlette awaits
+      background tasks inside the ASGI call, so on Lambda the caller waits for
+      the send, and a blocked SMTP socket hangs for ~20s before failing.
+  MailRelayToken:
+    Type: String
+    NoEcho: true
+    Default: ''
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+Globals:
+  Function:
+    Timeout: 20
+    # 1024 MB is not about memory. Lambda scales CPU with memory, and this
+    # function's slowest moment is bcrypt on a login - which is CPU, by design.
+    # At 512 MB a sign-in is noticeably slower for no saving, because the
+    # billed millisecond count rises as fast as the price per millisecond falls.
+    MemorySize: 1024
+    Architectures: [arm64]   # Cheaper per millisecond, and every wheel here has one.
+
+Resources:
+  MonevaApi:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: Dockerfile.lambda
+      DockerContext: .
+      DockerTag: latest
+    Properties:
+      PackageType: Image
+      FunctionUrlConfig:
+        AuthType: NONE          # The app authenticates; the URL is the front door.
+      Environment:
+        Variables:
+          DATABASE_URL: !Ref DatabaseUrl
+          JWT_SECRET: !Ref JwtSecret
+          MAIL_RELAY_URL: !Ref MailRelayUrl
+          MAIL_RELAY_TOKEN: !Ref MailRelayToken
+          GEMINI_API_KEY: !Ref GeminiApiKey
+          ENVIRONMENT: production
+      # A ceiling on concurrency, which is really a ceiling on DATABASE
+      # CONNECTIONS. Without it, a burst of traffic scales Lambda out until
+      # Postgres refuses connections, and the failure looks like a database
+      # outage rather than what it is.
+      ReservedConcurrentExecutions: 20
+
+Outputs:
+  ApiUrl:
+    Description: Point VITE_API_URL at this.
+    Value: !GetAtt MonevaApiUrl.FunctionUrl
