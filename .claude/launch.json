@@ -4,7 +4,7 @@
     {
       "name": "moneva-site",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve", "site", "--listen", "4173", "--no-clipboard"],
+      "runtimeArgs": ["--yes", "serve", "website", "--listen", "4173", "--no-clipboard"],
       "port": 4173
     }
   ]

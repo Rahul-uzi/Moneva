@@ -30,7 +30,7 @@ once you know them — `APK · v1.0.0 · 14 MB · Android 8.0+` reads well.
 ## Running it locally
 
 ```bash
-npx serve site
+npx serve website
 ```
 
 Or just open `index.html` in a browser — it needs no server.
@@ -42,17 +42,29 @@ Pages, or the same box as the API. The only external requests the page makes
 are to Google Fonts for Manrope and JetBrains Mono, and both have local
 fallbacks declared, so it still reads correctly if those are blocked.
 
-## Building it
+## Editing it
 
-`index.html` is generated, not hand-edited. The sources live in the session
-scratchpad and are stitched together by `build.mjs`, which also inlines the
-font and the brand logos as base64 and runs seven structural guards (one of
-which exists because a part file once closed `</style>` early and dumped the
-whole phone stylesheet onto the page as visible text — tag *counts* balanced
-perfectly, so the guards check *order*).
+`index.html` **is** the source — edit it directly. It was originally stitched
+together from part files by a `build.mjs`, but those lived in a temporary
+session directory and are gone. Nothing depends on them, nothing reads them at
+build or serve time, and there is no step to reinstate: the file in this folder
+is complete and self-contained.
 
-If you want to edit the page from here on, edit `index.html` directly; it is
-self-contained and the build script is no longer needed.
+It is roughly 4,100 lines in a fixed order, so search rather than scroll:
+
+| Lines | What |
+| --- | --- |
+| 13–2107 | One `<style>` block — tokens, type scale, layout, every component |
+| 2108–2839 | The markup, top to bottom |
+| 2840–2841 | GSAP and ScrollTrigger from cdnjs |
+| 2843–3257 | Site behaviour — theme, reveals, counters, the footer scrub |
+| 3258–4106 | The phone-frame demo app, running on invented figures |
+
+Every section of the markup is preceded by a banner comment in capitals
+(`NAV`, `HERO`, `01 — EXACTNESS`, `02 — THE APP, RUNNING`, … `FOOTER`), and the
+less obvious decisions carry a comment explaining why they are the way they
+are. Those comments are load-bearing — a few of them record bugs that took a
+while to find. Please keep them with the code they explain.
 
 ## Typography
 
