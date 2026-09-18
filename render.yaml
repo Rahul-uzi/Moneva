@@ -118,3 +118,33 @@ services:
       # Leave it blank and the assistant falls back to the rule engine.
       - key: GEMINI_API_KEY
         sync: false
+
+      # ------------------------------------------------------------------
+      # WHAT THE APP IS TOLD WHEN IT CHECKS FOR AN UPDATE.
+      #
+      # These four are why an audit found 1.0.2 invisible to every existing
+      # user: the APK was built, signed, published and reachable, and nothing
+      # pointed at it. /app/version reads these env vars and nothing else, so
+      # unset means it answers version_code 0 - which the client is required to
+      # read as "no release exists" and treat as silence.
+      #
+      # Nothing fails when they are missing. The server returns 200, the app
+      # says "you are up to date", and the only symptom is a prompt that never
+      # appears. That is exactly how the step got skipped, so it is declared
+      # here: Render shows a `sync: false` key as required on the service, and
+      # scripts/release.mjs prints the values to paste after every build.
+      #
+      # RAISE ALL FOUR TOGETHER, and use the Cloudflare URL - the GitHub
+      # release asset 404s for anyone once the repository is private, and the
+      # app would fail mid-download.
+      # ------------------------------------------------------------------
+      - key: LATEST_VERSION_CODE
+        sync: false        # 10002 - MAJOR*10000 + MINOR*100 + PATCH
+      - key: LATEST_VERSION_NAME
+        sync: false        # 1.0.2 - must match the versionCode above
+      - key: APK_DOWNLOAD_URL
+        sync: false        # https://moneva.monev.workers.dev/downloads/moneva-1.0.2.apk
+      - key: LATEST_RELEASE_NOTES
+        sync: false        # one line; it is what makes someone take the update
+      - key: LATEST_VERSION_MANDATORY
+        sync: false        # "true" only when an older build is genuinely unsafe

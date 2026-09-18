@@ -48,11 +48,11 @@ apps belong here.
 The form does not take the APK. It takes **the SHA-256 of an APK that has been
 uploaded to VirusTotal**, so that has to happen first.
 
-1. Go to https://www.virustotal.com and upload `moneva-1.0.1.apk`
+1. Go to https://www.virustotal.com and upload `moneva-1.0.2.apk`
 2. Let the scan finish and keep the page
 3. The hash VirusTotal reports must match the file you are shipping:
 
-   `03EB7EB09BF6AFFCE7279D46D4ED1317918C8DBC0F06D29F8AFD553FCECAA63F`
+   `ce57ab4ec99e1d5cdfa2b616fe86da2a030aaf9be4192cfa149410b729b530df`
 
    If it does not, you uploaded a different build than the one on the site.
 
@@ -168,7 +168,7 @@ Install Android platform-tools, then:
 
 ```bash
 adb devices                          # confirm the phone is listed as "device"
-adb install -r moneva-1.0.1.apk      # -r replaces an existing install
+adb install -r moneva-1.0.2.apk      # -r replaces an existing install
 ```
 
 `Success` is the whole output on a good run.

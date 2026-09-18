@@ -11,10 +11,23 @@
   # download that installs and one that appears to have gone nowhere.
   Content-Type: application/vnd.android.package-archive
 
-  # A versioned filename never changes contents, so it can be cached hard. A
-  # new release is a new name, which is the whole reason for putting the
-  # version in it.
-  Cache-Control: public, max-age=31536000, immutable
+  # An hour, NOT a year - and the reasoning is the opposite of what it looks
+  # like.
+  #
+  # A versioned filename never changes, so `max-age=31536000, immutable` is
+  # correct for the FILE. It was set that way, and an audit found what it also
+  # does: these headers are matched on the PATH, not the status, so a 404 under
+  # this prefix is served with a year-long immutable cache too. Ask for
+  # /downloads/moneva-1.0.3.apk an hour before that build is uploaded - a
+  # crawler, a mistyped link, someone guessing the next version - and caches
+  # may keep answering Not Found for a year after the file exists. Verified at
+  # the edge: the 404 really did carry it.
+  #
+  # The long cache was buying almost nothing anyway. An APK is downloaded once
+  # per person; nobody re-fetches it, so there is no repeat traffic to save.
+  # A poisoned 404 on a release nobody can download is a far worse trade than
+  # a cache miss on a 2.8 MB file.
+  Cache-Control: public, max-age=3600
 
 /*
   # Do not let a browser guess a type it was not given. The APK above is the

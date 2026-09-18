@@ -41,6 +41,18 @@ _load_dotenv()
 
 class Settings(BaseModel):
     PROJECT_NAME: str = "MONEVA API"
+
+    #: THE API's OWN VERSION, not the Android app's.
+    #:
+    #: These are separate artefacts and may legitimately differ - the app is at
+    #: 1.0.2 while this has not moved since the first commit, which is fine,
+    #: because nothing about the app requires the API to be re-versioned.
+    #:
+    #: It is called out because an audit flagged it as drift, and because
+    #: /api/health returns it under the bare key "version", which anybody would
+    #: reasonably read as the app's. Renaming that key would break whatever
+    #: polls the endpoint, so the ambiguity is documented rather than changed.
+    #: Raise this when the API's own contract changes - not when the app ships.
     VERSION: str = "1.0.0"
     API_PREFIX: str = "/api"
 
