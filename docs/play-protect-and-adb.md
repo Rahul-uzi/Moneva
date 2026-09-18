@@ -282,17 +282,55 @@ reads v2/v3/v4. An AAB genuinely is jar-signed, so that one goes to jarsigner.
 The release script had this backwards at first and would have failed every
 release for a reason that was not real.
 
-### What the bundle actually saves here: 14%
+### What the bundle costs here: 25% MORE, measured on a real phone
 
-| | |
+Corrected. An earlier figure here claimed a 14% saving, taken from
+`base-master.apk` in a universal build. That was the wrong split: a bundle
+contains **two** master variants for different SDK levels, and a modern phone
+gets the larger one.
+
+Asked with `--connected-device`, which queries the phone rather than guessing:
+
+```bash
+bundletool build-apks --bundle=app-release.aab --connected-device ...
+```
+
+| What the Samsung A33 receives | |
 |---|---|
-| Single APK the site serves | 2.78 MB |
-| What one phone downloads from Play | **2.38 MB** (master 2.26 MB + xxhdpi 81 KB + English 40 KB) |
+| `base-master_2.apk` | 3,432 KB |
+| `base-xxhdpi.apk` | 81 KB |
+| `base-en.apk` | 40 KB |
+| **total** | **3.47 MB** |
+| the single APK the site serves | **2.78 MB** |
 
-Worth knowing before treating App Bundles as a large win for this app. The
-saving is small because most of MONEVA's weight is the compiled web bundle in
-`assets/`, which is identical on every device - there is nothing to split.
-Bundles pay off for apps carrying native libraries per architecture and large
-per-density image sets, and MONEVA carries neither.
+So on this device the split delivery is **larger**, not smaller. Play applies
+further compression on its own servers, so what a user actually downloads is
+not exactly this number - but nothing here supports the claim that a bundle
+makes MONEVA smaller.
 
-So the bundle is worth having ready for Play, and is not a reason to go there.
+The reason is the same one that made the earlier estimate wrong to begin with:
+most of MONEVA's weight is the compiled web bundle in `assets/`, identical on
+every device and impossible to split. Bundles pay off for native libraries per
+architecture and large per-density image sets. MONEVA has neither.
+
+**The bundle is worth having ready for Play. It is not a size argument.**
+
+### Proven on the device
+
+Not just built - installed:
+
+```bash
+bundletool install-apks --apks=device.apks
+```
+
+The phone then reports:
+
+```
+splits=[base, config.en, config.xxhdpi]
+```
+
+Which is the point. The app is no longer a single APK on that device; it is
+the split set Play delivers, and it launches clean with no missing-split
+error. That is the difference between "the bundle builds" and "Play could
+actually ship this".
+

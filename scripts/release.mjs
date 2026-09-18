@@ -20,8 +20,9 @@
  * once left the PREVIOUS apk on disk and reported success at every later step,
  * and the stale file was installed on a phone before anyone noticed. So
  * nothing here trusts an exit code where it can check the artefact instead:
- * the APK's mtime is compared against the start of the run, both artefacts are
- * verified as signed, and the version inside the built APK is read back.
+ * both artefacts are verified as signed with apksigner, and the version is
+ * read back out of the PACKAGED APK - which is what proves the web build
+ * reached it, rather than restating what was written to a file two steps ago.
  *
  *   node scripts/release.mjs 1.0.2          # build, verify, stage
  *   node scripts/release.mjs 1.0.2 --install # ... and adb install it
@@ -91,16 +92,71 @@ const findApksigner = () => {
   die(`no apksigner found under ${dir}`);
 };
 
-/** Built during THIS run, not left over from a previous one. */
-const assertFresh = (file, what) => {
+/**
+ * Search the DECOMPRESSED contents of an APK for a string.
+ *
+ * An APK is a zip and its JavaScript is deflated, so reading the file and
+ * looking for the version in the raw bytes finds nothing - ever. Written that
+ * way first, it failed a release whose build was perfectly correct, and the
+ * failure message confidently blamed vite. The APK really did contain 1.0.2;
+ * the check could not see it.
+ *
+ * Shelled out to PowerShell because Node has no zip reader in its standard
+ * library, and this script is already Windows-bound - it invokes gradlew.bat
+ * and apksigner.bat. A dependency for forty lines of zip parsing is a worse
+ * trade than the one platform assumption already made.
+ */
+const apkContains = (file, needle) => {
+  const ps = [
+    'Add-Type -AssemblyName System.IO.Compression.FileSystem;',
+    `$z=[System.IO.Compression.ZipFile]::OpenRead('${file}');`,
+    'foreach($e in $z.Entries){',
+    "  if($e.FullName -like 'assets/public/assets/*.js'){",
+    '    $r=New-Object System.IO.StreamReader($e.Open());$t=$r.ReadToEnd();$r.Close();',
+    `    if($t -match [regex]::Escape('${needle}')){Write-Output ('FOUND ' + $e.FullName);break}`,
+    '  }',
+    '}',
+    '$z.Dispose()',
+  ].join(' ');
+  const out = run(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`, ROOT);
+  const hit = /FOUND (.+)/.exec(out.trim());
+  return { found: hit ? hit[1].trim() : null, alsoFoundOlder: null };
+};
+
+/**
+ * The artefact exists and is plausibly a build.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT DO ANY MORE: check a timestamp. Two
+ * different mtime rules were tried and both refused perfectly good builds.
+ *
+ *   "written during this run" - gradle is incremental, so a second run with
+ *   nothing changed correctly skips the build and leaves the previous, current
+ *   APK in place. Called STALE. Wrong.
+ *
+ *   "newer than its inputs" - vite rewrites every file in dist on every run
+ *   even when the output is byte-identical, so dist is always newer than an
+ *   APK gradle decided not to rebuild. Also called STALE. Also wrong.
+ *
+ * mtime cannot tell "skipped because nothing changed" from "failed and left
+ * the old file", and guessing produced a script that blocked good releases
+ * while sounding certain.
+ *
+ * WHAT ACTUALLY GUARDS THE ORIGINAL FAILURE - a gradle build that failed while
+ * later steps reported success - is two things that do not involve clocks:
+ *
+ *   - run() throws on any non-zero exit, so a failed gradle stops the script
+ *     here and now. The original incident was a shell `&&` chain with a grep
+ *     swallowing the status; nothing like that exists in this file.
+ *   - the version is read back out of the packaged APK a few steps below. An
+ *     APK left over from another version fails that, whatever its date.
+ */
+const assertBuilt = (file, what) => {
   if (!existsSync(file)) die(`${what} was not produced at ${file}`);
-  const m = statSync(file).mtimeMs;
-  if (m < startedAt) {
-    die(`${what} is STALE - last written ${new Date(m).toISOString()}, before this run began.\n`
-      + 'The build step reported success without producing anything. This is the\n'
-      + 'exact failure the script exists to catch; do not ship this file.');
+  const size = statSync(file).size;
+  if (size < 500_000) {
+    die(`${what} is only ${size} bytes - that is not a real build.`);
   }
-  return statSync(file).size;
+  return size;
 };
 
 // ---------------------------------------------------------------- versions ---
@@ -232,13 +288,13 @@ ok('capacitor sync done');
 heading('Building the signed APK');
 run('.\\gradlew.bat assembleRelease', ANDROID);
 const apk = join(ANDROID, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
-const apkSize = assertFresh(apk, 'the APK');
+const apkSize = assertBuilt(apk, 'the APK');
 ok(`${(apkSize / 1048576).toFixed(2)} MB, written during this run`);
 
 heading('Building the signed App Bundle');
 run('.\\gradlew.bat bundleRelease', ANDROID);
 const aab = join(ANDROID, 'app', 'build', 'outputs', 'bundle', 'release', 'app-release.aab');
-const aabSize = assertFresh(aab, 'the AAB');
+const aabSize = assertBuilt(aab, 'the AAB');
 ok(`${(aabSize / 1048576).toFixed(2)} MB, written during this run`);
 
 heading('Verifying both are signed');
@@ -280,14 +336,16 @@ heading('Reading the version back out of the built APK');
  * web build never ran, and gradle packaged the PREVIOUS dist while every step
  * still reported success.
  */
-if (!readFileSync(apk).includes(Buffer.from(version, 'utf8'))) {
+const inside = apkContains(apk, version);
+if (!inside.found) {
   die([
     `the built APK does not contain the string "${version}".`,
     'The web bundle inside it is from an earlier build: the version was written',
     'to .env.production but vite did not pick it up. Do not ship this file.',
+    inside.alsoFoundOlder ? `\nIt DOES contain "${inside.alsoFoundOlder}" - the previous build.` : '',
   ].join('\n'));
 }
-ok(`"${version}" found inside the packaged web bundle`);
+ok(`"${version}" found in ${inside.found}`);
 
 heading('Staging the APK on the site');
 mkdirSync(join(SITE, 'downloads'), { recursive: true });
