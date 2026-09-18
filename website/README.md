@@ -4,28 +4,38 @@ A single self-contained page introducing the app. No build step, no
 dependencies, no framework: `index.html` holds its own CSS and JavaScript, so
 it can be dropped on any static host as-is.
 
-## Before you publish it
+## Releasing a new version
 
-**Point the download button at a real APK.** Three links in `index.html` share
-the same href:
+The APK lives at `downloads/moneva-1.0.1.apk` and **four** links in
+`index.html` point at it — header, hero, final call to action, and footer.
+Search for `APK LINK`; the comment marks the first.
 
-```
-downloads/moneva-v1.0.0.apk
-```
+Shipping a new build is three edits and they must go together:
 
-Either put the APK at that path next to `index.html`, or replace all three with
-an absolute URL (a GitHub Releases asset works well):
+1. Copy the signed APK to `downloads/moneva-<version>.apk`
+2. Update all four hrefs — miss one and the footer quietly serves the old build
+3. Update the spec line near the final call to action:
+   `APK · v1.0.1 · 2.8 MB · Android 7.0+`
 
-```bash
-sed -i 's|downloads/moneva-v1.0.0.apk|https://github.com/Rahul-uzi/Moneva/releases/download/v1.0.0/moneva.apk|g' index.html
-```
+The filename carries the version deliberately. `app.apk` in somebody's
+downloads folder is indistinguishable from every other build they have had, and
+when they report a bug there is no way to tell which one they are running.
 
-Search for `APK LINK` in the file — the comment marks the first one.
+Then delete the previous APK, or the repository grows by ~3 MB per release for
+ever — git keeps every version of a binary it has ever seen.
 
-**Optional, in the hero and footer spec lines:** the file size and the minimum
-Android version are not stated, because neither is recorded anywhere in this
-repo (`apps/web/android/` is gitignored). Add them to the `.spec` paragraphs
-once you know them — `APK · v1.0.0 · 14 MB · Android 8.0+` reads well.
+The figures above are measured, not estimated: 2,912,860 bytes, and `minSdk 24`
+in `apps/web/android/variables.gradle`, which is Android 7.0.
+
+### Serving the APK correctly
+
+`_headers` sets `Content-Type: application/vnd.android.package-archive` on
+`/downloads/*.apk`. Without it the file is served as `octet-stream`, and some
+Android browsers then offer a list of apps to open it with rather than the
+package installer — the download completes and appears to have gone nowhere.
+
+Cloudflare Pages and Netlify both read that file. Any other host needs the same
+type set its own way.
 
 ## Running it locally
 

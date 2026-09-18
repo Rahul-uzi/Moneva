@@ -1,0 +1,33 @@
+# Response headers for Cloudflare Pages.
+#
+# Pages reads this file at the root of the published directory. Netlify uses
+# the same format, so the site stays portable between the two.
+
+/downloads/*.apk
+  # Without this the APK is served as application/octet-stream, and some
+  # Android browsers then treat it as a file of unknown type: the download
+  # completes, but tapping it offers a list of apps to open it with instead of
+  # the package installer. Stating the type is the difference between a
+  # download that installs and one that appears to have gone nowhere.
+  Content-Type: application/vnd.android.package-archive
+
+  # A versioned filename never changes contents, so it can be cached hard. A
+  # new release is a new name, which is the whole reason for putting the
+  # version in it.
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  # Do not let a browser guess a type it was not given. The APK above is the
+  # one thing here whose type must be taken literally.
+  X-Content-Type-Options: nosniff
+
+  # The page is meant to be read, not framed inside somebody else's site.
+  X-Frame-Options: DENY
+
+  # Send the origin to other sites, never the full path.
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/index.html
+  # The page changes with every release; the APK it points at does not. A
+  # cached index would offer an old download long after a new one shipped.
+  Cache-Control: public, max-age=0, must-revalidate
