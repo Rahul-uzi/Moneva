@@ -6,6 +6,31 @@
 <title>MONEVA — Money, to the paise</title>
 <meta name="description" content="An offline-first personal finance tracker that never rounds your money. Exact to the paise, balances computed from the ledger, and payment alerts read for you. Android.">
 <meta name="theme-color" content="#0A0B0D">
+
+<!-- WHERE THIS PAGE LIVES.
+     canonical stops the same page being indexed under several addresses -
+     with a custom domain later, the workers.dev URL and the domain would
+     otherwise compete as two separate pages with identical content.
+
+     The og: block is what draws the preview card when somebody shares the
+     link. Without it WhatsApp, Slack and X show a bare URL, and this app is
+     going to spread mostly by one person sending the link to another - so a
+     card that says what MONEVA is does more here than on most sites.
+
+     No og:image yet: a card image wants to be 1200x630, and the only images
+     in the repo are tall phone screenshots that crop badly at that ratio.
+     A text card is still far better than none; add the image when one exists.
+
+     UPDATE ALL THREE URLS TOGETHER when the domain changes. -->
+<link rel="canonical" href="https://moneva.monev.workers.dev/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://moneva.monev.workers.dev/">
+<meta property="og:site_name" content="MONEVA">
+<meta property="og:title" content="MONEVA — Money, to the paise">
+<meta property="og:description" content="An offline-first personal finance tracker that never rounds your money. Exact to the paise, balances computed from the ledger, and payment alerts read for you. Android.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="MONEVA — Money, to the paise">
+<meta name="twitter:description" content="An offline-first personal finance tracker that never rounds your money. Exact to the paise, and payment alerts read for you. Android.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23CDFF4A'/%3E%3Cpath d='M5 22.5 11 12l5 6.5L21 8l6 14.5' fill='none' stroke='%2310130A' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

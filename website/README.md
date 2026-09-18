@@ -47,10 +47,24 @@ Or just open `index.html` in a browser — it needs no server.
 
 ## Deploying
 
-Any static host serves it unchanged. GitHub Pages, Netlify drop, Cloudflare
-Pages, or the same box as the API. The only external requests the page makes
-are to Google Fonts for Manrope and JetBrains Mono, and both have local
-fallbacks declared, so it still reads correctly if those are blocked.
+**Live at https://moneva.monev.workers.dev/**
+
+Cloudflare Workers, deployed from `main` by the `wrangler.jsonc` at the repo
+root - an assets-only Worker pointed at this folder, so there is no build step
+and every push redeploys within a minute.
+
+The URL is `<worker>.<account-subdomain>.workers.dev`. Both halves are
+Cloudflare settings, not repository ones, so changing either means updating the
+three URLs in `index.html` (canonical, og:url) and this line by hand. Nothing
+reads them automatically.
+
+When a custom domain is attached, update those and `APK_DOWNLOAD_URL` on
+Render - the app checks that one endpoint for updates and never looks at this
+site, so a new domain here reaches nobody until Render is told.
+
+Any other static host serves the page unchanged. The only external requests it
+makes are to Google Fonts, and both faces have local fallbacks declared, so it
+still reads correctly if those are blocked.
 
 ## Editing it
 
