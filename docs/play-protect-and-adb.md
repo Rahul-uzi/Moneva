@@ -34,21 +34,75 @@ in the manifest.
 
 ## 1. Appeal to Google
 
-Google reviews apps distributed **outside** the Play Store and will clear a
-false positive. Search the current Play Protect developer documentation for the
-appeal form rather than following a link from here; the URL moves.
+**The form:** https://support.google.com/googleplay/android-developer/contact/protectappeals
 
-### Have these ready
+Reached from Google's own developer guidance at
+https://developers.google.com/android/play-protect/warning-dev-guidance,
+which says plainly that apps already ON Google Play use the separate
+"removed from Google Play" appeal, and that this form handles Play Protect
+classification appeals **regardless of how the app is distributed**. Sideloaded
+apps belong here.
 
-| | |
+### Before you open the form: upload to VirusTotal
+
+The form does not take the APK. It takes **the SHA-256 of an APK that has been
+uploaded to VirusTotal**, so that has to happen first.
+
+1. Go to https://www.virustotal.com and upload `moneva-1.0.1.apk`
+2. Let the scan finish and keep the page
+3. The hash VirusTotal reports must match the file you are shipping:
+
+   `03EB7EB09BF6AFFCE7279D46D4ED1317918C8DBC0F06D29F8AFD553FCECAA63F`
+
+   If it does not, you uploaded a different build than the one on the site.
+
+A clean VirusTotal result is itself part of the argument, so link it in the
+free-text field.
+
+### The five fields
+
+| Field | What to put |
 |---|---|
-| Package name | `com.moneva.app` |
-| Version | 1.0.1 (versionCode 10001) |
-| Download URL | the live site's `/downloads/moneva-1.0.1.apk` |
-| SHA-256 | `03EB7EB09BF6AFFCE7279D46D4ED1317918C8DBC0F06D29F8AFD553FCECAA63F` |
-| Source | https://github.com/Rahul-uzi/Moneva — public, which is unusual for an appeal and worth pointing at |
+| Email address | one you will keep — but see the warning below |
+| Developer name | as it appears on the site and in the keystore: MONEVA |
+| Application package name | `com.moneva.app` |
+| SHA-256 hash | the VirusTotal one above |
+| Additional information | the justification below |
 
-### Draft justification
+### Expect no reply
+
+The form states outright: **"All appeal decisions are final and you will not
+receive a response."** Google also says it will not advise on how to comply in
+future.
+
+So there is no ticket to chase and no outcome to wait for. The only way to
+learn whether it worked is to try installing from the site again after some
+days and see whether the warning still appears. Do not submit repeatedly
+hoping for an answer; there is nobody at the other end of it.
+
+### One thing worth knowing before you spend the effort
+
+The warning you got -
+
+> This app can request access to sensitive data. This can increase the risk of
+> identity theft or financial fraud.
+
+- does **not** appear in Google's published Play Protect warning strings at
+https://developers.google.com/android/play-protect/warning-strings. I checked.
+Nothing in that table matches it, and the SMS-related entry there is about
+billing fraud with entirely different wording.
+
+That suggests this is not a malware classification at all but a blanket,
+permission-based block on sideloaded apps requesting SMS access in certain
+countries, India among them. If so, an appeal may not move it, because there is
+no misclassification to correct - the block is doing exactly what it was built
+to do.
+
+It costs an hour to find out, and the alternative costs a feature, so it is
+still worth filing. But file it with that expectation rather than treating it
+as the plan.
+
+### The justification
 
 Every claim below is checkable against the repository. Do not soften them into
 vaguer language; the specifics are what make the appeal answerable.
@@ -63,15 +117,15 @@ vaguer language; the specifics are what make the appeal answerable.
 > is stored: `PaymentNotificationFilter.NEVER_A_PAYMENT` matches `otp`,
 > `one-time password`, `verification code` and `do not share`, and a message
 > matching any of them is dropped whatever else it contains. Two tests hold
-> that behaviour in place — `aOneTimeCodeIsNeverKept` and
-> `aOneTimeCodeWithAnAccountNumberIsNeverKept` — the second specifically
+> that behaviour in place - `aOneTimeCodeIsNeverKept` and
+> `aOneTimeCodeWithAnAccountNumberIsNeverKept` - the second specifically
 > covering an OTP that also carries an account number and an amount, which is
 > the shape most likely to slip through a naive filter.
 >
 > **A message is only read if it looks machine-written.** An amount alone is
 > not enough: the text must also carry a movement verb, a transaction
 > reference, a masked account number or a running balance. Personal messages
-> are left alone by construction — "₹500 to Karan" from a friend is refused,
+> are left alone by construction - "₹500 to Karan" from a friend is refused,
 > and there is a test asserting exactly that.
 >
 > **The app requests no other sensitive permission.** No contacts, no call log,
@@ -84,15 +138,15 @@ vaguer language; the specifics are what make the appeal answerable.
 > policy.
 >
 > **The source is public**, so every claim here can be checked rather than
-> taken on trust.
+> taken on trust: https://github.com/Rahul-uzi/Moneva
+>
+> A VirusTotal scan of the exact file being distributed is clean: <link>
 
 ### While you wait
 
-The appeal does not block anything else. Publish the install guide (below) so
-people can get past the warning in the meantime, and keep the fingerprint next
-to the download so they can verify the file is genuinely yours.
-
----
+The appeal blocks nothing else. Publish the install guide so people can get
+past the warning meanwhile, and keep the fingerprint next to the download so
+they can verify the file is genuinely yours.
 
 ## 2. Installing with adb
 
@@ -141,3 +195,65 @@ Even once Google clears the app, a sideloaded APK still shows the ordinary
 **"install from unknown sources"** prompt the first time. That one is not a
 warning about MONEVA — it appears for every app installed outside the Play
 Store — and it does not go away short of publishing there.
+
+---
+
+## 3. Play-ready packaging: the App Bundle
+
+Google Play has not accepted plain APKs for new apps since August 2021. It
+takes an **Android App Bundle** (`.aab`), from which Play generates and signs a
+tailored APK per device — smaller downloads, because a phone is not sent the
+resources of three screen densities it does not have.
+
+```bash
+cd apps/web/android
+./gradlew bundleRelease
+# -> app/build/outputs/bundle/release/app-release.aab
+```
+
+The same `signingConfig` applies, so it comes out signed with the release
+keystore. Verified:
+
+```
+jarsigner -verify app-release.aab
+  Signed by "CN=MONEVA, OU=Development, O=MONEVA, L=Ludhiana, ST=Punjab, C=IN"
+  jar verified.
+```
+
+### An .aab cannot be installed
+
+This is the part that surprises people. `adb install` will not take one, and
+neither will a phone — it is an upload format, not an install format. The APK
+stays the thing people download from the site; the bundle exists only for Play.
+
+To test what Play *would* generate, use Google's `bundletool`:
+
+```bash
+bundletool build-apks --bundle=app-release.aab --output=moneva.apks \
+  --ks=moneva-release.jks --ks-key-alias=<alias>
+bundletool install-apks --apks=moneva.apks
+```
+
+### If you do go to Play
+
+The bundle is ready, but the SMS permissions are the obstacle there too, and a
+harder one than Play Protect: Play's policy restricts `READ_SMS` to apps whose
+**core function** requires it, with a declaration form and review. A budgeting
+app that reads transaction alerts is a plausible case and not a certain one.
+
+Worth knowing before that effort: Play publication would also **replace the
+in-app updater**, since Play handles updates itself — so the update button, the
+`/app/version` endpoint and `APK_DOWNLOAD_URL` all become redundant for anyone
+who installed from the store, while still being needed for anyone who installed
+from the site. Two update paths for one app is a real maintenance cost.
+
+### Sizes, for reference
+
+| Artifact | Size | Purpose |
+|---|---|---|
+| `app-release.apk` | 2.78 MB | what the site serves, what people install |
+| `app-release.aab` | 3.75 MB | Play upload only; Play splits it per device |
+
+The bundle is larger because it carries every density and architecture
+together. What a phone actually downloads from Play would be smaller than the
+APK, not bigger.
