@@ -257,3 +257,42 @@ from the site. Two update paths for one app is a real maintenance cost.
 The bundle is larger because it carries every density and architecture
 together. What a phone actually downloads from Play would be smaller than the
 APK, not bigger.
+
+### Verified with bundletool
+
+The bundle was not just built, it was put through Google's own `bundletool`
+(1.18.3) to confirm Play could actually split it - because "it built and it is
+signed" and "Play can use it" are different claims, and the second is the one
+that matters.
+
+```bash
+java -jar bundletool.jar build-apks --bundle=app-release.aab \
+  --output=moneva.apks --ks=<keystore> --ks-key-alias=<alias>
+```
+
+**83 split APKs.** Every split carries the real release certificate -
+`CN=MONEVA, OU=Development, O=MONEVA, L=Ludhiana` - checked with `apksigner`,
+the same certificate as the APK the site serves.
+
+A note that cost half an hour: **`jarsigner` reports the release APK as "jar is
+unsigned", and that is correct and fine.** jarsigner reads v1 (JAR) signatures
+only, and `build.gradle` sets `enableV1Signing false` deliberately, because v1
+is needed below API 24 and this app requires 24. Use `apksigner` for an APK; it
+reads v2/v3/v4. An AAB genuinely is jar-signed, so that one goes to jarsigner.
+The release script had this backwards at first and would have failed every
+release for a reason that was not real.
+
+### What the bundle actually saves here: 14%
+
+| | |
+|---|---|
+| Single APK the site serves | 2.78 MB |
+| What one phone downloads from Play | **2.38 MB** (master 2.26 MB + xxhdpi 81 KB + English 40 KB) |
+
+Worth knowing before treating App Bundles as a large win for this app. The
+saving is small because most of MONEVA's weight is the compiled web bundle in
+`assets/`, which is identical on every device - there is nothing to split.
+Bundles pay off for apps carrying native libraries per architecture and large
+per-density image sets, and MONEVA carries neither.
+
+So the bundle is worth having ready for Play, and is not a reason to go there.
