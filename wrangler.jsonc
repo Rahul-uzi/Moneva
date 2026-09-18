@@ -1,0 +1,37 @@
+{
+  // Cloudflare deployment for the MONEVA landing site.
+  //
+  // This is an ASSETS-ONLY Worker: there is no `main` script, because there is
+  // no server-side code to run. Cloudflare serves the files in ./website
+  // directly from its edge, which is what a single self-contained index.html
+  // wants and costs nothing - static asset requests are not billed against the
+  // Workers request allowance.
+  //
+  // It exists because the dashboard's Workers flow deploys with
+  // `npx wrangler deploy`, and that command reads this file to learn what to
+  // deploy. Without it the deploy fails with nothing to publish. (The older
+  // Pages flow asked for an output directory in the form instead; this is the
+  // same answer, written down in the repository where it can be reviewed.)
+  "name": "moneva",
+  "compatibility_date": "2025-01-01",
+
+  "assets": {
+    "directory": "./website",
+
+    // Serve /index.html at /, and return a real 404 for anything else rather
+    // than the index page. The site is one page with in-page anchors, so a
+    // catch-all would answer every mistyped URL with a 200 and hide broken
+    // links - including a wrong APK path, which is the one link here that
+    // matters most.
+    "not_found_handling": "404-page"
+  },
+
+  // Cloudflare reads website/_headers from the assets directory, which is what
+  // sets Content-Type: application/vnd.android.package-archive on the APK.
+  // Without that header some Android browsers offer a list of apps to open the
+  // download with rather than the package installer.
+
+  "observability": {
+    "enabled": true
+  }
+}
