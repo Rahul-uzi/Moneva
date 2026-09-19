@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One page, so this is nearly ceremony. It earns its place for one reason:
+  Search Console accepts a sitemap as a submission, and submitting one is the
+  fastest route into the index for a site nobody links to yet. Waiting to be
+  discovered is the alternative, and that can take weeks.
+
+  No <lastmod>. A date nobody updates is worse than none - Google ignores
+  lastmod values it finds unreliable, and a stale one here would be exactly
+  that. If this site ever grows past one page, generate this file in
+  scripts/release.mjs rather than hand-editing it.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://moneva.monev.workers.dev/</loc>
+    <changefreq>monthly</changefreq>
+  </url>
+</urlset>

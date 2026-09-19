@@ -1,0 +1,20 @@
+# MONEVA - the landing page for the Android app.
+#
+# Without this file Cloudflare serves a generated one: the Content Signals
+# Policy preamble. That text is comments only - it declares no rule in either
+# direction - so nothing is given up by replacing it, and this adds the two
+# things a generated file cannot know: what to skip, and where the sitemap is.
+#
+# It deliberately does NOT declare AI content signals. Cloudflare's default
+# declared none either, and whether to allow ai-train / ai-input is a decision
+# about this content, not a technical default to inherit.
+
+User-agent: *
+Allow: /
+
+# The APK is for people, not crawlers. Indexing a 2.8 MB binary spends crawl
+# budget on something no search result should ever be, and can surface a bare
+# download link with no page around it to explain what is being installed.
+Disallow: /downloads/
+
+Sitemap: https://moneva.monev.workers.dev/sitemap.xml
