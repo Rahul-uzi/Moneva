@@ -31,10 +31,55 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="MONEVA — Money, to the paise">
 <meta name="twitter:description" content="An offline-first personal finance tracker that never rounds your money. Exact to the paise, and payment alerts read for you. Android.">
+<!-- STRUCTURED DATA.
+     Lighthouse scores SEO 100 without this; the score is a checklist, not a
+     ranking. What this adds is the app-style search result - name, platform,
+     price, category - instead of a plain blue link. Nothing else on the page
+     tells a crawler this is an Android application rather than an article.
+
+     No aggregateRating and no reviewCount. There are no reviews. Inventing
+     them is a manual-action offence with Google and would also just be false.
+
+     softwareVersion, downloadUrl and fileSize are rewritten by
+     scripts/release.mjs on every release, alongside the four download hrefs -
+     see repointSite(). If you change them by hand, change them there too. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "MONEVA",
+  "applicationCategory": "FinanceApplication",
+  "operatingSystem": "Android 7.0+",
+  "url": "https://moneva.monev.workers.dev/",
+  "description": "An offline-first personal finance tracker that never rounds your money. Exact to the paise, balances computed from the ledger, and payment alerts read for you.",
+  "softwareVersion": "1.0.2",
+  "downloadUrl": "https://moneva.monev.workers.dev/downloads/moneva-1.0.2.apk",
+  "fileSize": "2.8 MB",
+  "author": { "@type": "Organization", "name": "MONEVA" },
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "INR",
+    "availability": "https://schema.org/InStock"
+  }
+}
+</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23CDFF4A'/%3E%3Cpath d='M5 22.5 11 12l5 6.5L21 8l6 14.5' fill='none' stroke='%2310130A' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- The font stylesheet was the single render-blocking request on the page:
+     Lighthouse measured 913ms of the 2.8s first paint spent waiting on it.
+
+     media="print" makes the browser fetch it without blocking rendering -
+     it is not a print stylesheet, it just is not one the screen needs yet -
+     and onload promotes it to the real thing the moment it lands. The
+     <noscript> copy keeps the fonts working with JavaScript off.
+
+     display=swap is already in the URL, so text paints in the fallback face
+     immediately either way; this only stops the FIRST paint waiting. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"></noscript>
 <style>
 /* Typefaces are linked, not embedded - see the <link> in the head. */
 
@@ -259,7 +304,7 @@ h3 { font-weight: 800; font-stretch: 112%; letter-spacing: -0.02em; }
 .tile h3, .step h3, .lock b, .scr-btn .t b { font-weight: 800; font-stretch: 110%; }
 
 /* Small uppercase labels take the condensed end. */
-.foot-col h4, .stat .k {
+.foot-col h3, .stat .k {
   font-family: var(--sans);
   font-weight: 700;
   font-stretch: 78%;
@@ -1086,7 +1131,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 .foot-brand { max-width: 300px; }
 .foot-brand p { margin-top: 12px; font-size: 0.82rem; color: var(--ink-3); line-height: 1.6; }
 .foot-cta { margin-top: 20px; }
-.foot-col h4 {
+.foot-col h3 {
   font-size: 0.66rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1339,7 +1384,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
   gap: 10px;
   margin-top: 3px;
 }
-.ap-head h4 { font-size: 19px; font-weight: 800; letter-spacing: -0.025em; }
+.ap-head .ap-h { font-size: 19px; font-weight: 800; letter-spacing: -0.025em; }
 .ap-head span {
   font-size: 11px;
   font-weight: 600;
@@ -1391,7 +1436,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
    for both, the pill drops to a second line rather than either one spilling
    out of the card. */
 .inc-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px; }
-.inc-top h4 { font-size: 16px; font-weight: 700; letter-spacing: -0.025em; margin-right: auto; white-space: nowrap; }
+.inc-top .ap-h { font-size: 16px; font-weight: 700; letter-spacing: -0.025em; margin-right: auto; white-space: nowrap; }
 .inc-top .pill { flex: none; padding: 4px 9px; }
 .pill {
   font-size: 11.5px;
@@ -2168,7 +2213,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
          moneva.apk in somebody's downloads folder is indistinguishable from
          every other build they have ever had, and there is no way to tell
          which one they installed when they report a bug. -->
-    <a class="btn btn-primary btn-sm apk" href="downloads/moneva-1.0.2.apk" download>
+    <a class="btn btn-primary btn-sm apk" href="downloads/moneva-1.0.2.apk" download aria-label="Download MONEVA for Android">
       <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
       <span>Download</span>
     </a>
@@ -2221,7 +2266,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
          so the hero can never drift out of step with it. Inert here. -->
     <div class="hero-art rv" style="--d:120ms">
       <div class="ph">
-        <div class="ph-screen"><div class="ap" id="heroApp" data-ap-theme="dark" aria-hidden="true"></div></div>
+        <div class="ph-screen"><div class="ap" id="heroApp" data-ap-theme="dark" aria-hidden="true" inert></div></div>
       </div>
     </div>
   </div>
@@ -2825,7 +2870,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       </div>
 
       <div class="foot-col rv" style="--d:80ms">
-        <h4>The page</h4>
+        <h3>The page</h3>
         <a href="#app">Try the app</a>
         <a href="#does">What it does</a>
         <a href="#capture">How it works</a>
@@ -2833,7 +2878,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       </div>
 
       <div class="foot-col rv" style="--d:160ms">
-        <h4>Project</h4>
+        <h3>Project</h3>
         <a href="https://github.com/Rahul-uzi/Moneva" target="_blank" rel="noopener">Source on GitHub</a>
         <a href="#get">Download the APK</a>
         <span>Made for Android</span>
@@ -3539,7 +3584,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       '</div></div>';
 
     h += '<div class="ap-card">' +
-      '<div class="inc-top">' + ico("wallet", 19) + '<h4>September Income</h4><span class="pill' +
+      '<div class="inc-top">' + ico("wallet", 19) + '<div class="ap-h">September Income</div><span class="pill' +
       (used > 90 ? " bad" : used > 70 ? " warn" : "") + '">' + used + '% used</span></div>' +
       '<div class="inc-cols">' +
       '<div><div class="k">Received</div><div class="v volt-t">' + amt(inc, "", s.hide) + '</div></div>' +
@@ -3550,7 +3595,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       '<div class="inc-foot">Salary ' + full(salary) + ' · Other ' + full(other) + '</div>' +
       '</div>';
 
-    h += '<div class="ap-head"><h4>My Accounts</h4><span>' + s.accounts.length + ' total</span></div>' +
+    h += '<div class="ap-head"><div class="ap-h">My Accounts</div><span>' + s.accounts.length + ' total</span></div>' +
       '<div class="acc-rail">' + s.accounts.map(function (a) {
         return '<button class="acc" data-act="go" data-to="activity">' +
           '<div class="acc-top">' + logoTile({ logo: a.logo, who: a.name, tint: a.tint }) +
@@ -3570,7 +3615,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
         '</button>';
     }
 
-    h += '<div class="ap-head"><h4>Upcoming Bills</h4><span>' + s.bills.length + ' due</span></div>';
+    h += '<div class="ap-head"><div class="ap-h">Upcoming Bills</div><span>' + s.bills.length + ' due</span></div>';
     h += s.bills.map(function (b) {
       return '<button class="tx" data-act="go" data-to="plan">' +
         logoTile({ who: b.name, tint: b.days <= 4 ? "#8A6200" : "#3A4048" }) +
@@ -3673,7 +3718,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       }).join("") + '</div>';
 
     if (tab === "all" || tab === "budgets") {
-      h += '<div class="ap-head"><h4>Budgets</h4><span>' + s.budgets.length + ' active</span></div>';
+      h += '<div class="ap-head"><div class="ap-h">Budgets</div><span>' + s.budgets.length + ' active</span></div>';
       h += s.budgets.map(function (b) {
         var spent = spentIn(s, b.cat), pct = Math.round(spent / b.limit * 100);
         var cls = pct > 100 ? "bad" : pct > 80 ? "warn" : "";
@@ -3689,7 +3734,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
     }
 
     if (tab === "all" || tab === "goals") {
-      h += '<div class="ap-head"><h4>Goals</h4><span>' + s.goals.length + ' active</span></div>';
+      h += '<div class="ap-head"><div class="ap-h">Goals</div><span>' + s.goals.length + ' active</span></div>';
       h += s.goals.map(function (g) {
         var pct = Math.round(g.saved / g.target * 100);
         return '<div class="ap-card"><div class="goal-row"><b>' + g.name + '</b><span class="pill">' + pct + '%</span></div>' +
@@ -3700,7 +3745,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 
     if (tab === "all" || tab === "subs") {
       var yearly = s.subs.reduce(function (n, x) { return n + x.yearly; }, 0);
-      h += '<div class="ap-head"><h4>Subscriptions</h4><span>' + plain(yearly) + ' a year</span></div>';
+      h += '<div class="ap-head"><div class="ap-h">Subscriptions</div><span>' + plain(yearly) + ' a year</span></div>';
       h += s.subs.map(function (x) {
         return '<button class="tx" data-act="noop">' + logoTile(x.logo ? { logo: x.logo } : { who: x.name, tint: x.tint }) +
           '<span class="who"><b>' + x.name + '</b><span>' + x.cadence.toUpperCase() +
@@ -3711,7 +3756,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 
     if (tab === "all" || tab === "emis") {
       var perMonth = s.emis.reduce(function (n, e) { return n + e.perMonth; }, 0);
-      h += '<div class="ap-head"><h4>EMIs</h4><span>' + plain(perMonth) + ' a month</span></div>';
+      h += '<div class="ap-head"><div class="ap-h">EMIs</div><span>' + plain(perMonth) + ' a month</span></div>';
       h += s.emis.map(function (e) {
         var done = e.of - e.left;
         return '<div class="ap-card"><div class="goal-row"><b>' + e.name + '</b>' +
@@ -3723,7 +3768,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
     }
 
     if (tab === "all" || tab === "bills") {
-      h += '<div class="ap-head"><h4>Bills</h4><span>' + s.bills.length + ' upcoming</span></div>';
+      h += '<div class="ap-head"><div class="ap-h">Bills</div><span>' + s.bills.length + ' upcoming</span></div>';
       h += s.bills.map(function (b) {
         return '<button class="tx" data-act="noop">' + logoTile({ who: b.name, tint: b.days <= 4 ? "#8A6200" : "#3A4048" }) +
           '<span class="who"><b>' + b.name + '</b><span>Due in ' + b.days + ' days</span></span>' +

@@ -237,6 +237,17 @@ const repointSite = (version) => {
   html = html.replace(/href="downloads\/moneva-[^"]+\.apk"/g,
     `href="downloads/moneva-${version}.apk"`);
 
+  const ldVersion = html.match(/"softwareVersion": "[^"]+"/g) || [];
+  if (ldVersion.length !== 1) die(`expected 1 softwareVersion in the JSON-LD, found ${ldVersion.length}`);
+  html = html.replace(/"softwareVersion": "[^"]+"/, `"softwareVersion": "${version}"`);
+
+  const ldUrl = html.match(/"downloadUrl": "[^"]+"/g) || [];
+  if (ldUrl.length !== 1) die(`expected 1 downloadUrl in the JSON-LD, found ${ldUrl.length}`);
+  html = html.replace(/"downloadUrl": "[^"]+"/,
+    `"downloadUrl": "https://moneva.monev.workers.dev/downloads/moneva-${version}.apk"`);
+
+  html = html.replace(/"fileSize": "[^"]+"/, '"fileSize": "SIZE_MB MB"');
+
   const specBefore = html;
   html = html.replace(/<span>APK · v[^<]*<\/span>/,
     `<span>APK · v${version} · SIZE_MB MB · Android 7.0+</span>`);
@@ -356,7 +367,9 @@ const { links, specChanged } = repointSite(version);
 // The size is only known after the build, so the placeholder is filled now.
 const sizeMb = (apkSize / 1048576).toFixed(1);
 const indexFile = join(SITE, 'index.html');
-writeFileSync(indexFile, readFileSync(indexFile, 'utf8').replace('SIZE_MB', sizeMb));
+const filled = readFileSync(indexFile, 'utf8').replaceAll('SIZE_MB', sizeMb);
+if (filled.includes('SIZE_MB')) die('a SIZE_MB placeholder survived the substitution');
+writeFileSync(indexFile, filled);
 ok(`${links} download link${links === 1 ? '' : 's'} repointed`);
 ok(specChanged ? `spec line now reads v${version} · ${sizeMb} MB` : 'spec line unchanged - check it by hand');
 
