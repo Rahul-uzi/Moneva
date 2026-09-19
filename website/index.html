@@ -360,6 +360,33 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
   .rv, .rv.in { opacity: 1; transform: none; transition: none; }
 }
 
+/* The same reveal, for the first screen - driven by CSS instead of JavaScript.
+
+   .rv above sets opacity:0 and waits for a script two thirds of the way down
+   a 227KB document to add .in. PageSpeed Insights, on an emulated Moto G
+   Power over Slow 4G, measured First Contentful Paint at 4.1s - identical to
+   Largest Contentful Paint and to Speed Index, because until that script ran
+   there was nothing on the page for the browser to paint at all. Every
+   element of the hero carried .rv, so the entire first screen was invisible.
+   It also meant a script failure left a blank page rather than a static one.
+
+   An animation needs no script: the browser starts it as soon as it has
+   parsed this stylesheet. Same 620ms, same easing, same per-element --d
+   stagger, so the hero looks exactly as it did.
+
+   Below the fold .rv is still correct - those elements SHOULD wait until
+   they are scrolled to, and no paint is gated on them. */
+.rv-now {
+  animation: rv-in var(--dur-draw) var(--ease-out) var(--d, 0ms) both;
+}
+@keyframes rv-in {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rv-now { animation: none; }
+}
+
 /* --- scroll progress --------------------------------------------------- */
 .progress {
   position: fixed;
@@ -2231,13 +2258,13 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 
   <div class="wrap hero-grid">
     <div class="hero-copy">
-      <div class="eyebrow rv">Money tracker · Android · Free</div>
+      <div class="eyebrow rv-now">Money tracker · Android · Free</div>
 
-      <h1 class="display rv" style="--d:70ms">
+      <h1 class="display rv-now" style="--d:70ms">
         Know where<br><span class="hl">it all went.</span>
       </h1>
 
-      <p class="lead rv" style="--d:140ms">
+      <p class="lead rv-now" style="--d:140ms">
         MONEVA keeps track of your spending without you having to type it in.
         It reads the payment alerts and bank texts your phone already gets, and
         can bring in the months before you installed it. Accounts, cards,
@@ -2245,7 +2272,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
         working when you have no signal.
       </p>
 
-      <div class="cta-row rv" style="--d:210ms">
+      <div class="cta-row rv-now" style="--d:210ms">
         <a class="btn btn-primary apk" href="downloads/moneva-1.0.2.apk" download>
           <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>
           Download for Android
@@ -2253,7 +2280,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
         <a class="btn btn-ghost" href="#app">Try it right here</a>
       </div>
 
-      <p class="spec rv" style="--d:270ms">
+      <p class="spec rv-now" style="--d:270ms">
         <span>Free to use</span>
         <i class="dot" aria-hidden="true"></i>
         <span>Works offline</span>
@@ -2264,7 +2291,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
 
     <!-- Rendered by the same code that drives the interactive demo below,
          so the hero can never drift out of step with it. Inert here. -->
-    <div class="hero-art rv" style="--d:120ms">
+    <div class="hero-art rv-now" style="--d:120ms">
       <div class="ph">
         <div class="ph-screen"><div class="ap" id="heroApp" data-ap-theme="dark" aria-hidden="true" inert></div></div>
       </div>
