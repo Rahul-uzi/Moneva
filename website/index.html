@@ -2910,11 +2910,14 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
   </div>
 </footer>
 
-<!-- GSAP drives the footer wordmark. Loaded from cdnjs, pinned, and placed
-     before the page scripts so it is defined by the time they run. If either
-     file fails to arrive the page still works - the mark just sits drawn. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<!-- GSAP used to be loaded here, eagerly, as two tags. It drives exactly one
+     thing: the footer wordmark cascade, which nobody can see until they have
+     scrolled the entire page.
+
+     Lighthouse on a throttled mobile CPU put the cost at 1,734ms for gsap.min
+     and 2,315ms for ScrollTrigger.min - 4.0s of a 4.3s total script bootup,
+     spent before first paint, for an effect at the very bottom of the
+     document. It is fetched on approach now; see "footer wordmark" below. -->
 
 <script>
 (function () {
@@ -3070,7 +3073,10 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
   }
 
   var stack = document.getElementById("brandstack");
-  if (stack && window.gsap && window.ScrollTrigger && !reduced) {
+
+  /* The animation is unchanged - only WHEN its library arrives is. */
+  function animateStack() {
+    if (!window.gsap || !window.ScrollTrigger) return;
     gsap.registerPlugin(ScrollTrigger);
     var words = stack.querySelectorAll(".bs-word");
     gsap.set(words, { yPercent: 106 });
@@ -3087,6 +3093,37 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
         invalidateOnRefresh: true
       }
     });
+  }
+
+  function loadScript(src, done) {
+    var s = document.createElement("script");
+    s.src = src;
+    s.async = true;
+    s.onload = done;
+    /* Errors are swallowed deliberately: if cdnjs is unreachable the wordmark
+       stays drawn where it is, which is what already happened when these were
+       eager tags. Nothing else on the page touches gsap. */
+    s.onerror = function () {};
+    document.head.appendChild(s);
+  }
+
+  /* 1200px of lead time means both files are fetched, parsed and scrubbed
+     into position before the mark is on screen, so the effect looks exactly
+     as it did when loaded eagerly. Much less and a fast scroll to the footer
+     can catch gsap.set() mid-flight, which reads as a flicker.
+
+     ScrollTrigger registers itself against the gsap global, so the core must
+     finish first - these cannot be fetched in parallel. */
+  if (stack && !reduced && "IntersectionObserver" in window) {
+    var GSAP_CDN = "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/";
+    var gsapObs = new IntersectionObserver(function (entries) {
+      if (!entries[0].isIntersecting) return;
+      gsapObs.disconnect();
+      loadScript(GSAP_CDN + "gsap.min.js", function () {
+        loadScript(GSAP_CDN + "ScrollTrigger.min.js", animateStack);
+      });
+    }, { rootMargin: "0px 0px 1200px 0px" });
+    gsapObs.observe(stack);
   }
 
   onScroll();
@@ -4167,16 +4204,42 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
     createApp(heroRoot, false);
   }
 
+  /* The demo is a SECOND full instance of the same engine as the hero mock,
+     and it lives below the fold in #app. Building it during load cost about
+     as much as the hero one and showed nothing: Lighthouse never scrolls, and
+     neither does a visitor who bounces, so on a cold mobile load it was pure
+     blocking time for a widget that may never be reached.
+
+     Built on approach instead. The rail buttons mount it too, in case one is
+     somehow clicked first - it cannot be, since they sit in the same section,
+     but mountDemo is idempotent and the guard costs nothing. */
   var demoRoot = document.getElementById("demoApp");
+  var demo = null;
+
+  function mountDemo() {
+    if (!demo && demoRoot) demo = createApp(demoRoot, true);
+    return demo;
+  }
+
   if (demoRoot) {
-    var demo = createApp(demoRoot, true);
     railBtns.forEach(function (b) {
       b.addEventListener("click", function () {
         var id = b.getAttribute("data-goto");
         syncRail(id);
-        demo.goto(id);
+        mountDemo().goto(id);
       });
     });
+
+    if ("IntersectionObserver" in window) {
+      var demoObs = new IntersectionObserver(function (entries) {
+        if (!entries[0].isIntersecting) return;
+        demoObs.disconnect();
+        mountDemo();
+      }, { rootMargin: "0px 0px 600px 0px" });
+      demoObs.observe(demoRoot);
+    } else {
+      mountDemo();
+    }
   }
 })();
 </script>
