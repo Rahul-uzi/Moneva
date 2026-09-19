@@ -17,4 +17,11 @@ Allow: /
 # download link with no page around it to explain what is being installed.
 Disallow: /downloads/
 
+# README.md documents this site for whoever maintains it. Cloudflare serves
+# every file in the assets directory, so it is publicly readable at /README.md
+# whether or not that was intended - confirmed live, HTTP 200. It is developer
+# notes, not a page anyone searched for, and letting it into the index would
+# put internal documentation alongside the product page for brand queries.
+Disallow: /README.md
+
 Sitemap: https://moneva.monev.workers.dev/sitemap.xml
