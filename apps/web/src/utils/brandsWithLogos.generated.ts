@@ -7,6 +7,7 @@
  */
 export const BRANDS_WITH_LOGOS: readonly string[] = [
   'air india',
+  'airtel',
   'amazon',
   'amazon pay',
   'angel one',
@@ -33,6 +34,7 @@ export const BRANDS_WITH_LOGOS: readonly string[] = [
   'federal bank',
   'flipkart',
   'goibibo',
+  'google pay',
   'groww',
   'haldirams',
   'hdfc bank',
@@ -41,6 +43,7 @@ export const BRANDS_WITH_LOGOS: readonly string[] = [
   'icici bank',
   'idfc first bank',
   'ikea',
+  'indian bank',
   'indian oil',
   'indusind bank',
   'ixigo',

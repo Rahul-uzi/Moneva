@@ -65,12 +65,17 @@ describe('a payment to a shop wears the shop logo', () => {
 });
 
 describe('a payment to a person wears the rail', () => {
-  it('Google Pay to a friend shows the Google Pay monogram', () => {
+  it('Google Pay to a friend shows the Google Pay mark', () => {
     // A person has no logo of their own. Naming the rail is what stops the
     // row falling back to a bare arrow - and it is how people describe these
     // payments to themselves.
+    //
+    // This asserted 'monogram' until google-pay.png was added, which was
+    // never the point being made: the rule here is WHICH brand gets named -
+    // the rail rather than the person - and the mark type follows from
+    // whether that brand has an image, exactly as it does for Swiggy above.
     expect(rowFor('com.google.android.apps.nbu.paisa.user', 'Karan paid you ₹45', 'Tap to view'))
-      .toEqual({ description: 'Google Pay - Karan', mark: 'monogram' });
+      .toEqual({ description: 'Google Pay - Karan', mark: 'logo' });
   });
 
   it('WhatsApp Pay to a friend shows the WhatsApp Pay monogram', () => {
