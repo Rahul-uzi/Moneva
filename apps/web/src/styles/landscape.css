@@ -251,7 +251,7 @@
   }
 
   /* What stays full width, and why:
-       - the expense/income/transfer tabs choose what the whole form MEANS,
+       - the expense/income tabs choose what the whole form MEANS,
          so they read as a header, not as one field of a pair;
        - the amount is the reason the sheet is open and keeps its emphasis;
        - a free-text note is the one field people write a sentence in;

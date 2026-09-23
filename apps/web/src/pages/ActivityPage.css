@@ -14,7 +14,10 @@
 
 .activity-filter-tabs {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* repeat(4, 1fr) against four buttons, until Transfers went and left a
+     quarter of the bar empty. Let the browser count them. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 6px;
   background-color: var(--moneva-surface);
   padding: 4px;

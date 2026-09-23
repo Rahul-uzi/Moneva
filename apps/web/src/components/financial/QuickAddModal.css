@@ -6,7 +6,12 @@
 
 .type-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  /* Counted by the browser, not by hand. This was 1fr 1fr 1fr against three
+     buttons; dropping Transfer left the third column sitting there as a gap
+     the size of a button, because nothing tied the track count to the number
+     of children. auto-flow does, so the next change cannot reintroduce it. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: 6px;
   background-color: var(--moneva-bg);
   padding: 4px;
