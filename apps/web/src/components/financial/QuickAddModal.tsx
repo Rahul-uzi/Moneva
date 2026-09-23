@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Sparkles, Calendar } from 'lucide-react';
+import { Sparkles, Calendar, Info } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { AmountInput } from '../ui/AmountInput';
 import { FormField } from '../ui/FormField';
@@ -161,12 +161,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
       // so recording it as one would keep it in your net worth forever. It is
       // filed as an expense against the category the destination suggests,
       // matched by name so a category the user deleted is never invented.
-      const hinted = destination?.categoryHint;
-      const hintedCategory = hinted
-        ? categories.find((c) => c.type === 'expense' && c.name === hinted)
-        : undefined;
-      const fallbackCategory = categories.find((c) => c.type === 'expense' && c.name === 'Other');
-      const outboundCategory = hintedCategory ?? fallbackCategory;
 
       const effectiveType = isExternal ? 'expense' : type;
       const transferDescription = destinationLabel
@@ -215,6 +209,20 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
   const destination = findDestination(toAccountId);
   const destinationLabel =
     toAccountId === OTHER_DESTINATION_ID ? customPayee.trim() : (destination?.label ?? '');
+
+  /**
+   * The expense category an external destination lands in.
+   *
+   * This used to be worked out inside the submit handler, where nothing on
+   * screen could read it - so the form could not tell you where the money was
+   * about to be filed until after it had been. Matched by NAME against the
+   * categories the user actually has, so a category they deleted is never
+   * invented; "Other" is the fallback, and undefined if even that is gone.
+   */
+  const outboundCategory = isExternal
+    ? (categories.find((c) => c.type === 'expense' && c.name === destination?.categoryHint)
+        ?? categories.find((c) => c.type === 'expense' && c.name === 'Other'))
+    : undefined;
 
   const filteredCategories = categories.filter((c) => c.type === type);
 
@@ -353,14 +361,37 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
                 />
               )}
 
-              {/* Says plainly what the choice does to the numbers, because the
-                  two cases are genuinely different kinds of movement. */}
+              {/* The two cases are genuinely different kinds of movement, and
+                  only one of them surprises people.
+
+                  Sending money to anywhere that is not your own account is
+                  recorded as an EXPENSE, because it has left you - but the tab
+                  you are standing in says "Transfer", so the row is then not
+                  where you go looking for it. The old copy here said "counts
+                  as spending", which is true and still never mentioned that.
+                  It was also 12px muted grey, quiet enough to miss entirely.
+
+                  So the external case gets a real notice that names the tab
+                  and the category. The internal case stays a quiet aside -
+                  nothing about it is unexpected. */}
               {toAccountId && (
-                <span className="text-body text-xs text-muted transfer-effect-hint">
-                  {isExternal
-                    ? 'This money leaves you, so it comes off your total and counts as spending.'
-                    : 'Moving money between your own accounts - your total net worth does not change.'}
-                </span>
+                isExternal ? (
+                  <div className="transfer-external-notice">
+                    <Info size={18} className="notice-icon" aria-hidden="true" />
+                    <p className="text-body text-xs">
+                      <strong>
+                        Saved as an expense
+                        {outboundCategory ? ` under ${outboundCategory.name}` : ''}.
+                      </strong>{' '}
+                      Money sent outside your own accounts has left you, so it comes off
+                      your total. Look for it in <strong>Expenses</strong>, not Transfers.
+                    </p>
+                  </div>
+                ) : (
+                  <span className="text-body text-xs text-muted transfer-effect-hint">
+                    Moving money between your own accounts - your total net worth does not change.
+                  </span>
+                )
               )}
             </div>
           ) : (

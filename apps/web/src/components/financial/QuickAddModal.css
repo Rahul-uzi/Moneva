@@ -107,3 +107,32 @@
   margin-top: 6px;
   line-height: 1.45;
 }
+
+/* Amber, which index.css reserves for warnings and nothing else. Not coral:
+   this is not an error and nothing is wrong - the entry saves fine, it just
+   will not be where the tab name implies. The tint is mixed from the token
+   rather than hardcoded so it follows light and dark themes, which the
+   hardcoded rgba on .distinction-notice does not. */
+.transfer-external-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--moneva-orange);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--moneva-orange) 12%, transparent);
+  color: var(--moneva-text-main);
+}
+
+.transfer-external-notice .notice-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--moneva-text-on-warning);
+}
+
+.transfer-external-notice p {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--moneva-text-main);
+}
