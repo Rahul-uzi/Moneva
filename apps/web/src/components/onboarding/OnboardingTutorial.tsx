@@ -27,7 +27,7 @@ const SLIDES: Slide[] = [
   {
     art: 'add',
     title: 'Record it in seconds',
-    body: 'Tap the + button on any screen to log an expense, income, or transfer. Every amount is stored to the exact paisa.',
+    body: 'Tap the + button on any screen to log an expense or income. Every amount is stored to the exact paisa.',
   },
   {
     art: 'goal',

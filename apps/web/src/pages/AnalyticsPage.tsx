@@ -291,7 +291,7 @@ export const AnalyticsPage: React.FC = () => {
                 <BarChart3 size={18} className="text-blue" />
                 <h2 className="heading-md">Income vs Expenses</h2>
               </div>
-              <span className="text-xs text-muted">Excludes transfers</span>
+              <span className="text-xs text-muted">Excludes money moved, not spent</span>
             </div>
 
             <div className="inc-exp-row">

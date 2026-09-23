@@ -5,7 +5,7 @@ import { formatMonetaryValue } from '../../utils/money';
 import './ActionProposalCard.css';
 
 export interface ProposedAction {
-  type: 'add_expense' | 'add_income' | 'transfer' | 'bill_payment' | 'goal_contribution' | 'create_budget' | 'create_goal' | 'create_bill';
+  type: 'add_expense' | 'add_income' | 'bill_payment' | 'goal_contribution' | 'create_budget' | 'create_goal' | 'create_bill';
   amountPaise: number;
   description: string;
   categoryName?: string;
@@ -51,7 +51,6 @@ export const ActionProposalCard: React.FC<ActionProposalCardProps> = ({
     switch (proposal.type) {
       case 'add_expense': return 'Add Expense';
       case 'add_income': return 'Add Income';
-      case 'transfer': return 'Internal Transfer';
       case 'bill_payment': return 'Pay Bill';
       case 'goal_contribution': return 'Savings Goal Contribution';
       case 'create_budget': return 'Create Budget';

@@ -92,7 +92,7 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
         </div>
       )}
       <div className="tx-info">
-        <span className="tx-title">{transaction.description || (isTransfer ? 'Transfer' : isIncome ? 'Income' : 'Expense')}</span>
+        <span className="tx-title">{transaction.description || (isTransfer ? 'Moved' : isIncome ? 'Income' : 'Expense')}</span>
         <span className="tx-date">
           {isNew && <span className="tx-new">New</span>}
           {dateFormatted}

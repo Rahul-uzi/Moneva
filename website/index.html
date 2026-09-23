@@ -3696,7 +3696,6 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
     var list = s.txns.filter(function (t) {
       if (s.filter === "expense" && t.type !== "expense") return false;
       if (s.filter === "income" && t.type !== "income") return false;
-      if (s.filter === "transfer") return false;
       if (q && t.who.toLowerCase().indexOf(q) < 0 && CATS[t.cat].name.toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
@@ -3705,7 +3704,7 @@ h3 { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; }
       '<span class="ap-title">Activity Log</span>' +
       '<span class="ap-drop">All time ' + ico("down2", 15) + '</span></div>';
 
-    h += '<div class="seg">' + [["all", "All"], ["expense", "Expenses"], ["income", "Income"], ["transfer", "Transfers"]]
+    h += '<div class="seg">' + [["all", "All"], ["expense", "Expenses"], ["income", "Income"]]
       .map(function (f) {
         return '<button class="' + (s.filter === f[0] ? "on" : "") + '" data-act="filter" data-v="' + f[0] + '">' + f[1] + '</button>';
       }).join("") + '</div>';

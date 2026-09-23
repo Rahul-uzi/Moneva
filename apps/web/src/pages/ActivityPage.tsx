@@ -29,7 +29,7 @@ export const ActivityPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Filters & State
-  const [activeTab, setActiveTab] = useState<'all' | 'expense' | 'income' | 'transfer'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'expense' | 'income'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [period, setPeriod] = useState<'month' | '30d' | '90d' | '3m' | 'all'>('all');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -258,13 +258,6 @@ export const ActivityPage: React.FC = () => {
           onClick={() => setActiveTab('income')}
         >
           Income
-        </button>
-        <button
-          type="button"
-          className={`filter-tab ${activeTab === 'transfer' ? 'tab-active-transfer' : ''}`}
-          onClick={() => setActiveTab('transfer')}
-        >
-          Transfers
         </button>
       </div>
 

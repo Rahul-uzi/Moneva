@@ -431,7 +431,6 @@ button,
 .tab-active-liability { background-color: rgba(255, 107, 74, 0.2); color: var(--moneva-text-on-danger); }
 .tab-active-income    { background-color: rgba(205, 255, 74, 0.2);  color: var(--moneva-text-on-success); }
 .tab-active-expense   { background-color: rgba(255, 107, 74, 0.2); color: var(--moneva-text-on-danger); }
-.tab-active-transfer  { background-color: var(--moneva-overlay); color: var(--moneva-text-secondary); }
 
 /* Undefined utilities that were in use across the app. */
 .text-xs   { font-size: 12px; }

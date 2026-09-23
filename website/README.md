@@ -379,7 +379,7 @@ spending, the budget bars and the activity list all move together.
 - All five screens: Home, Activity, Plan, Ask, Profile
 - Floating pill nav with the lime FAB; the avatar opens Profile
 - The eye icon hides every balance
-- Activity filters (All / Expenses / Income / Transfers) and live merchant search
+- Activity filters (All / Expenses / Income) and live merchant search
 - Plan tabs, budget bars with healthy / tight / over states
 - The assistant answers from the data, and *proposes* rather than writes —
   type "petrol 500" and it offers an entry to confirm

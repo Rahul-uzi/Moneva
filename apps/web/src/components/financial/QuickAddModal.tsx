@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Sparkles, Calendar, Info } from 'lucide-react';
+import { Sparkles, Calendar } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { AmountInput } from '../ui/AmountInput';
 import { FormField } from '../ui/FormField';
@@ -17,7 +17,6 @@ import {
   MERCHANTS,
   OTHER_DESTINATION_ID,
   findDestination,
-  isExternalDestination,
 } from '../../data/transferDestinations';
 import type { Account, Category, Transaction, RecurringIncome } from '../../types/api';
 import './QuickAddModal.css';
@@ -29,13 +28,19 @@ interface QuickAddModalProps {
 }
 
 export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [type, setType] = useState<'expense' | 'income' | 'transfer'>('expense');
+  const [type, setType] = useState<'expense' | 'income'>('expense');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [accountId, setAccountId] = useState<string>('');
-  const [toAccountId, setToAccountId] = useState<string>('');
-  // Free text for "Someone else / Other", so an unlisted payee still has a name.
-  const [customPayee, setCustomPayee] = useState<string>('');
+  /**
+   * Who the money went to, picked from the catalogue that used to sit behind
+   * the Transfer tab's "Send to" - banks, wallets and apps.
+   *
+   * Empty, or "Other", means the payee is typed into `merchant` instead. There
+   * is no second free-text field: one name for the payee, wherever it came
+   * from, is what the description is built out of.
+   */
+  const [payeeId, setPayeeId] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string>('');
   const [amountPaise, setAmountPaise] = useState<number>(0);
   const [merchant, setMerchant] = useState<string>('');
@@ -62,11 +67,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
       setAccounts(accRes.data);
       setCategories(catRes.data);
 
+      // No second account is preselected any more: the payee list is not a
+      // list of your accounts, and it opens on "Type it below" on purpose.
       if (accRes.data.length > 0) {
         setAccountId(accRes.data[0].id);
-        if (accRes.data.length > 1) {
-          setToAccountId(accRes.data[1].id);
-        }
       }
 
       const matchingCats = catRes.data.filter((c) => c.type === type);
@@ -126,62 +130,43 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
       return;
     }
 
-    if (type !== 'transfer' && !categoryId) {
+    if (!categoryId) {
       setFormError('Please select a category.');
       return;
     }
 
-    if (type === 'transfer') {
-      if (!toAccountId) {
-        setFormError('Please choose where the money is going.');
-        return;
-      }
-      if (toAccountId === OTHER_DESTINATION_ID && !customPayee.trim()) {
-        setFormError('Please type who the money is going to.');
-        return;
-      }
-      // Only meaningful between two of your own accounts; an external
-      // destination is never the account it came from.
-      if (!isExternal && accountId === toAccountId) {
-        setFormError('Source and destination accounts must be different.');
-        return;
-      }
+    // Choosing "Other" and then typing nothing leaves a row with no name on
+    // it, which is worse than no choice at all.
+    if (type === 'expense' && payeeId === OTHER_DESTINATION_ID && !merchant.trim()) {
+      setFormError('Please type who the money went to.');
+      return;
     }
 
     setIsSubmitting(true);
     try {
       const clientMutationId = crypto.randomUUID();
-      const combinedDescription = merchant.trim()
+
+      // One name for the payee wherever it came from: the catalogue label
+      // when one was picked, otherwise whatever was typed.
+      const payeeName = payee ? payee.label : merchant.trim();
+      const combinedDescription = payeeName
         ? notes.trim()
-          ? `${merchant.trim()} - ${notes.trim()}`
-          : merchant.trim()
+          ? `${payeeName} - ${notes.trim()}`
+          : payeeName
         : notes.trim() || null;
-
-      // Money sent outside your own accounts is not a transfer: it has left,
-      // so recording it as one would keep it in your net worth forever. It is
-      // filed as an expense against the category the destination suggests,
-      // matched by name so a category the user deleted is never invented.
-
-      const effectiveType = isExternal ? 'expense' : type;
-      const transferDescription = destinationLabel
-        ? notes.trim()
-          ? `${destinationLabel} - ${notes.trim()}`
-          : destinationLabel
-        : combinedDescription;
 
       const payload = {
         client_mutation_id: clientMutationId,
         account_id: accountId,
-        to_account_id: type === 'transfer' && !isExternal ? toAccountId : null,
-        category_id: isExternal
-          ? (outboundCategory?.id ?? null)
-          : type !== 'transfer' && categoryId
-            ? categoryId
-            : null,
-        transaction_type: effectiveType,
+        // Nothing this form creates has a far side any more. Transfers are
+        // still made by goal contributions and by captured ATM withdrawals,
+        // neither of which comes through here.
+        to_account_id: null,
+        category_id: categoryId || null,
+        transaction_type: type,
         amount_minor: amountPaise,
         currency: 'INR',
-        description: type === 'transfer' ? transferDescription : combinedDescription,
+        description: combinedDescription,
         transaction_date: txDate ? new Date(txDate).toISOString() : new Date().toISOString(),
         device_id: 'web-client',
       };
@@ -192,7 +177,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
       setSavedTransaction(res.data);
       setAmountPaise(0);
       setMerchant('');
-      setCustomPayee('');
+      setPayeeId('');
       setNotes('');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to create transaction.';
@@ -202,27 +187,27 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
     }
   };
 
-  // What the chosen destination means. Sending money out of your accounts and
-  // shuffling it between them are different events, and only the second leaves
-  // net worth untouched - so the destination decides which one gets recorded.
-  const isExternal = type === 'transfer' && isExternalDestination(toAccountId);
-  const destination = findDestination(toAccountId);
-  const destinationLabel =
-    toAccountId === OTHER_DESTINATION_ID ? customPayee.trim() : (destination?.label ?? '');
+  /** The catalogue entry behind the chosen payee, if one was chosen. */
+  const payee = type === 'expense' ? findDestination(payeeId) : undefined;
+
+  /** The payee has to be typed when none was picked, or "Other" was. */
+  const payeeIsTyped = type === 'expense' && (!payeeId || payeeId === OTHER_DESTINATION_ID);
 
   /**
-   * The expense category an external destination lands in.
+   * Picking a payee also picks the category it usually belongs to.
    *
-   * This used to be worked out inside the submit handler, where nothing on
-   * screen could read it - so the form could not tell you where the money was
-   * about to be filed until after it had been. Matched by NAME against the
-   * categories the user actually has, so a category they deleted is never
-   * invented; "Other" is the fallback, and undefined if even that is gone.
+   * Applied on change rather than at submit, so the choice is visible in the
+   * Category field and can be overridden. Matched by NAME against the user's
+   * own categories, so one they deleted is never invented - and when no match
+   * exists the category is simply left alone.
    */
-  const outboundCategory = isExternal
-    ? (categories.find((c) => c.type === 'expense' && c.name === destination?.categoryHint)
-        ?? categories.find((c) => c.type === 'expense' && c.name === 'Other'))
-    : undefined;
+  const choosePayee = (id: string) => {
+    setPayeeId(id);
+    const hint = findDestination(id)?.categoryHint;
+    if (!hint) return;
+    const match = categories.find((c) => c.type === 'expense' && c.name === hint);
+    if (match) setCategoryId(match.id);
+  };
 
   const filteredCategories = categories.filter((c) => c.type === type);
 
@@ -246,13 +231,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
               onClick={() => setType('income')}
             >
               Income
-            </button>
-            <button
-              type="button"
-              className={`tab-btn ${type === 'transfer' ? 'tab-active tab-transfer' : ''}`}
-              onClick={() => setType('transfer')}
-            >
-              Transfer
             </button>
           </div>
 
@@ -291,12 +269,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
           <AmountInput
             valuePaise={amountPaise}
             onChangePaise={setAmountPaise}
-            label={type === 'income' ? 'Income Amount' : type === 'expense' ? 'Expense Amount' : 'Transfer Amount'}
+            label={type === 'income' ? 'Income Amount' : 'Expense Amount'}
           />
 
           {/* Account Selector */}
           <div className="select-group">
-            <label className="form-label">{type === 'transfer' ? 'From Account' : 'Account'}</label>
+            <label className="form-label">Account</label>
             {accounts.length === 0 ? (
               <div className="empty-selection-box">
                 <span className="text-body text-xs text-coral">No account added yet.</span>
@@ -315,25 +293,27 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
             )}
           </div>
 
-          {type === 'transfer' ? (
+          {/* Who the money went to.
+              Optional: picking from the list saves typing and picks the
+              category too, but an unlisted payee is still just typed below.
+              It sits above Category deliberately - choosing a payee changes
+              the category, and a field that changes itself has to be visible
+              when it does. */}
+          {type === 'expense' && (
             <div className="select-group">
-              <label className="form-label">Send to</label>
+              <label className="form-label">Paid to</label>
               <select
                 className="form-select"
-                value={toAccountId}
-                onChange={(e) => setToAccountId(e.target.value)}
+                value={payeeId}
+                onChange={(e) => choosePayee(e.target.value)}
               >
-                <option value="">Choose a destination</option>
-                {/* Own accounts first: this is the only group that leaves net
-                    worth unchanged, so it is the one most people want. */}
-                <optgroup label="My accounts">
-                  {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.id} disabled={acc.id === accountId}>
-                      {acc.name} ({acc.account_type.toUpperCase()})
-                    </option>
+                <option value="">Type it below</option>
+                <optgroup label="Apps & services">
+                  {MERCHANTS.map((d) => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
                   ))}
                 </optgroup>
-                <optgroup label="Bank transfer">
+                <optgroup label="Banks">
                   {BANKS.map((d) => (
                     <option key={d.id} value={d.id}>{d.label}</option>
                   ))}
@@ -343,59 +323,12 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
                     <option key={d.id} value={d.id}>{d.label}</option>
                   ))}
                 </optgroup>
-                <optgroup label="Apps & services">
-                  {MERCHANTS.map((d) => (
-                    <option key={d.id} value={d.id}>{d.label}</option>
-                  ))}
-                </optgroup>
                 <option value={OTHER_DESTINATION_ID}>Someone else / Other…</option>
               </select>
-
-              {toAccountId === OTHER_DESTINATION_ID && (
-                <FormField
-                  label="Who is it going to?"
-                  type="text"
-                  placeholder="e.g. Rahul, landlord, ICICI ...4821"
-                  value={customPayee}
-                  onChange={(e) => setCustomPayee(e.target.value)}
-                />
-              )}
-
-              {/* The two cases are genuinely different kinds of movement, and
-                  only one of them surprises people.
-
-                  Sending money to anywhere that is not your own account is
-                  recorded as an EXPENSE, because it has left you - but the tab
-                  you are standing in says "Transfer", so the row is then not
-                  where you go looking for it. The old copy here said "counts
-                  as spending", which is true and still never mentioned that.
-                  It was also 12px muted grey, quiet enough to miss entirely.
-
-                  So the external case gets a real notice that names the tab
-                  and the category. The internal case stays a quiet aside -
-                  nothing about it is unexpected. */}
-              {toAccountId && (
-                isExternal ? (
-                  <div className="transfer-external-notice">
-                    <Info size={18} className="notice-icon" aria-hidden="true" />
-                    <p className="text-body text-xs">
-                      <strong>
-                        Saved as an expense
-                        {outboundCategory ? ` under ${outboundCategory.name}` : ''}.
-                      </strong>{' '}
-                      Money sent outside your own accounts has left you, so it comes off
-                      your total. Look for it in <strong>Expenses</strong>, not Transfers.
-                    </p>
-                  </div>
-                ) : (
-                  <span className="text-body text-xs text-muted transfer-effect-hint">
-                    Moving money between your own accounts - your total net worth does not change.
-                  </span>
-                )
-              )}
             </div>
-          ) : (
-            <div className="select-group">
+          )}
+
+          <div className="select-group">
               <label className="form-label">Category</label>
               {filteredCategories.length === 0 ? (
                 <div className="empty-selection-box">
@@ -413,13 +346,13 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
                   ))}
                 </select>
               )}
-            </div>
-          )}
+          </div>
 
-          {/* Merchant / Payee / Source. Hidden on a transfer: the destination
-              above already names who the money went to, so asking twice wasted
-              a whole field. */}
-          {type !== 'transfer' && (
+          {/* The typed payee. Hidden once one is picked from the list above -
+              the label already names who was paid, and asking twice wasted a
+              whole field. Income always types it; there is no catalogue of
+              people who pay you. */}
+          {(type === 'income' || payeeIsTyped) && (
             <FormField
               label={type === 'income' ? 'Income Source / Payee' : 'Merchant / Payee'}
               type="text"
@@ -453,7 +386,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
             isLoading={isSubmitting}
             disabled={accounts.length === 0}
           >
-            {type === 'expense' ? 'Save Expense' : type === 'income' ? 'Save Income' : 'Save Transfer'}
+            {type === 'expense' ? 'Save Expense' : 'Save Income'}
           </Button>
         </form>
       </Modal>
@@ -493,7 +426,6 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
         transaction={savedTransaction}
         categoryName={categories.find((c) => c.id === savedTransaction?.category_id)?.name}
         accountName={accounts.find((a) => a.id === savedTransaction?.account_id)?.name}
-        toAccountName={accounts.find((a) => a.id === savedTransaction?.to_account_id)?.name}
         onClose={() => {
           setSavedTransaction(null);
           onClose();

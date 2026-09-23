@@ -710,36 +710,11 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
                 proposal=proposal
             )
 
-        # B3: TRANSFER INTENT
-        if not is_question and any(k in lower for k in ["transfer", "move money", "move funds", "send to savings", "move to savings"]):
-            amount_minor = parse_amount_to_minor(clean_prompt)
-            if not amount_minor:
-                return AIQueryResponse(
-                    response_type=ResponseType.CLARIFICATION_REQUIRED,
-                    clarification_prompt="How much would you like to transfer?"
-                )
-            if len(accounts) < 2:
-                return AIQueryResponse(
-                    response_type=ResponseType.CLARIFICATION_REQUIRED,
-                    clarification_prompt="You need at least two active accounts to perform a transfer."
-                )
-            src_acc = accounts[0]
-            dst_acc = accounts[1]
-
-            proposal = ProposedActionSchema(
-                type="transfer",
-                amount_minor=amount_minor,
-                description="Internal Account Transfer",
-                account_id=str(src_acc.id),
-                account_name=src_acc.name,
-                to_account_id=str(dst_acc.id),
-                to_account_name=dst_acc.name
-            )
-            return AIQueryResponse(
-                response_type=ResponseType.ACTION_PROPOSAL,
-                message="I have prepared an internal transfer proposal. Please confirm to execute:",
-                proposal=proposal
-            )
+        # B3 was a TRANSFER INTENT. It is gone with the rest of the feature.
+        # It was also the crudest branch here: it never asked which accounts,
+        # it just took accounts[0] and accounts[1] in whatever order the query
+        # returned them. Goal contributions, which are still transfers on the
+        # ledger, are proposed by their own branch and are unaffected.
 
         # B4: EXPENSE / INCOME INTENT
         if not is_question and any(k in lower for k in [

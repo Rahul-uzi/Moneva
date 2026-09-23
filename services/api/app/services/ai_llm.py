@@ -43,7 +43,7 @@ RESPONSE FORMAT - return ONLY a JSON object, no markdown fence:
   "response_type": "ANSWER" | "ACTION_PROPOSAL" | "CLARIFICATION_REQUIRED",
   "message": "what to show the user",
   "proposal": {            // ONLY when response_type is ACTION_PROPOSAL
-    "type": "add_expense" | "add_income" | "transfer" | "bill_payment" | "goal_contribution",
+    "type": "add_expense" | "add_income" | "bill_payment" | "goal_contribution",
     "amount_minor": 71183,
     "currency": "INR",
     "description": "Bike fuel",
@@ -181,7 +181,7 @@ async def query_llm(prompt: str, snapshot: Dict[str, Any]) -> Optional[Dict[str,
         amount = _coerce_minor_units(raw.get("amount_minor"))
         ptype = raw.get("type")
         if amount is None or ptype not in (
-            "add_expense", "add_income", "transfer", "bill_payment", "goal_contribution"
+            "add_expense", "add_income", "bill_payment", "goal_contribution"
         ):
             return None
         out["proposal"] = {

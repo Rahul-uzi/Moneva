@@ -13,7 +13,6 @@ interface ExpenseSuccessModalProps {
   transaction: Transaction | null;
   categoryName?: string;
   accountName?: string;
-  toAccountName?: string;
   onClose: () => void;
 }
 
@@ -21,7 +20,6 @@ export const ExpenseSuccessModal: React.FC<ExpenseSuccessModalProps> = ({
   transaction,
   categoryName = 'Expense',
   accountName = 'Account',
-  toAccountName,
   onClose,
 }) => {
   const navigate = useNavigate();
@@ -33,16 +31,14 @@ export const ExpenseSuccessModal: React.FC<ExpenseSuccessModalProps> = ({
     timeStyle: 'short',
   });
 
-  // This screen is shown after an expense, an income OR a transfer. It used to
-  // announce "Expense Saved" for all three, so moving your own money between
-  // accounts was reported as money spent.
+  // Only QuickAddModal shows this, and it now records expenses and income and
+  // nothing else. Goal contributions and captured ATM withdrawals are still
+  // transfers, but neither of them comes through this screen.
   const kind = transaction.transaction_type;
   const copy =
     kind === 'income'
       ? { title: 'Income Saved', label: 'Income Recorded', sign: '+', tone: 'text-teal', accountLabel: 'Received Into' }
-      : kind === 'transfer'
-        ? { title: 'Transfer Saved', label: 'Transfer Recorded', sign: '', tone: 'text-main', accountLabel: 'From Account' }
-        : { title: 'Expense Saved', label: 'Expense Recorded', sign: '-', tone: 'text-coral', accountLabel: 'Paid From Account' };
+      : { title: 'Expense Saved', label: 'Expense Recorded', sign: '-', tone: 'text-coral', accountLabel: 'Paid From Account' };
 
   return (
     <Modal isOpen={!!transaction} onClose={onClose} title={copy.title}>
@@ -61,23 +57,14 @@ export const ExpenseSuccessModal: React.FC<ExpenseSuccessModalProps> = ({
         </div>
 
         <div className="success-details-list">
-          {/* A transfer has no category; it has a destination instead. */}
-          {kind !== 'transfer' && (
-            <div className="detail-row">
-              <span className="detail-label">Category</span>
-              <span className="detail-val">{categoryName}</span>
-            </div>
-          )}
+          <div className="detail-row">
+            <span className="detail-label">Category</span>
+            <span className="detail-val">{categoryName}</span>
+          </div>
           <div className="detail-row">
             <span className="detail-label">{copy.accountLabel}</span>
             <span className="detail-val">{accountName}</span>
           </div>
-          {kind === 'transfer' && toAccountName && (
-            <div className="detail-row">
-              <span className="detail-label">To Account</span>
-              <span className="detail-val">{toAccountName}</span>
-            </div>
-          )}
           <div className="detail-row">
             <span className="detail-label">Date & Time</span>
             <span className="detail-val">{formattedDate}</span>

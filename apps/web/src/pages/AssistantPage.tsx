@@ -35,7 +35,7 @@ interface AIResponseData {
   response_type: 'ANSWER' | 'ACTION_PROPOSAL' | 'CLARIFICATION_REQUIRED' | 'ERROR' | 'OFFLINE';
   message: string;
   proposal?: {
-    type: 'add_expense' | 'add_income' | 'transfer' | 'bill_payment' | 'goal_contribution' | 'create_budget' | 'create_goal' | 'create_bill';
+    type: 'add_expense' | 'add_income' | 'bill_payment' | 'goal_contribution' | 'create_budget' | 'create_goal' | 'create_bill';
     amount_minor: number;
     description: string;
     account_id?: string;
@@ -338,7 +338,9 @@ export const AssistantPage: React.FC = () => {
 
       let txType = 'expense';
       if (proposal.type === 'add_income') txType = 'income';
-      if (proposal.type === 'transfer' || proposal.type === 'goal_contribution') txType = 'transfer';
+      // Still a transfer on the ledger - a goal contribution moves money into
+      // a goal rather than spending it - but nothing on screen calls it one.
+      if (proposal.type === 'goal_contribution') txType = 'transfer';
 
       const payload = {
         client_mutation_id: clientMutationId,
