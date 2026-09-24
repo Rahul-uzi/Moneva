@@ -41,6 +41,19 @@ const nameOf = (file) =>
     .trim();
 
 const files = readdirSync(BRANDS_DIR).filter((f) => USABLE.test(f));
+
+/* A capitalised filename used to ship a logo nobody ever saw. BrandMark keys
+   these by their stem and looks them up through slugFor(), which lowercases;
+   Bigbasket.png keyed itself "Bigbasket", the lookup asked for "bigbasket",
+   and the image sat in the bundle unused. The loader lowercases its keys now,
+   so this can no longer break anything - but a mixed-case directory is still
+   a directory where the next person has to know that, so it is refused. */
+const shouty = files.filter((f) => f !== f.toLowerCase());
+if (shouty.length) {
+  console.error("Filenames must be lowercase - rename these:");
+  for (const f of shouty) console.error("  " + f + "  ->  " + f.toLowerCase());
+  process.exit(1);
+}
 const ignored = readdirSync(BRANDS_DIR).filter((f) => !USABLE.test(f));
 
 const names = [...new Set(files.map(nameOf))].filter(Boolean).sort();
