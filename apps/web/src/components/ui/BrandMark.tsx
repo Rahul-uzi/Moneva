@@ -9,7 +9,7 @@ import './BrandMark.css';
  * with no network and no waiting - and a brand with no file simply is not in
  * the map, which is what selects the monogram below.
  */
-const LOGO_FILES = import.meta.glob('../../assets/brands/*.{png,svg}', {
+const LOGO_FILES = import.meta.glob('../../assets/brands/*.{png,svg,jpg,jpeg,webp}', {
   eager: true,
   query: '?url',
   import: 'default',
@@ -18,7 +18,12 @@ const LOGO_FILES = import.meta.glob('../../assets/brands/*.{png,svg}', {
 const LOGOS: Record<string, string> = {};
 for (const [path, url] of Object.entries(LOGO_FILES)) {
   const file = path.split('/').pop() ?? '';
-  LOGOS[file.replace(/\.(png|svg)$/i, '')] = url;
+  /* Lowercased, because slugFor() below lowercases and the two have to meet.
+     A file shipped as Bigbasket.png keyed itself as "Bigbasket" while the
+     lookup asked for "bigbasket", so the brand wore a monogram with its own
+     logo sitting unused in the bundle. Nothing failed - it just never
+     appeared, which is the hardest kind of wrong to notice. */
+  LOGOS[file.replace(/\.(png|svg|jpe?g|webp)$/i, '').toLowerCase()] = url;
 }
 
 /** Must match slugFor() in scripts/fetch-brand-logos.mjs. */

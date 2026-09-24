@@ -26,10 +26,12 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BRANDS_DIR = join(ROOT, 'apps', 'web', 'src', 'assets', 'brands');
 const OUT = join(ROOT, 'apps', 'web', 'src', 'utils', 'brandsWithLogos.generated.ts');
 
-/* The extensions BrandMark's import.meta.glob actually picks up. A .jpg in
-   this directory is not a bug worth failing over, but it would never be
-   loaded, so it must not be advertised as a brand either. */
-const USABLE = /\.(png|svg)$/i;
+/* The extensions BrandMark's import.meta.glob actually picks up. These two
+   lists ARE the same list, and drift between them is silent in the worst
+   direction: a file the manifest advertises but the glob skips makes a brand
+   recognised with no image to draw. jpg and webp were added here and there
+   together. */
+const USABLE = /\.(png|svg|jpe?g|webp)$/i;
 
 const nameOf = (file) =>
   file
