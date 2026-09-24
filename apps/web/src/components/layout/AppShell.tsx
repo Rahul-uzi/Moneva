@@ -214,6 +214,25 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
 
   return (
     <div className="app-viewport">
+      <TopBar
+        title={title}
+        unreadCount={unreadCount}
+        onNotificationClick={() => setIsNotifOpen(true)}
+        onProfileClick={() => navigate('/profile')}
+      />
+
+      {/* BELOW the header, not above it.
+          index.html sets viewport-fit=cover, so the WebView draws under the
+          status bar, and .topbar's padding - calc(16px + safe-area-inset-top)
+          - is the only thing in this shell that clears it. These three used to
+          render BEFORE TopBar, which meant any one of them took the top of the
+          screen with no inset of its own: the clock and battery sat on top of
+          the text, and the header's inset then opened a redundant gap
+          underneath the strip.
+
+          Under the header each one is still "a strip above the content", which
+          is what UpdateBanner.css says it is, and the status bar stays the
+          header's problem alone. */}
       {update && (
         <UpdateBanner
           news={update}
@@ -232,12 +251,6 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
           onRetry={() => setRefreshTrigger((prev) => prev + 1)}
         />
       )}
-      <TopBar
-        title={title}
-        unreadCount={unreadCount}
-        onNotificationClick={() => setIsNotifOpen(true)}
-        onProfileClick={() => navigate('/profile')}
-      />
       <SyncStatusIndicator />
       <main className="app-content">
         <RouteTransition>
