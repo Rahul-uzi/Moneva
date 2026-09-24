@@ -150,7 +150,6 @@ export const TransactionEditModal: React.FC<Props> = ({
             className="form-input tx-edit-notes"
             rows={3}
             maxLength={1000}
-            placeholder="Split with Anita - she owes me half"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
