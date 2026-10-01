@@ -1,22 +1,25 @@
 # Render Blueprint for MONEVA.
 #
 # Create this stack from the Render dashboard with "New +" -> "Blueprint" and
-# point it at this repository. Render reads this file and provisions both the
-# API service and its Postgres database.
+# point it at this repository. Render reads this file and provisions the API
+# service. The database is NOT here - see below.
 #
 # WHY POSTGRES AND NOT SQLITE:
 # Render's service filesystem is ephemeral - it is wiped on every deploy and
 # every restart. A SQLite file would silently lose every user, account and
 # transaction. The app already speaks Postgres; it just needs the URL.
-
-databases:
-  - name: moneva-db
-    databaseName: moneva
-    user: moneva
-    # Basic, not free. The free database EXPIRES after about 30 days and
-    # takes its contents with it - fine for a smoke test, not for anything
-    # holding a person's financial history.
-    plan: basic-256mb
+#
+# WHY THE DATABASE IS NOT DECLARED HERE ANY MORE:
+# It used to be, as a `databases:` block on plan basic-256mb, with a comment
+# warning that the free plan expires after about thirty days and takes its
+# contents with it. The database that actually got created was on the free
+# plan regardless, so the running stack never matched this file - and on
+# 2026-10-01 it expired exactly as the comment said it would, taking the API
+# down and locking the data behind an upgrade.
+#
+# Postgres now lives on Neon's free plan, which is permanent rather than a
+# trial: "The Free plan is permanent (not a trial)". Render hosts the API and
+# nothing else, and DATABASE_URL is set by hand in the dashboard.
 
 services:
   - type: web
@@ -36,11 +39,20 @@ services:
     startCommand: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      # Wired automatically from the database above.
+      # sync: false, NOT fromDatabase. This is the whole reason the block
+      # above was removed rather than merely commented out: fromDatabase
+      # rewrites the value on every blueprint apply, so leaving it would have
+      # silently repointed the live service at a database that no longer
+      # exists, the next time anyone synced this file.
+      #
+      # The value is Neon's DIRECT connection string - the host must NOT
+      # contain "-pooler". The pooled endpoint is PgBouncer in transaction
+      # mode, and asyncpg relies on prepared statements; the two fail together
+      # intermittently under load. app/db/url.py converts the scheme to
+      # +asyncpg and strips sslmode and channel_binding, so Neon's string is
+      # pasted in exactly as given.
       - key: DATABASE_URL
-        fromDatabase:
-          name: moneva-db
-          property: connectionString
+        sync: false
 
       # Password-reset email. `sync: false` means Render prompts for the value
       # in the dashboard and never reads it from this file - which is the only
