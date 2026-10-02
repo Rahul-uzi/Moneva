@@ -210,6 +210,12 @@
 .msg-avatar-logo {
   width: 30px;
   height: 30px;
+  /* The circle was an oval. This is a flex item next to a bubble that wants
+     all the room it can get, so without this the avatar was the thing that
+     gave way - squeezed narrower while its height stayed 30px, which turns a
+     border-radius: 50% circle into an ellipse and crushes the logo inside it
+     into a smudge. Width and height alone do not hold a flex item's size. */
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--moneva-overlay-weak);
   padding: 4px;

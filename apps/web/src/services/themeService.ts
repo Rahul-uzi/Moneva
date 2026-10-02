@@ -67,4 +67,28 @@ export const initTheme = () => {
   prefersDark().addEventListener('change', () => {
     if (getStoredThemeMode() === 'system') applyTheme('system');
   });
+
+  /* Re-stated, not just set once.
+     Styling the bar at startup is not enough to keep it styled: Android
+     reapplies its own appearance when the activity resumes, and now that the
+     window resizes for the keyboard it can be reset mid-session too. The
+     symptom is a status bar whose clock, battery and signal are simply not
+     there - the icons are still being drawn, in the colour of the background
+     they are sitting on.
+     Cheap enough to redo on every resume: two native calls, both ignorable. */
+  const restate = () => syncStatusBar(resolveTheme(getStoredThemeMode()));
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) restate();
+  });
+
+  if (Capacitor.isNativePlatform()) {
+    void import('@capacitor/app')
+      .then(({ App }) => App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive) restate();
+      }))
+      .catch(() => {
+        /* The visibilitychange listener above still covers the common case. */
+      });
+  }
 };
