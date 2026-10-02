@@ -105,66 +105,68 @@ class TestTheSnapshotCarriesTheThingsItWasMissing:
 
 
 class TestTheProviderChain:
-    """Gemini first, Groq when Gemini cannot answer.
+    """Groq first, Gemini behind it.
 
-    This exists because of the free tier. Gemini free allows roughly ten
-    requests a minute; three quick follow-ups can trip it, and a 429 used to
-    be indistinguishable from a stupid answer because the rule engine quietly
-    took over. Groq's free tier runs about three times that rate, so it
-    absorbs the overflow instead of the user absorbing it.
+    The order follows which provider actually answers. Gemini's free quota is
+    spent - 429 on every call - so asking it first bought nothing and cost the
+    user a timeout before the request that was going to work even began.
+
+    Gemini stays in the chain because one provider is no provider: when Groq's
+    daily allowance runs out, something has to answer other than the canned
+    rule engine.
     """
 
     def _snapshot(self):
         return {"currency": "INR", "today": "2026-10-02"}
 
-    def test_groq_answers_when_gemini_is_rate_limited(self, monkeypatch):
+    def test_gemini_answers_when_groq_is_rate_limited(self, monkeypatch):
         import asyncio
         from app.services import ai_llm
 
-        async def gemini_429(_payload):
-            return None  # what a 429 looks like after it is logged
+        async def groq_429(_payload):
+            return None  # what a rate limit looks like after it is logged
 
-        async def groq_ok(_payload):
+        async def gemini_ok(_payload):
             return '{"response_type": "ANSWER", "message": "Rs 210 on fuel."}'
 
-        monkeypatch.setattr(ai_llm, "_call_gemini", gemini_429)
-        monkeypatch.setattr(ai_llm, "_call_groq", groq_ok)
+        monkeypatch.setattr(ai_llm, "_call_groq", groq_429)
+        monkeypatch.setattr(ai_llm, "_call_gemini", gemini_ok)
         out = asyncio.run(ai_llm.query_llm("how much on fuel", self._snapshot()))
         assert out is not None, "the fallback provider never ran"
         assert out["message"] == "Rs 210 on fuel."
 
-    def test_groq_is_not_called_when_gemini_answers(self, monkeypatch):
+    def test_gemini_is_not_called_when_groq_answers(self, monkeypatch):
         import asyncio
         from app.services import ai_llm
 
-        called = {"groq": False}
+        called = {"gemini": False}
 
-        async def gemini_ok(_payload):
-            return '{"response_type": "ANSWER", "message": "from gemini"}'
-
-        async def groq_spy(_payload):
-            called["groq"] = True
+        async def groq_ok(_payload):
             return '{"response_type": "ANSWER", "message": "from groq"}'
 
-        monkeypatch.setattr(ai_llm, "_call_gemini", gemini_ok)
-        monkeypatch.setattr(ai_llm, "_call_groq", groq_spy)
-        out = asyncio.run(ai_llm.query_llm("hello", self._snapshot()))
-        assert out["message"] == "from gemini"
-        assert called["groq"] is False, "the understudy ran while the primary was fine"
+        async def gemini_spy(_payload):
+            called["gemini"] = True
+            return '{"response_type": "ANSWER", "message": "from gemini"}'
 
-    def test_groq_also_covers_gemini_returning_rubbish(self, monkeypatch):
+        monkeypatch.setattr(ai_llm, "_call_groq", groq_ok)
+        monkeypatch.setattr(ai_llm, "_call_gemini", gemini_spy)
+        out = asyncio.run(ai_llm.query_llm("hello", self._snapshot()))
+        assert out["message"] == "from groq", "the first provider was not asked first"
+        assert called["gemini"] is False, "the backup ran while the first choice was fine"
+
+    def test_gemini_also_covers_groq_returning_rubbish(self, monkeypatch):
         """Not just errors - a reply that will not parse is also a failure."""
         import asyncio
         from app.services import ai_llm
 
-        async def gemini_prose(_payload):
+        async def groq_prose(_payload):
             return "I'm sorry, I can't help with that."
 
-        async def groq_ok(_payload):
+        async def gemini_ok(_payload):
             return '{"response_type": "ANSWER", "message": "recovered"}'
 
-        monkeypatch.setattr(ai_llm, "_call_gemini", gemini_prose)
-        monkeypatch.setattr(ai_llm, "_call_groq", groq_ok)
+        monkeypatch.setattr(ai_llm, "_call_groq", groq_prose)
+        monkeypatch.setattr(ai_llm, "_call_gemini", gemini_ok)
         out = asyncio.run(ai_llm.query_llm("hello", self._snapshot()))
         assert out["message"] == "recovered"
 

@@ -47,7 +47,7 @@ PROVIDER_TIMEOUT_SECONDS = float(os.getenv("AI_PROVIDER_TIMEOUT", "9"))
 #: failures. Pick a model name from what the API says, not from memory.
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
-#: The understudy, tried when Gemini cannot answer - see _call_groq.
+#: The model that answers first - see the chain in query_llm.
 #:
 #: Chosen because it is on Groq's free tier, is strong at instruction-following
 #: and strict JSON, and is served through an OpenAI-compatible endpoint, so it
@@ -251,7 +251,10 @@ def _history_block(history: Optional[List[Dict[str, str]]]) -> str:
 
 
 async def _call_gemini(payload: str) -> Optional[str]:
-    """The primary. Returns raw model text, or None if it could not answer."""
+    """The backup, tried when Groq cannot answer.
+
+    Returns raw model text, or None if it could not answer.
+    """
     api_key = (os.getenv("GEMINI_API_KEY") or "").strip()
     if not api_key:
         return None
@@ -281,7 +284,7 @@ async def _call_gemini(payload: str) -> Optional[str]:
 
 
 async def _call_groq(payload: str) -> Optional[str]:
-    """The understudy, used when Gemini cannot answer.
+    """The one tried first, because it is the one whose free tier is live.
 
     Plain HTTP against Groq's OpenAI-compatible surface rather than another
     SDK: it is one POST, and the project already depends on httpx. That also
@@ -346,14 +349,22 @@ async def query_llm(
         + "</untrusted_input>"
     )
 
-    # Tried in order, and the second one exists because of the first one's
-    # free tier. Gemini free allows about ten requests a minute; a person
-    # asking three quick follow-ups can trip that, and a 429 looked exactly
-    # like a stupid answer because the rule engine quietly took over. Groq's
-    # free tier is roughly three times the rate, so it catches the overflow
-    # rather than the user catching it.
+    # GROQ FIRST, Gemini behind it - the order follows which one actually
+    # answers, not which one is nominally better.
+    #
+    # Gemini was first and could not answer at all: its free quota is spent
+    # (429 on every call), so asking it first bought nothing and cost up to
+    # PROVIDER_TIMEOUT_SECONDS of the user's wait before the request that was
+    # going to work even started. Groq's free tier is both live and roughly
+    # three times the per-minute rate.
+    #
+    # Gemini stays in the chain rather than being removed, because one
+    # provider is no provider: Groq's free tier is about a thousand requests a
+    # day, and when that runs out or Groq has an outage the fallback is the
+    # canned rule engine unless something else can answer. Swap the order back
+    # whenever Gemini's quota is real again.
     parsed: Optional[Dict[str, Any]] = None
-    for provider in (_call_gemini, _call_groq):
+    for provider in (_call_groq, _call_gemini):
         try:
             raw = await asyncio.wait_for(provider(payload), PROVIDER_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
