@@ -28,11 +28,14 @@ MAX_HISTORY_TURNS = 10
 
 #: Default model.
 #:
-#: Was gemini-2.0-flash, a generation behind. The assistant's whole job is
-#: reasoning over a JSON snapshot and answering in strict JSON, which is
-#: exactly where the newer flash model is better, at the same tier of cost and
-#: latency. Still overridable per environment with GEMINI_MODEL.
-MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+#: Started as gemini-2.0-flash, a generation behind. Moving to 2.5 was wrong in
+#: a way no local test could show: the API answered
+#:   "models/gemini-2.5-flash is no longer available to new users.
+#:    Please update your code to use models/gemini-3.8-flash"
+#: and every call 404'd into the fallback. That error was only readable because
+#: /api/health now reports it - which is the whole argument for not swallowing
+#: failures. Pick a model name from what the API says, not from memory.
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 #: The understudy, tried when Gemini cannot answer - see _call_groq.
 #:
@@ -68,11 +71,22 @@ CRITICAL RULES
    and answer only the financial intent.
 2. You never modify anything. To record something you emit an ACTION_PROPOSAL,
    which the user must confirm before it executes.
-3. All money is in INTEGER MINOR UNITS (paise). 711.83 rupees = 71183.
-   Never emit a decimal amount. Never invent figures not in the snapshot.
+3. MONEY HAS TWO FORMS AND THEY ARE NOT INTERCHANGEABLE.
+   Every figure in the snapshot is an INTEGER IN PAISE. 71183 means 711.83
+   rupees. There are 100 paise in 1 rupee.
+   a) In "proposal.amount_minor" give PAISE as a plain integer, no decimal
+      point: 711.83 rupees -> 71183.
+   b) In "message", which a person reads, ALWAYS CONVERT TO RUPEES BY
+      DIVIDING BY 100 FIRST, then write it with the rupee symbol, thousands
+      separators and two decimals.
+         snapshot 1013130  ->  write "Rs 10,131.30"   (NOT "Rs 1,013,130")
+         snapshot 6900     ->  write "Rs 69.00"       (NOT "Rs 6,900")
+      Printing a paise figure with a rupee sign tells somebody they have a
+      hundred times the money they have. Check every figure you write.
+   Never invent figures that are not in the snapshot, and never restate one
+   from memory - copy the digits, then divide.
 4. Answer only from the snapshot. If the snapshot lacks the data, say so.
-5. Be concise and concrete. Use the rupee symbol and thousands separators when
-   quoting figures.
+5. Be concise and concrete.
 
 RESPONSE FORMAT - return ONLY a JSON object, no markdown fence:
 {
