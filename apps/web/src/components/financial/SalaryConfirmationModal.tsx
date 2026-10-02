@@ -43,7 +43,16 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
   // One dialog does both jobs: record what actually arrived, and optionally
   // remember it as a monthly stream. Splitting them across two modals meant
   // setting up salary and recording salary were separate journeys.
-  const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  // TRUE in both places it is set - here and in the reset effect below.
+  //
+  // Setting it only in the reset was not enough, and the device proved it:
+  // the first open after launch showed the box CLEAR and every open after it
+  // showed it ticked. The reset runs inside a setTimeout(0) whose cleanup
+  // clears the timer, so on a cold mount - while the parent is still settling
+  // from its own fetches - that one pass can be lost. Any state whose wrong
+  // value is silently destructive should not depend on a deferred write; with
+  // the initialiser correct too there is no window where it is false.
+  const [isRecurring, setIsRecurring] = useState<boolean>(true);
   const [rules, setRules] = useState<RecurringIncome[]>([]);
   const [rulesBusy, setRulesBusy] = useState<boolean>(false);
 
@@ -61,7 +70,18 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
     const timer = setTimeout(() => {
       setConfirmedTransaction(null);
       setFormError(null);
-      setIsRecurring(false);
+      // ON by default, which is the whole point of the dialog.
+      //
+      // It defaulted to off, and the stream is only written when it is on - so
+      // the ordinary path through "set up salary" recorded the payment and
+      // remembered nothing. `has_salary_configured` stayed false, the home
+      // card kept offering to set up a salary that had been set up several
+      // times, and the next payday prompted nobody. One real account ended up
+      // with a Rs 12,500 salary transaction and zero recurring rules.
+      //
+      // A salary is monthly; that is what makes it a salary. The rule touches
+      // no balance, and the box is right there to clear for a one-off bonus.
+      setIsRecurring(true);
       setAmountPaise(recurringSalary ? recurringSalary.amount_minor : 0);
       setSourceName(recurringSalary ? recurringSalary.source : 'Monthly Salary');
       setTxDate(nowForDateTimeInput());

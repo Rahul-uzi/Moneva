@@ -9,6 +9,7 @@ import { BillCard } from '../components/financial/BillCard';
 import { TransactionRow } from '../components/financial/TransactionRow';
 import { TransactionDetailModal } from '../components/financial/TransactionDetailModal';
 import { SalaryConfirmationModal } from '../components/financial/SalaryConfirmationModal';
+import { RecurringSalaryModal } from '../components/financial/RecurringSalaryModal';
 import { DueSalaryCard } from '../components/financial/DueSalaryCard';
 import { PaydayCard } from '../components/financial/PaydayCard';
 import { PendingPayments } from '../components/financial/PendingPayments';
@@ -78,6 +79,15 @@ export const HomePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isSalaryDialogOpen, setIsSalaryDialogOpen] = useState<boolean>(false);
+  /* "Set up salary" opens THIS, not the confirmation dialog.
+     The card offers to "add your salary once" so the month can be tracked
+     against it - a description of a standing arrangement, not of a payment
+     that has just landed. It opened the confirmation dialog, which always
+     posts a transaction, so following that link on any day other than payday
+     credited a month's pay that never arrived. Setting the expectation moves
+     no money; `onSelectForConfirmation` is the way through to recording one. */
+  const [isSalaryStreamOpen, setIsSalaryStreamOpen] = useState<boolean>(false);
+  const [ruleToConfirm, setRuleToConfirm] = useState<RecurringIncome | null>(null);
 
   const { addToast } = useUiStore();
 
@@ -238,7 +248,7 @@ export const HomePage: React.FC = () => {
 
       {/* 3. This month's income vs spending */}
       {salaryUsage && (
-        <SalaryUsageCard usage={salaryUsage} onSetUpSalary={() => setIsSalaryDialogOpen(true)} />
+        <SalaryUsageCard usage={salaryUsage} onSetUpSalary={() => setIsSalaryStreamOpen(true)} />
       )}
 
       {/* 4. Accounts Overview */}
@@ -346,13 +356,34 @@ export const HomePage: React.FC = () => {
           </div>
         )}
       </div>
-      {/* One dialog: what arrived, and whether it repeats. */}
+      {/* Setting the expectation. Writes a rule, moves no money. */}
+      <RecurringSalaryModal
+        isOpen={isSalaryStreamOpen}
+        onClose={() => {
+          setIsSalaryStreamOpen(false);
+          // The card is driven by whether a stream exists, so it has to be
+          // asked again - otherwise it still reads "Set up salary" directly
+          // after one was set up, which is the bug this pair of changes is
+          // about.
+          void fetchAllData(true);
+        }}
+        onSelectForConfirmation={(rule) => {
+          setIsSalaryStreamOpen(false);
+          setRuleToConfirm(rule);
+          setIsSalaryDialogOpen(true);
+        }}
+      />
+
+      {/* What actually arrived, and whether it repeats. */}
       <SalaryConfirmationModal
         isOpen={isSalaryDialogOpen}
-        recurringSalary={null}
+        recurringSalary={ruleToConfirm}
         accounts={accounts}
         categories={categories}
-        onClose={() => setIsSalaryDialogOpen(false)}
+        onClose={() => {
+          setIsSalaryDialogOpen(false);
+          setRuleToConfirm(null);
+        }}
         onSuccess={() => void fetchAllData(true)}
       />
 

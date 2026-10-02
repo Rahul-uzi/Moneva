@@ -138,65 +138,14 @@
 }
 
 /*
-  Custom checkbox.
-
-  `accent-color` hands the checkmark's colour to the browser, which picks it
-  for contrast and cannot be overridden. Drawing the control ourselves is the
-  only way to theme the tick, so the box is reset and the mark is a rotated
-  border on ::after - crisp at any density, and no image to load.
-
-  The row is a <label>, so the 22px control is not the tap target.
+  The custom checkbox used to live here, and that was the bug: Vite emits
+  this file as the Profile ROUTE's chunk, so the rules only arrived once
+  somebody had opened Profile. `.toggle-checkbox` is also worn by the
+  salary dialog, which opens from Home and from the add sheet - on a cold
+  start that reached it without visiting Profile, the control fell back to
+  the browser's own blue checkbox. It is in index.css now, with the other
+  shared controls.
 */
-.toggle-checkbox {
-  appearance: none;
-  -webkit-appearance: none;
-  position: relative;
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  margin: 0;
-  border: 2px solid var(--moneva-border);
-  border-radius: 6px;
-  background-color: transparent;
-  cursor: pointer;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast),
-    transform var(--transition-fast);
-}
-
-.toggle-checkbox:checked {
-  background-color: var(--moneva-teal);
-  border-color: var(--moneva-teal);
-}
-
-.toggle-checkbox::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 46%;
-  width: 5px;
-  height: 10px;
-  border: solid var(--moneva-tick);
-  border-width: 0 2.5px 2.5px 0;
-  transform: translate(-50%, -55%) rotate(45deg) scale(0);
-  transition: transform 0.18s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-.toggle-checkbox:checked::after {
-  transform: translate(-50%, -55%) rotate(45deg) scale(1);
-}
-
-.toggle-checkbox:active {
-  transform: scale(0.88);
-}
-
-.toggle-checkbox:focus-visible {
-  outline: 2px solid var(--moneva-blue);
-  outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toggle-checkbox::after { transition: none; }
-}
 
 .security-status-grid {
   display: grid;
