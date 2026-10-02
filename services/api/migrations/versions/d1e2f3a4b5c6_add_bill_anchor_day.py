@@ -1,7 +1,7 @@
 """Add bills.anchor_day so recurring bills stop drifting
 
-Revision ID: a7b8c9d0e1f2
-Revises: f6a7b8c9d0e1
+Revision ID: d1e2f3a4b5c6
+Revises: c9d0e1f2a3b4
 Create Date: 2026-10-02
 
 Paying a bill now produces the next one instead of marking it Paid for good,
@@ -18,8 +18,8 @@ date they are on today.
 from alembic import op
 import sqlalchemy as sa
 
-revision = 'a7b8c9d0e1f2'
-down_revision = 'f6a7b8c9d0e1'
+revision = 'd1e2f3a4b5c6'
+down_revision = 'c9d0e1f2a3b4'
 branch_labels = None
 depends_on = None
 
