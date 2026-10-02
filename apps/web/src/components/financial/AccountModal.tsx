@@ -190,11 +190,29 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         </div>
 
         {!isEditing && (
-          <AmountInput
-            valuePaise={openingBalancePaise}
-            onChangePaise={setOpeningBalancePaise}
-            label="Opening / Starting Balance"
-          />
+          <>
+            <AmountInput
+              valuePaise={openingBalancePaise}
+              onChangePaise={setOpeningBalancePaise}
+              label="Opening / Starting Balance"
+            />
+            {/* The one hint that was missing, on the one field where the wrong
+                answer is unrecoverable.
+                "Opening balance" reads as "the balance", so people type what
+                the account holds today - and then import a statement, and
+                every rupee is counted twice: once in the opening figure and
+                again in the payments that produced it. Editing does not undo
+                it either, because changing the opening balance posts a
+                correction rather than rewriting history. Three hints appear
+                once the account exists; there were none at the moment the
+                decision is actually made. */}
+            <p className="account-modal-hint">
+              Where this account's history <em>starts</em>, not what it holds
+              now. Bringing in a statement? Put <strong>0</strong> and let the
+              payments build the balance - your own figure plus those payments
+              would count the same money twice.
+            </p>
+          </>
         )}
 
         {/* Only once the account exists, because before that the opening
