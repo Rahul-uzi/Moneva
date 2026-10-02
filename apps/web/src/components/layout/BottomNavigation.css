@@ -93,3 +93,20 @@
     transition: none;
   }
 }
+
+/*
+  Out of the way while the keyboard is up.
+
+  The dock sits against the bottom of the viewport, and the window resizes when
+  the keyboard opens - so it came to rest directly on top of the input that
+  raised it. On the assistant that is the message box, which is the entire
+  point of the screen; the composer was visible only as a sliver of its border
+  peeking out from under the bar.
+
+  Hidden rather than merely nudged up: while someone is typing, the thing they
+  are typing into matters and five navigation tabs do not. It comes straight
+  back when the keyboard closes.
+*/
+.app-viewport[data-keyboard='open'] .dock {
+  display: none;
+}

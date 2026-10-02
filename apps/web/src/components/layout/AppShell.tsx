@@ -51,6 +51,45 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
    * having to do anything.
    */
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  /* Whether the on-screen keyboard is covering part of the window.
+
+     The dock is positioned against the bottom of the viewport, and the window
+     now resizes when the keyboard opens (windowSoftInputMode=adjustResize), so
+     the dock lands exactly on top of whatever input raised it - on the
+     assistant that is the message box, the one control the screen exists for.
+     Chat apps hide the bar for the same reason.
+
+     Measured with visualViewport because that is what actually changes;
+     listening for focus events would also fire for a date picker or a select,
+     which do not take the bottom of the screen. */
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    /* Measured against the TALLEST this window has been, not against
+       visualViewport.
+
+       The obvious check - innerHeight minus visualViewport.height - is the
+       right one on the web, where the keyboard overlays the page. It reports
+       nothing here: windowSoftInputMode=adjustResize resizes the window
+       itself, so both numbers shrink together and the difference stays zero.
+       What actually changes is the window's height against its own usual
+       height, so that is what is compared. */
+    let tallest = window.innerHeight;
+    const check = () => {
+      const now = window.innerHeight;
+      if (now > tallest) tallest = now;        // rotation, or the bar coming back
+      // A keyboard takes a serious bite. 180px is well above a system bar
+      // appearing or disappearing and well below any real keyboard.
+      setIsKeyboardOpen(tallest - now > 180);
+    };
+    check();
+    window.addEventListener('resize', check);
+    window.visualViewport?.addEventListener('resize', check);
+    return () => {
+      window.removeEventListener('resize', check);
+      window.visualViewport?.removeEventListener('resize', check);
+    };
+  }, []);
   const [update, setUpdate] = useState<UpdateNews | null>(null);
   const [showSetup, setShowSetup] = useState<boolean>(isSetupPending);
   const [showTour, setShowTour] = useState<boolean>(isTourPending);
@@ -213,7 +252,7 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
   };
 
   return (
-    <div className="app-viewport">
+    <div className="app-viewport" data-keyboard={isKeyboardOpen ? 'open' : undefined}>
       <TopBar
         title={title}
         unreadCount={unreadCount}

@@ -12,3 +12,10 @@
   flex-direction: column;
   gap: 16px;
 }
+
+/* With the dock hidden there is nothing left to clear, and keeping 90px of it
+   would push the composer back off a screen the keyboard has already made
+   short. */
+.app-viewport[data-keyboard='open'] .app-content {
+  padding-bottom: 12px;
+}
