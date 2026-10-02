@@ -251,7 +251,15 @@ export const AssistantPage: React.FC = () => {
         role: m.sender,
         content: m.text.slice(0, 2000),
       }));
-      const res = await apiClient.post<AIResponseData>('/ai/query', { prompt: text, history });
+      const res = await apiClient.post<AIResponseData>(
+        '/ai/query',
+        { prompt: text, history },
+        // Longer than the client's general 15s, because this one request is a
+        // model round trip and possibly two: a rate-limited primary has to
+        // fail and the understudy has to answer, and at 15s the app gave up
+        // first and blamed the network for a question that was being answered.
+        { timeout: 45000 },
+      );
       setIsThinking(false);
 
       const data = res.data;

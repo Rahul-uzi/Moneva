@@ -14,6 +14,7 @@ Design constraints carried over from the rule engine:
 * If no API key is configured, or the call fails for any reason, this module
   returns None and the caller falls back to the deterministic rule engine.
 """
+import asyncio
 import json
 import logging
 import os
@@ -25,6 +26,15 @@ logger = logging.getLogger(__name__)
 #: How many earlier turns to replay. Enough for "and last month?" to mean
 #: something, short enough that the prompt stays small.
 MAX_HISTORY_TURNS = 10
+
+#: How long any one provider gets before the chain moves on.
+#:
+#: The understudy is worthless if the primary can hold the whole request open.
+#: Gemini's SDK retries a 429 internally for a long time, so an exhausted free
+#: quota ate the client's entire 15 second budget and the app showed "check
+#: your network connection" - with Groq sitting there never asked. A provider
+#: that cannot answer quickly has not answered.
+PROVIDER_TIMEOUT_SECONDS = float(os.getenv("AI_PROVIDER_TIMEOUT", "9"))
 
 #: Default model.
 #:
@@ -344,7 +354,14 @@ async def query_llm(
     # rather than the user catching it.
     parsed: Optional[Dict[str, Any]] = None
     for provider in (_call_gemini, _call_groq):
-        raw = await provider(payload)
+        try:
+            raw = await asyncio.wait_for(provider(payload), PROVIDER_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            name = provider.__name__.replace("_call_", "")
+            logger.warning("%s did not answer within %ss; trying the next provider.",
+                           name, PROVIDER_TIMEOUT_SECONDS)
+            _remember_error(name, f"timed out after {PROVIDER_TIMEOUT_SECONDS}s")
+            continue
         if raw is None:
             continue
         parsed = _extract_json(raw)
