@@ -276,6 +276,12 @@ class Bill(Base):
     currency = Column(String, default="INR", nullable=False)
     due_date = Column(DateTime(timezone=True), nullable=False)
     recurrence = Column(String, nullable=True)  # monthly, weekly, yearly, one-time
+    # The day of the month this bill is anchored to, for the same reason
+    # recurring_incomes carries one: paying a recurring bill advances its due
+    # date, and advancing from due_date alone drifts - a bill due on the 31st
+    # clamps to 28 in February and stays there. Nullable for rows written
+    # before this existed; the handler falls back to due_date.day.
+    anchor_day = Column(SmallInteger, nullable=True)
     category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     status = Column(String, default="upcoming", nullable=False)  # upcoming, due, overdue, paid, cancelled
     reminder_enabled = Column(Boolean, default=True, nullable=False)

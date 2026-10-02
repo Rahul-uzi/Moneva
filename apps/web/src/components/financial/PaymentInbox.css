@@ -248,3 +248,21 @@
 :root[data-theme='light'] .pay-inbox-cat-name {
   background-color: rgba(110, 150, 0, 0.1);
 }
+
+/*
+  The bill line on a payment card.
+
+  Deliberately louder than the category line below it: agreeing to a category
+  files a row, agreeing to this settles a bill and moves its due date a month.
+*/
+.pay-inbox-bill {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--moneva-text-muted);
+}
+
+.pay-inbox-bill-name {
+  font-weight: 600;
+  color: var(--moneva-teal);
+}

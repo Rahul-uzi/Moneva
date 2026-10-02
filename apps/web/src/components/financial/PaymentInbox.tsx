@@ -16,10 +16,11 @@ import {
 } from '../../services/notificationCapture';
 import type { AlertProposal } from '../../utils/paymentAlert';
 import { suggestCategory } from '../../utils/categorise';
+import { matchBillForPayment } from '../../utils/billMatch';
 import { decideConfirm, badgeFor, needsDestinationPicker, describeProposal } from './paymentInboxRules';
 import { recordConfirmation, recordRejection } from '../../utils/autoAdd';
 import { loadTrustLedger, saveTrustLedger } from '../../services/autoAddStore';
-import type { Account, Category, Transaction } from '../../types/api';
+import type { Account, Bill, Category, Transaction } from '../../types/api';
 import './PaymentInbox.css';
 
 interface Props {
@@ -57,6 +58,9 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
   const [toAccountId, setToAccountId] = useState<string>('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [history, setHistory] = useState<Transaction[]>([]);
+  /* What is still owed, so a mandate that has already taken the money can
+     settle the bill instead of being filed as a second expense. */
+  const [bills, setBills] = useState<Bill[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const addToast = useUiStore((s) => s.addToast);
@@ -84,18 +88,20 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
       // The account list is needed before anything can be confirmed: an alert
       // names a bank, not one of this app's accounts, so the user picks.
       try {
-        const [accRes, catRes, txRes] = await Promise.all([
+        const [accRes, catRes, txRes, billRes] = await Promise.all([
           apiClient.get<Account[]>('/accounts'),
           apiClient.get<Category[]>('/categories'),
           // Recent history only, and only so a payee already filed once is
           // filed the same way again - see categorise.ts. Their own past
           // decision is the one signal that is not a guess.
           apiClient.get<Transaction[]>('/transactions', { params: { limit: 200 } }),
+          apiClient.get<Bill[]>('/bills'),
         ]);
         if (!alive) return;
         setAccounts(accRes.data);
         setCategories(catRes.data);
         setHistory(txRes.data);
+        setBills(billRes.data);
         // An asset account by preference: a payment alert almost always
         // describes money leaving a bank account, not a credit card being
         // repaid, and picking the first liability would be wrong more often.
@@ -118,6 +124,14 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
     else void refresh();
   };
 
+  /** The bill this payment settles, if it plainly settles one. */
+  const billFor = (proposal: AlertProposal) =>
+    matchBillForPayment(
+      { amountPaise: proposal.amountPaise, kind: proposal.kind, postedAt: proposal.postedAt,
+        merchant: proposal.merchant },
+      bills,
+    );
+
   const confirm = async (proposal: AlertProposal) => {
     const decision = decideConfirm(proposal.kind, accountId, toAccountId);
     if (!decision.ok) {
@@ -126,6 +140,29 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
     }
     setBusyId(proposal.clientMutationId);
     try {
+      /* An autopay has already taken the money, so the bill is settled rather
+         than a second expense written beside it. /bills/{id}/pay creates the
+         expense itself AND rolls a recurring bill to its next date - the two
+         things that would otherwise both be missed, leaving the rupees counted
+         twice and the bill owed. Same client_mutation_id, so the idempotency
+         that protects a retried confirmation still protects this one. */
+      const matched = billFor(proposal);
+      if (matched) {
+        await apiClient.post<Transaction>(`/bills/${matched.bill.id}/pay`, {
+          client_mutation_id: proposal.clientMutationId,
+          account_id: accountId,
+          payment_date: new Date(proposal.postedAt).toISOString(),
+          device_id: 'android-notification',
+        });
+        saveTrustLedger(recordConfirmation(loadTrustLedger(), proposal, Date.now()));
+        await acknowledgeProposal(proposal);
+        setProposals((rest) => rest.filter((p) => p.clientMutationId !== proposal.clientMutationId));
+        setBills((rest) => rest.filter((b) => b.id !== matched.bill.id));
+        addToast(`${matched.bill.name} marked paid.`, 'success');
+        onSuccess();
+        return;
+      }
+
       // The category is a suggestion, shown on the card before this runs, so
       // nothing is filed under a guess the user has not seen. Null when
       // nothing matched - an uncategorised row beats a wrong one, which
@@ -336,11 +373,22 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
                     simply appears is one nobody checks; "because you filed
                     Swiggy under Food & Dining before" is something a person
                     can agree or disagree with at a glance. */}
-                {categoryFor(p).categoryName && (
-                  <p className="pay-inbox-category">
-                    <span className="pay-inbox-cat-name">{categoryFor(p).categoryName}</span>
-                    {categoryFor(p).reason ? ` - ${categoryFor(p).reason}` : ''}
+                {billFor(p) ? (
+                  /* Same principle as the category line, with more riding on
+                     it: confirming this settles a bill and moves its due date,
+                     so the user is told which bill and why BEFORE the tick,
+                     not shown a toast afterwards. */
+                  <p className="pay-inbox-bill">
+                    <span className="pay-inbox-bill-name">Bill: {billFor(p)!.bill.name}</span>
+                    {` - ${billFor(p)!.reason}. Confirming marks it paid.`}
                   </p>
+                ) : (
+                  categoryFor(p).categoryName && (
+                    <p className="pay-inbox-category">
+                      <span className="pay-inbox-cat-name">{categoryFor(p).categoryName}</span>
+                      {categoryFor(p).reason ? ` - ${categoryFor(p).reason}` : ''}
+                    </p>
+                  )
                 )}
               </div>
             ))}

@@ -10,8 +10,18 @@ from app.core.security import get_current_user
 from app.db.database import get_db
 from app.models.models import User, Bill, Account, Transaction
 from app.schemas.schemas import BillCreate, BillUpdate, BillResponse, BillPayPayload, TransactionResponse
+from app.services.recurring import _as_utc, next_after
 
 router = APIRouter(prefix="/bills", tags=["Bills"])
+
+#: Recurrences that produce another bill after this one is settled.
+#:
+#: "one-time" and an empty recurrence are the opposite case and must stay the
+#: opposite case: those really are finished when paid, and rolling them forward
+#: would resurrect a bill the user settled for good.
+RECURRING_BILL_PERIODS = frozenset(
+    {"daily", "weekly", "fortnightly", "biweekly", "monthly", "quarterly", "yearly", "annually"}
+)
 
 @router.get("", response_model=List[BillResponse])
 async def list_bills(
@@ -40,6 +50,8 @@ async def create_bill(
         amount_minor=payload.amount_minor,
         currency=payload.currency or current_user.currency,
         due_date=payload.due_date,
+        # The day the user meant, kept so a 31st bill survives February.
+        anchor_day=payload.due_date.day,
         recurrence=payload.recurrence,
         category_id=payload.category_id,
         status=payload.status or "upcoming",
@@ -88,6 +100,10 @@ async def update_bill(
         b.amount_minor = payload.amount_minor
     if payload.due_date is not None:
         b.due_date = payload.due_date
+        # Moving the due date re-states which day of the month is meant, so
+        # the anchor follows it. Without this, editing a 15th bill to the 31st
+        # would advance it on the 15th forever.
+        b.anchor_day = payload.due_date.day
     if payload.recurrence is not None:
         b.recurrence = payload.recurrence
     if payload.category_id is not None:
@@ -167,8 +183,31 @@ async def pay_bill(
     if not account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment account not found.")
 
-    # Mark bill paid
-    b.status = "paid"
+    # Settle it - and, if it repeats, line up the next one.
+    #
+    # `recurrence` was stored and shown and nothing ever acted on it: paying a
+    # monthly bill set it to "paid" and left the due date where it was, so the
+    # bill never came back. A Spotify autopay on the 3rd showed "Monthly",
+    # settled once, and then sat Paid for the next ten years while the money
+    # kept leaving the account every month.
+    #
+    # The next date is anchored to the DUE date, not to when it was paid: a
+    # subscription that bills on the 3rd still bills on the 3rd when February
+    # is paid late on the 9th. `next_after` carries the anchor day through
+    # short months, so the 31st survives February instead of sticking at 28.
+    paid_at = payload.payment_date or datetime.now(timezone.utc)
+    if (b.recurrence or "").strip().lower() in RECURRING_BILL_PERIODS:
+        anchor_day = b.anchor_day or b.due_date.day
+        nxt = _as_utc(b.due_date)
+        # Several periods can have gone by on a bill nobody settled. Walk
+        # forward to the first one still ahead of this payment rather than
+        # landing on another date already in the past.
+        while nxt <= _as_utc(paid_at):
+            nxt = next_after(nxt, b.recurrence, anchor_day)
+        b.due_date = nxt
+        b.status = "upcoming"
+    else:
+        b.status = "paid"
 
     # Create expense transaction
     tx_payment = Transaction(
