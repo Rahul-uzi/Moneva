@@ -76,13 +76,24 @@ def parse_amount_to_minor(text: str) -> Optional[int]:
 async def _build_snapshot(user_id: uuid.UUID, db: AsyncSession) -> dict:
     """Read-only picture of the user's finances handed to the model as context."""
     summary = await get_financial_summary_tool(user_id, db)
+    now = datetime.now(timezone.utc)
     return {
         "currency": "INR",
         "note": "All amounts are integer minor units (paise). 100 = 1 rupee.",
+        # The assistant was never told what day it is, so "this month", "last
+        # week" and "yesterday" were unanswerable - it either refused or made
+        # a date up. Everything else in here is undated context; this is what
+        # makes it a timeline.
+        "today": now.date().isoformat(),
+        "current_month": now.strftime("%B %Y"),
         "summary": summary,
         "accounts": await get_account_balances_tool(user_id, db),
         "category_spend_this_month": await get_category_breakdown_tool(user_id, db),
-        "recent_transactions": await get_recent_transactions_tool(user_id, db, limit=8),
+        # Eight was not a history, it was a glimpse - roughly a week for anyone
+        # who uses the app as intended, so "what did I spend on groceries"
+        # could only ever see a sliver and answer confidently from it. Sixty
+        # covers a couple of months and still costs a fraction of the window.
+        "recent_transactions": await get_recent_transactions_tool(user_id, db, limit=60),
         "budgets": await get_budgets_tool(user_id, db),
         "goals": await get_goals_tool(user_id, db),
         "bills": await get_bills_tool(user_id, db),
@@ -146,7 +157,12 @@ async def _resolve_proposal_names(
     )
 
 
-async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) -> AIQueryResponse:
+async def process_ai_query(
+    user_id: uuid.UUID,
+    prompt: str,
+    db: AsyncSession,
+    history: Optional[List[dict]] = None,
+) -> AIQueryResponse:
     """
     Processes a natural-language financial query for an authenticated user.
 
@@ -158,7 +174,7 @@ async def process_ai_query(user_id: uuid.UUID, prompt: str, db: AsyncSession) ->
     if ai_llm.is_enabled():
         try:
             snapshot = await _build_snapshot(user_id, db)
-            llm = await ai_llm.query_llm(prompt, snapshot)
+            llm = await ai_llm.query_llm(prompt, snapshot, history)
             if llm:
                 proposal = None
                 if llm.get("proposal"):

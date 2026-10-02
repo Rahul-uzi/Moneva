@@ -241,7 +241,17 @@ export const AssistantPage: React.FC = () => {
     setIsThinking(true);
 
     try {
-      const res = await apiClient.post<AIResponseData>('/ai/query', { prompt: text });
+      /* The conversation so far, so a follow-up has something to attach to.
+         The thread was already on screen and already in localStorage - it was
+         simply never sent, so "and last month?" reached the model with no
+         "last month" to refer to and came back as a non-answer. Trimmed to the
+         last ten turns, and `messages` is read BEFORE this turn's own reply so
+         the question is not duplicated as its own context. */
+      const history = messages.slice(-10).map((m) => ({
+        role: m.sender,
+        content: m.text.slice(0, 2000),
+      }));
+      const res = await apiClient.post<AIResponseData>('/ai/query', { prompt: text, history });
       setIsThinking(false);
 
       const data = res.data;

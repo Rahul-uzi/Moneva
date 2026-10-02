@@ -131,6 +131,20 @@ services:
       - key: GEMINI_API_KEY
         sync: false
 
+      # The assistant's understudy, tried when Gemini cannot answer.
+      #
+      # Both free tiers are real, and the limit that bites is requests per
+      # minute: Gemini free allows about ten, which three quick follow-ups can
+      # trip, and a 429 is indistinguishable from a stupid answer because the
+      # rule engine silently takes over. Groq free runs about three times that
+      # rate, so it absorbs the overflow.
+      #
+      # Optional. Either key alone switches the assistant on; neither means the
+      # deterministic rule engine answers everything. Check which is actually
+      # configured at /api/health, under "ai".
+      - key: GROQ_API_KEY
+        sync: false
+
       # ------------------------------------------------------------------
       # WHAT THE APP IS TOLD WHEN IT CHECKS FOR AN UPDATE.
       #

@@ -52,10 +52,29 @@ async def get_category_breakdown_tool(user_id: uuid.UUID, db: AsyncSession) -> L
     ]
 
 async def get_recent_transactions_tool(user_id: uuid.UUID, db: AsyncSession, limit: int = 5) -> List[Dict[str, Any]]:
-    """Returns recent transactions for the user."""
+    """Returns recent transactions for the user, each with its category and account.
+
+    The category and account names are the point. Without them the assistant
+    received a list of descriptions and amounts and was then asked things like
+    "how much did I spend on food" - questions it could only answer by guessing
+    from the wording, which is exactly the kind of confident wrong answer that
+    makes an assistant useless. Joined here rather than looked up per row: one
+    query for the categories and one for the accounts, not one per transaction.
+    """
     stmt = select(Transaction).where(Transaction.user_id == user_id).order_by(Transaction.transaction_date.desc()).limit(limit)
     res = await db.execute(stmt)
     txs = res.scalars().all()
+
+    cat_ids = {tx.category_id for tx in txs if tx.category_id}
+    acc_ids = {tx.account_id for tx in txs if tx.account_id}
+    cat_names: Dict[Any, str] = {}
+    acc_names: Dict[Any, str] = {}
+    if cat_ids:
+        rows = await db.execute(select(Category.id, Category.name).where(Category.id.in_(cat_ids)))
+        cat_names = {cid: name for cid, name in rows.all()}
+    if acc_ids:
+        rows = await db.execute(select(Account.id, Account.name).where(Account.id.in_(acc_ids)))
+        acc_names = {aid: name for aid, name in rows.all()}
 
     return [
         {
@@ -63,6 +82,11 @@ async def get_recent_transactions_tool(user_id: uuid.UUID, db: AsyncSession, lim
             "transaction_type": tx.transaction_type,
             "amount_minor": tx.amount_minor,
             "description": tx.description,
+            # Explicitly null rather than omitted: "this payment has no
+            # category" is a fact worth the assistant knowing, and the user's
+            # imported history is full of them.
+            "category_name": cat_names.get(tx.category_id),
+            "account_name": acc_names.get(tx.account_id),
             "transaction_date": tx.transaction_date.isoformat()
         }
         for tx in txs

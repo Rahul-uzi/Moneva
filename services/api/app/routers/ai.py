@@ -26,7 +26,12 @@ async def ai_query(
         )
 
     try:
-        return await process_ai_query(user_id=current_user.id, prompt=payload.prompt, db=db)
+        return await process_ai_query(
+            user_id=current_user.id,
+            prompt=payload.prompt,
+            db=db,
+            history=[t.model_dump() for t in (payload.history or [])],
+        )
     except Exception as e:
         return AIQueryResponse(
             response_type=ResponseType.ERROR,

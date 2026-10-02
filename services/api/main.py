@@ -109,6 +109,7 @@ app.include_router(emis.router, prefix=settings.API_PREFIX)
 async def health_check():
     """API health status endpoint."""
     from app.services.mailer import delivery_status
+    from app.services.ai_llm import ai_status
 
     return {
         "status": "healthy",
@@ -119,6 +120,16 @@ async def health_check():
         # without this a broken mail config can only be found by noticing
         # that no email ever arrives.
         "email": delivery_status(),
+        # Whether the assistant is actually thinking, on the same principle as
+        # the mail block above: the configuration, never the key.
+        #
+        # Without this there was no way to tell a working assistant from one
+        # that had silently fallen back to the rule engine for every single
+        # question - a missing key, an expired key and a retired model name all
+        # produced the same canned answers and no signal anywhere. "The AI is
+        # stupid" was unanswerable because nobody could check whether the model
+        # had ever run.
+        "ai": ai_status(),
     }
 
 
