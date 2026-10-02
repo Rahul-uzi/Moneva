@@ -189,3 +189,39 @@ export const suggestCategory = (input: {
   // ---- 4. say nothing ---------------------------------------------------
   return none;
 };
+
+/**
+ * The same question, asked about a line of a bank statement.
+ *
+ * Statement rows differ from a payment alert in one way that matters here, so
+ * the two arguments are deliberately NOT the same string:
+ *
+ *   merchant - the CLEANED name, because that is what the row will be stored
+ *              as and therefore what a future import will compare its history
+ *              against. Matching on the raw narration would file the same
+ *              payee differently every month, since the reference number in
+ *              it changes with every payment.
+ *   text     - the RAW narration, because the cleaner's job is to produce a
+ *              readable label and it can drop the very word that places the
+ *              payment. "BY TRANSFER-UPI/DR/512345/INDIANOIL" cleans to
+ *              something a person can read; "indianoil" is what says Fuel.
+ *
+ * More haystack, same needle - so the clean name is used where identity
+ * matters and the full line where recognition does.
+ */
+export const suggestImportCategory = (input: {
+  /** The narration as the bank wrote it. */
+  raw: string;
+  /** The same narration after `subscriptionName`, if it produced anything. */
+  cleaned: string;
+  direction: 'debit' | 'credit';
+  categories: CategoryLike[];
+  history?: PastTransaction[];
+}): CategorySuggestion =>
+  suggestCategory({
+    merchant: input.cleaned || input.raw,
+    text: input.raw,
+    kind: input.direction,
+    categories: input.categories,
+    history: input.history,
+  });

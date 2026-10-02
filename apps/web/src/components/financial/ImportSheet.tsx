@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Upload, FileSpreadsheet, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -6,9 +6,10 @@ import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { formatMonetaryValue } from '../../utils/money';
-import { parseStatement, assignImportIds, type ParsedStatement } from '../../utils/parseStatement';
+import { parseStatement, assignImportIds, type ParsedStatement, type ParsedRow } from '../../utils/parseStatement';
 import { subscriptionName } from '../../utils/subscriptions';
-import type { Account } from '../../types/api';
+import { suggestImportCategory } from '../../utils/categorise';
+import type { Account, Category, Transaction } from '../../types/api';
 import './ImportSheet.css';
 
 interface Props {
@@ -56,8 +57,45 @@ export const ImportSheet: React.FC<Props> = ({ isOpen, onClose, onImported, acco
   const addToast = useUiStore((s) => s.addToast);
   // Scopes the derived ids to this account - see importMutationId.
   const ownerId = useAuthStore((s) => s.user?.id ?? '');
+  /* What the rows get filed under. Fetched here rather than passed in because
+     both callers - the profile page and first-run setup - would otherwise have
+     to load them purely to hand them straight back. History comes too: the
+     categoriser's best signal is what this person filed the same payee under
+     last time, which beats any keyword table. */
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [history, setHistory] = useState<Transaction[]>([]);
 
   const currency = accounts.find((a) => a.id === accountId)?.currency ?? 'INR';
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const [catRes, txRes] = await Promise.all([
+          apiClient.get<Category[]>('/categories'),
+          apiClient.get<Transaction[]>('/transactions', { params: { limit: 200 } }),
+        ]);
+        if (!alive) return;
+        setCategories(catRes.data);
+        setHistory(txRes.data);
+      } catch {
+        /* Not fatal. Without these every row simply arrives uncategorised,
+           which is what the import did before it could categorise at all. */
+      }
+    })();
+    return () => { alive = false; };
+  }, [isOpen]);
+
+  /** What this row should be filed under; see suggestImportCategory. */
+  const categoryFor = (row: ParsedRow): string | null =>
+    suggestImportCategory({
+      raw: row.description,
+      cleaned: subscriptionName(row.description),
+      direction: row.direction,
+      categories,
+      history,
+    }).categoryId;
 
   const reset = () => {
     setFileName(''); setParsed(null); setOutcome(null); setProgress(0);
@@ -144,6 +182,12 @@ export const ImportSheet: React.FC<Props> = ({ isOpen, onClose, onImported, acco
             // row's logo. Same filter the subscription list uses, so an
             // imported row and a captured one end up spelled alike.
             description: subscriptionName(row.description) || null,
+            // Same categoriser the payment alerts use. Without it a statement
+            // - the one action that brings in hundreds of rows at once - was
+            // the only path into the ledger that produced nothing a budget or
+            // a breakdown could read. Null where nothing matched, which is
+            // honest: a wrong category is worse than an empty one.
+            category_id: categoryFor(row),
             transaction_date: row.date,
           })),
         });
@@ -168,6 +212,12 @@ export const ImportSheet: React.FC<Props> = ({ isOpen, onClose, onImported, acco
 
   const layout = parsed?.layout;
   const preview = parsed?.rows.slice(0, 5) ?? [];
+  /* Counted for the preview line only - runImport asks again rather than
+     reusing this, because the categories may still be loading when the file
+     is read and a number shown is not a number sent. */
+  const categorised = parsed && categories.length
+    ? parsed.rows.reduce((n, r) => (categoryFor(r) ? n + 1 : n), 0)
+    : 0;
 
   return (
     <Modal isOpen={isOpen} onClose={() => { reset(); onClose(); }} title="Bring in a statement">
@@ -280,6 +330,18 @@ export const ImportSheet: React.FC<Props> = ({ isOpen, onClose, onImported, acco
                 <strong>{parsed.rows.length}</strong> rows ready
                 {parsed.skipped.length > 0 && (
                   <> · {parsed.skipped.length} skipped (headings, totals, blank lines)</>
+                )}
+                {/* Said before the button, like everything else on this
+                    screen: a category the user did not expect is easier to
+                    argue with now than to find later among three hundred
+                    rows. The ones with no match are named rather than hidden,
+                    because "28 of 32" invites the obvious next question. */}
+                {categorised > 0 && (
+                  <> · <strong>{categorised}</strong> will be categorised
+                    {categorised < parsed.rows.length && (
+                      <>, {parsed.rows.length - categorised} left blank</>
+                    )}
+                  </>
                 )}
               </p>
 

@@ -358,6 +358,11 @@ class ImportRow(BaseModel):
     amount_minor: int = Field(..., ge=-(10**15), le=10**15)
     currency: str = Field(default="INR", min_length=3, max_length=3)
     description: Optional[str] = Field(default=None, max_length=500)
+    # What the client's categoriser made of the narration. Optional, and
+    # VERIFIED in the handler rather than trusted: an id that is not this
+    # user's own (or a shared default) is dropped and the row still lands.
+    # Losing a payment over a label would be the wrong trade.
+    category_id: Optional[uuid.UUID] = None
     transaction_date: datetime
 
 
@@ -661,9 +666,18 @@ class AccountBalanceResponse(BaseModel):
     currency: str
 
 # ----------------- AI ASSISTANT SCHEMAS -----------------
+class AITurn(BaseModel):
+    """One earlier message, replayed so a follow-up has something to attach to."""
+    role: str = Field(max_length=16)
+    content: str = Field(max_length=2000)
+
+
 class AIQueryRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=1000)
     conversation_id: Optional[str] = None
+    #: Oldest first. Bounded here as well as in the service: this arrives from
+    #: the client, and an unbounded list would be an unbounded prompt.
+    history: Optional[List[AITurn]] = Field(default=None, max_length=20)
 
 
 

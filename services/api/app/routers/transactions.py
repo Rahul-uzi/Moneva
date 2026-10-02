@@ -348,6 +348,24 @@ async def _apply_import(db, user_id, payload, incoming_ids) -> ImportResult:
     )
     seen = {mutation_id: owner for mutation_id, owner in seen_res.all()}
 
+    # Which of the suggested categories this user may actually file under.
+    # ONE query for the whole chunk, not one per row: a per-row check would be
+    # five hundred round trips on a five hundred row import, which is the cost
+    # this endpoint exists to avoid. A null user_id is a shared default, the
+    # same rule the single-transaction route applies.
+    wanted_categories = {row.category_id for row in payload.rows if row.category_id}
+    allowed_categories: set = set()
+    if wanted_categories:
+        cat_res = await db.execute(
+            select(Category.id).where(
+                and_(
+                    Category.id.in_(wanted_categories),
+                    or_(Category.user_id == user_id, Category.user_id.is_(None)),
+                )
+            )
+        )
+        allowed_categories = {cid for (cid,) in cat_res.all()}
+
     created = 0
     duplicates = 0
     rejected: list[ImportRejection] = []
@@ -397,6 +415,12 @@ async def _apply_import(db, user_id, payload, incoming_ids) -> ImportResult:
                 amount_minor=row.amount_minor,
                 currency=row.currency,
                 description=row.description,
+                # Silently dropped when it is not a category this user may
+                # use. The row is still worth keeping - an unlabelled payment
+                # is a gap in a breakdown, a missing payment is a wrong balance.
+                category_id=(
+                    row.category_id if row.category_id in allowed_categories else None
+                ),
                 transaction_date=row.transaction_date,
                 device_id="statement-import",
             )

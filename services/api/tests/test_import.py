@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.security import create_access_token, hash_password
 from app.db.database import get_db
-from app.models.models import Account, Base, Transaction, User
+from app.models.models import Account, Base, Category, Transaction, User
 from main import app
 
 pytestmark = pytest.mark.asyncio
@@ -69,8 +69,9 @@ async def api():
     app.dependency_overrides.clear()
 
 
-def row(mutation_id=None, *, amount=25000, kind="expense", description="SWIGGY", days_ago=1):
-    return {
+def row(mutation_id=None, *, amount=25000, kind="expense", description="SWIGGY", days_ago=1,
+        category_id=None):
+    body = {
         "client_mutation_id": str(mutation_id or uuid.uuid4()),
         "transaction_type": kind,
         "amount_minor": amount,
@@ -78,6 +79,11 @@ def row(mutation_id=None, *, amount=25000, kind="expense", description="SWIGGY",
         "description": description,
         "transaction_date": (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat(),
     }
+    # Omitted entirely when absent, so the default-path tests exercise the
+    # same body an older client would send.
+    if category_id is not None:
+        body["category_id"] = category_id
+    return body
 
 
 async def send(client, account_id, rows):
@@ -573,3 +579,120 @@ class TestTheImportRoutesAreBounded:
             if res.status_code == 429:
                 break
         assert 429 in statuses, "the conversion route accepted an unbounded number of requests"
+
+
+class TestTheCategoryOnAnImportedRow:
+    """A statement row arrives with the client's guess at a category.
+
+    The guess is worth having - an import is the one action that brings in
+    hundreds of rows at once, and before this they all landed unlabelled, so
+    the single biggest route into the ledger was the only one that produced
+    nothing a budget or a breakdown could read.
+
+    But it is a client's guess at an id, which makes it the usual question:
+    what happens when the id is not one this user may use. The answer here is
+    deliberately NOT to reject the row. A category is a label; the payment is
+    the fact. Losing the fact to protect the label would be the wrong trade,
+    so a bad id is dropped and the row still lands.
+    """
+
+    async def test_a_category_of_this_users_own_is_applied(self, api):
+        client, factory, account_id, user_id = api
+        cat_id = uuid.uuid4()
+        async with factory() as session:
+            session.add(Category(id=cat_id, user_id=uuid.UUID(user_id),
+                                 name="Fuel", type="expense"))
+            await session.commit()
+
+        res = await send(client, account_id,
+                         [row(description="INDIAN OIL", category_id=str(cat_id))])
+        assert res.status_code == 200, res.text
+
+        async with factory() as session:
+            stored = (await session.execute(select(Transaction))).scalars().one()
+        assert stored.category_id == cat_id
+
+    async def test_a_shared_default_category_is_applied(self, api):
+        """A seeded category has no owner, and every user may file under it."""
+        client, factory, account_id, _u = api
+        cat_id = uuid.uuid4()
+        async with factory() as session:
+            session.add(Category(id=cat_id, user_id=None, name="Groceries", type="expense"))
+            await session.commit()
+
+        await send(client, account_id, [row(description="DMART", category_id=str(cat_id))])
+        async with factory() as session:
+            stored = (await session.execute(select(Transaction))).scalars().one()
+        assert stored.category_id == cat_id
+
+    async def test_another_users_category_is_dropped_and_the_row_still_lands(self, api):
+        """The one that matters.
+
+        Filing this user's payment under a stranger's category would put their
+        spending into a breakdown that is not theirs to read, and the id is
+        supplied by the client - so it is checked rather than believed.
+        """
+        client, factory, account_id, _u = api
+        stranger, cat_id = uuid.uuid4(), uuid.uuid4()
+        async with factory() as session:
+            session.add(User(id=stranger, email="someone.else@example.com",
+                             password_hash=hash_password("AnotherPass123"),
+                             display_name="Stranger", currency="INR"))
+            session.add(Category(id=cat_id, user_id=stranger, name="Private", type="expense"))
+            await session.commit()
+
+        res = await send(client, account_id,
+                         [row(description="SWIGGY", category_id=str(cat_id))])
+        assert res.status_code == 200, res.text
+        assert res.json()["created"] == 1, "the payment itself must not be lost"
+
+        async with factory() as session:
+            stored = (await session.execute(select(Transaction))).scalars().one()
+        assert stored.category_id is None, "a stranger's category was written to this ledger"
+        assert stored.amount_minor == 25000
+
+    async def test_an_id_matching_nothing_is_dropped_and_the_row_still_lands(self, api):
+        client, factory, account_id, _u = api
+        res = await send(client, account_id,
+                         [row(description="SWIGGY", category_id=str(uuid.uuid4()))])
+        assert res.status_code == 200, res.text
+        assert res.json()["created"] == 1
+
+        async with factory() as session:
+            stored = (await session.execute(select(Transaction))).scalars().one()
+        assert stored.category_id is None
+
+    async def test_a_row_without_a_category_is_unchanged(self, api):
+        """The field is optional; an older client sends no category at all."""
+        client, factory, account_id, _u = api
+        res = await send(client, account_id, [row(description="SWIGGY")])
+        assert res.status_code == 200, res.text
+
+        async with factory() as session:
+            stored = (await session.execute(select(Transaction))).scalars().one()
+        assert stored.category_id is None
+
+    async def test_one_lookup_covers_a_whole_chunk(self, api):
+        """Two hundred rows must not become two hundred category queries.
+
+        Checked by behaviour rather than by counting queries: every row in the
+        chunk names the same valid category, and every row comes back wearing
+        it. A per-row check would pass this too - but the assertion that all
+        two hundred landed labelled is the one that would fail if the set
+        lookup were wrong, which is the part worth guarding.
+        """
+        client, factory, account_id, user_id = api
+        cat_id = uuid.uuid4()
+        async with factory() as session:
+            session.add(Category(id=cat_id, user_id=uuid.UUID(user_id),
+                                 name="Food & Dining", type="expense"))
+            await session.commit()
+
+        rows = [row(description=f"SWIGGY {n}", category_id=str(cat_id)) for n in range(200)]
+        res = await send(client, account_id, rows)
+        assert res.status_code == 200, res.text
+        assert res.json()["created"] == 200
+
+        async with factory() as session:
+            stored = (await session.execute(select(Transaction))).scalars().all()
+        assert {t.category_id for t in stored} == {cat_id}
