@@ -39,7 +39,23 @@ MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 #: Chosen because it is on Groq's free tier, is strong at instruction-following
 #: and strict JSON, and is served through an OpenAI-compatible endpoint, so it
 #: costs one httpx call rather than a second vendor SDK.
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
+#: The last failure from each provider, for /api/health. In memory only, one
+#: line each, and never persisted.
+#:
+#: Logging alone was not enough: the logs are on the host, the person asking
+#: "why is the assistant stupid" is holding a phone, and the answer turned out
+#: to be a model name that had been retired out from under us. A reason that
+#: cannot be read is barely better than no reason.
+_LAST_ERROR: Dict[str, Optional[str]] = {"gemini": None, "groq": None}
+
+#: Anything key-shaped is stripped before an error is shown.
+_KEYISH = re.compile(r"(?i)(key|token|authorization|bearer)[=:\s\"']+[A-Za-z0-9_\-\.]{8,}")
+
+
+def _remember_error(provider: str, message: str) -> None:
+    _LAST_ERROR[provider] = _KEYISH.sub(r"\1=[redacted]", message)[:300]
 
 SYSTEM_PROMPT = """You are the MONEVA personal-finance assistant for a single authenticated user.
 
@@ -130,10 +146,12 @@ def ai_status() -> Dict[str, Any]:
             "model": MODEL_NAME,
             "key_configured": _usable(os.getenv("GEMINI_API_KEY") or ""),
             "sdk_installed": sdk,
+            "last_error": _LAST_ERROR["gemini"],
         },
         "groq": {
             "model": GROQ_MODEL,
             "key_configured": _usable(os.getenv("GROQ_API_KEY") or ""),
+            "last_error": _LAST_ERROR["groq"],
         },
     }
 
@@ -234,6 +252,7 @@ async def _call_gemini(payload: str) -> Optional[str]:
         # somebody can read - and a rate limit is now visibly a rate limit.
         logger.warning("Gemini call failed (model=%s): %s: %s",
                        MODEL_NAME, type(exc).__name__, exc)
+        _remember_error("gemini", f"{type(exc).__name__}: {exc}")
         return None
 
 
@@ -268,13 +287,16 @@ async def _call_groq(payload: str) -> Optional[str]:
                 },
             )
         if res.status_code != 200:
-            logger.warning("Groq call failed (model=%s): HTTP %s", GROQ_MODEL, res.status_code)
+            logger.warning("Groq call failed (model=%s): HTTP %s %s",
+                           GROQ_MODEL, res.status_code, res.text[:200])
+            _remember_error("groq", f"HTTP {res.status_code}: {res.text[:200]}")
             return None
         body = res.json()
         return (body.get("choices") or [{}])[0].get("message", {}).get("content") or None
     except Exception as exc:
         logger.warning("Groq call failed (model=%s): %s: %s",
                        GROQ_MODEL, type(exc).__name__, exc)
+        _remember_error("groq", f"{type(exc).__name__}: {exc}")
         return None
 
 
