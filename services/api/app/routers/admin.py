@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
@@ -76,7 +76,16 @@ async def overview(
         verified_users=verified,
         users_with_2fa=with_2fa,
         new_users_7d=new_week,
-        total_accounts=await count(select(func.count()).select_from(Account)),
+        # ACTIVE only, in all three places an account is counted.
+        #
+        # Deactivating an account is a soft delete - the row stays so its
+        # transactions keep their history - so counting rows reports accounts
+        # the owner has already got rid of. One real user showed 4 here while
+        # their app showed 2, because two had been deactivated and replaced.
+        # A panel that disagrees with the app is worse than one that is empty.
+        total_accounts=await count(
+            select(func.count()).select_from(Account).where(Account.is_active.is_(True))
+        ),
         total_transactions=await count(select(func.count()).select_from(Transaction)),
         total_downloads=await count(select(func.count()).select_from(AppDownload)),
         downloads_24h=await count(
@@ -117,7 +126,7 @@ async def list_users(
     acc_count = (
         select(func.count())
         .select_from(Account)
-        .where(Account.user_id == User.id)
+        .where(and_(Account.user_id == User.id, Account.is_active.is_(True)))
         .correlate(User)
         .scalar_subquery()
     )
@@ -185,7 +194,8 @@ async def set_user_active(
         select(func.count()).select_from(Transaction).where(Transaction.user_id == target.id)
     )).scalar_one() or 0)
     acc = int((await db.execute(
-        select(func.count()).select_from(Account).where(Account.user_id == target.id)
+        select(func.count()).select_from(Account)
+        .where(and_(Account.user_id == target.id, Account.is_active.is_(True)))
     )).scalar_one() or 0)
 
     return AdminUserRow(

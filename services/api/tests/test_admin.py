@@ -228,3 +228,42 @@ class TestGrowth:
     async def test_growth_is_admin_only(self, api):
         client, _f, _a, plain_id = api
         assert (await client.get("/api/admin/growth", headers=auth(plain_id))).status_code == 404
+
+
+class TestDeactivatedAccountsAreNotCounted:
+    """Deactivating a money account is a soft delete, not a delete.
+
+    The row stays so its transactions keep their history, which means counting
+    rows reports accounts the owner has already got rid of. A real user saw 4
+    in this panel while their app showed 2 - two had been deactivated during a
+    data restore and replaced. A panel that disagrees with the app is worse
+    than one that shows nothing.
+    """
+
+    async def _add_dead_account(self, factory, user_id):
+        async with factory() as s:
+            s.add(Account(id=uuid.uuid4(), user_id=uuid.UUID(user_id), name="Old SBI",
+                          account_type="asset", currency="INR",
+                          opening_balance_minor=0, is_active=False))
+            await s.commit()
+
+    async def test_the_overview_total_ignores_them(self, api):
+        client, factory, admin_id, plain_id = api
+        before = (await client.get("/api/admin/overview", headers=auth(admin_id))).json()["total_accounts"]
+        await self._add_dead_account(factory, plain_id)
+        after = (await client.get("/api/admin/overview", headers=auth(admin_id))).json()["total_accounts"]
+        assert after == before, "a deactivated account was counted in the total"
+
+    async def test_the_per_user_count_ignores_them(self, api):
+        client, factory, admin_id, plain_id = api
+        await self._add_dead_account(factory, plain_id)
+        rows = (await client.get("/api/admin/users", headers=auth(admin_id))).json()
+        person = next(r for r in rows if r["id"] == plain_id)
+        assert person["account_count"] == 1, "a deactivated account showed in the person's row"
+
+    async def test_the_count_returned_after_suspending_ignores_them(self, api):
+        client, factory, admin_id, plain_id = api
+        await self._add_dead_account(factory, plain_id)
+        res = await client.post(f"/api/admin/users/{plain_id}/active?active=false", headers=auth(admin_id))
+        assert res.status_code == 200, res.text
+        assert res.json()["account_count"] == 1
