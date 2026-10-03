@@ -254,6 +254,46 @@ td .who span { font-size: 11.5px; color: var(--ink-3); }
 .meter { display: block; height: 3px; margin-top: 4px; border-radius: 2px; background: var(--weak); overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--volt); }
 
+/* A tile is a question; this is the answer. Overlay rather than a new page,
+   because every one of these is a slice of data already on screen and sending
+   somebody somewhere else to see it would lose their place. */
+.sheet {
+  position: fixed; inset: 0; z-index: 50;
+  display: grid; place-items: center;
+  padding: 18px;
+  background: rgba(4,5,7,0.72);
+  backdrop-filter: blur(6px);
+  animation: fade 160ms ease;
+}
+@keyframes fade { from { opacity: 0; } }
+.sheet-card {
+  width: min(760px, 100%);
+  max-height: 86dvh;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  animation: rise 180ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@keyframes rise { from { transform: translateY(10px); opacity: 0; } }
+.sheet-card > header { display: flex; align-items: center; gap: 10px; padding: 15px 18px; border-bottom: 1px solid var(--hairline); }
+.sheet-card > header h3 { margin: 0; font-family: var(--display); font-size: 16px; font-weight: 800; }
+.sheet-card > header .sub { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.sheet-body { padding: 16px 18px 20px; overflow: auto; }
+
+/* key/value lines inside a sheet */
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; }
+.kv > div { display: contents; }
+.kv dt { padding: 9px 0; color: var(--ink-3); font-size: 13px; border-bottom: 1px solid var(--hairline); margin: 0; }
+.kv dd { padding: 9px 0; margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--hairline); }
+
+.tile { cursor: pointer; }
+.tile:focus-visible { outline: 2px solid var(--volt); outline-offset: 2px; }
+.tile .go { position: absolute; top: 12px; right: 13px; color: var(--ink-3); font-family: var(--mono); font-size: 13px; opacity: 0; transition: opacity 140ms ease; }
+.tile:hover .go, .tile:focus-visible .go { opacity: 1; }
+
+tbody tr { cursor: pointer; }
+
 .empty { padding: 32px 16px; text-align: center; color: var(--ink-3); font-size: 14px; }
 .foot { margin-top: 22px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); text-align: center; }
 .hidden { display: none !important; }
@@ -388,6 +428,8 @@ td .who span { font-size: 11.5px; color: var(--ink-3); }
       </div>
     </section>
 
+    <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-label="Detail"></div>
+
     <p class="foot">Counts only &mdash; this panel cannot read anybody&rsquo;s transactions, balances or merchants.</p>
   </main>
 </div>
@@ -496,22 +538,30 @@ td .who span { font-size: 11.5px; color: var(--ink-3); }
 
   /* ---------------- tiles ---------------- */
 
-  function tile(k, v, n, cls) {
-    return '<div class="tile ' + (cls || '') + '"><div class="k">' + esc(k) + '</div>' +
-      '<div class="v" data-to="' + v + '">0</div>' + (n ? '<div class="n">' + esc(n) + '</div>' : '') + '</div>';
+  /* Each tile carries the view it opens. role/tabindex rather than a <button>
+     because the tile is a block of layout, and wrapping it in a button would
+     inherit a pile of control styling to undo - but it still has to be
+     reachable and announced, so it declares what it is. */
+  function tile(k, v, n, cls, view) {
+    return '<div class="tile ' + (cls || '') + '" data-view="' + view + '" role="button" tabindex="0"' +
+      ' aria-label="' + esc(k) + ', ' + v + '. Open details.">' +
+      '<span class="go">→</span>' +
+      '<div class="k">' + esc(k) + '</div>' +
+      '<div class="v" data-to="' + v + '">0</div>' +
+      (n ? '<div class="n">' + esc(n) + '</div>' : '') + '</div>';
   }
 
   function renderOverview(o) {
     var pct = o.total_users ? Math.round((o.verified_users / o.total_users) * 100) : 0;
     $('tiles').innerHTML = [
-      tile('Users', o.total_users, num(o.active_users) + ' active', 'accent'),
-      tile('New this week', o.new_users_7d, 'last 7 days'),
-      tile('Verified', o.verified_users, pct + '% of accounts'),
-      tile('Two-factor', o.users_with_2fa, 'authenticator on'),
-      tile('Accounts', o.total_accounts, 'across all users'),
-      tile('Transactions', o.total_transactions, 'recorded'),
-      tile('Downloads', o.total_downloads, num(o.downloads_7d) + ' this week', 'cyan'),
-      tile('Downloads 24h', o.downloads_24h, 'last day', 'cyan')
+      tile('Users', o.total_users, num(o.active_users) + ' active', 'accent', 'users'),
+      tile('New this week', o.new_users_7d, 'last 7 days', '', 'new'),
+      tile('Verified', o.verified_users, pct + '% of accounts', '', 'verified'),
+      tile('Two-factor', o.users_with_2fa, 'authenticator on', '', 'twofa'),
+      tile('Accounts', o.total_accounts, 'across all users', '', 'accounts'),
+      tile('Transactions', o.total_transactions, 'recorded', '', 'txns'),
+      tile('Downloads', o.total_downloads, num(o.downloads_7d) + ' this week', 'cyan', 'downloads'),
+      tile('Downloads 24h', o.downloads_24h, 'last day', 'cyan', 'downloads')
     ].join('');
     Array.prototype.forEach.call($('tiles').querySelectorAll('.v'), function (el) {
       countTo(el, parseInt(el.getAttribute('data-to'), 10) || 0);
@@ -640,7 +690,16 @@ td .who span { font-size: 11.5px; color: var(--ink-3); }
   });
 
   $('rows').addEventListener('click', function (ev) {
-    var b = ev.target.closest('button[data-id]'); if (!b) return;
+    var b = ev.target.closest('button[data-id]');
+    if (!b) {
+      // Anywhere else on the row opens that person.
+      var tr = ev.target.closest('tr');
+      if (!tr) return;
+      var id = tr.querySelector('button[data-id]');
+      var u = id && state.users.filter(function (x) { return x.id === id.getAttribute('data-id'); })[0];
+      if (u) openUser(u);
+      return;
+    }
     var to = b.getAttribute('data-to') === 'true';
     if (!window.confirm(to ? 'Restore this account?' : 'Suspend this account? They will not be able to sign in.')) return;
     b.disabled = true;
@@ -648,6 +707,151 @@ td .who span { font-size: 11.5px; color: var(--ink-3); }
       .then(load)
       .catch(function (e) { window.alert(e.message || 'Could not change that account.'); b.disabled = false; });
   });
+
+  /* ---------------- detail sheets ---------------- */
+
+  var lastFocus = null;
+
+  function closeSheet() {
+    $('sheet').classList.add('hidden');
+    $('sheet').innerHTML = '';
+    // Focus goes back where it came from, or a keyboard user is stranded at
+    // the top of the document every time they close one of these.
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  function showSheet(title, sub, bodyHtml) {
+    lastFocus = document.activeElement;
+    $('sheet').innerHTML =
+      '<div class="sheet-card">' +
+        '<header><div><h3>' + esc(title) + '</h3>' +
+        (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') + '</div>' +
+        '<div class="spacer"></div><button data-close>Close</button></header>' +
+        '<div class="sheet-body">' + bodyHtml + '</div>' +
+      '</div>';
+    $('sheet').classList.remove('hidden');
+    var b = $('sheet').querySelector('[data-close]');
+    if (b) b.focus();
+  }
+
+  $('sheet').addEventListener('click', function (ev) {
+    // Backdrop or the close button. A click inside the card is not a dismiss.
+    if (ev.target === this || ev.target.closest('[data-close]')) closeSheet();
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && !$('sheet').classList.contains('hidden')) closeSheet();
+  });
+
+  function heading(text) {
+    return '<h4 style="font-family:var(--display);font-size:13px;margin:20px 0 8px">' + esc(text) + '</h4>';
+  }
+
+  function kvList(pairs) {
+    return '<dl class="kv">' + pairs.map(function (r) {
+      return '<div><dt>' + r[0] + '</dt><dd>' + r[1] + '</dd></div>';
+    }).join('') + '</dl>';
+  }
+
+  /** A list of people, rendered the same way wherever it appears. */
+  function peopleList(list) {
+    if (!list.length) return '<p class="empty">Nobody here.</p>';
+    return kvList(list.map(function (u) {
+      return [
+        esc(u.display_name) + ' <span style="color:var(--ink-3)">' + esc(u.email) + '</span>',
+        num(u.transaction_count) + ' txns'
+      ];
+    }));
+  }
+
+  function daysAgo(n) { return Date.now() - n * 864e5; }
+  function byCount(k) { return function (a, b) { return b[k] - a[k]; }; }
+
+  var VIEWS = {
+    users: function () {
+      var on = state.users.filter(function (u) { return u.is_active; });
+      var off = state.users.filter(function (u) { return !u.is_active; });
+      showSheet('All users', state.users.length + ' total',
+        heading('Active (' + on.length + ')') + peopleList(on) +
+        (off.length ? heading('Suspended (' + off.length + ')') + peopleList(off) : ''));
+    },
+    'new': function () {
+      var list = state.users.filter(function (u) { return new Date(u.created_at).getTime() >= daysAgo(7); });
+      showSheet('Joined this week', 'last 7 days', peopleList(list));
+    },
+    verified: function () {
+      var y = state.users.filter(function (u) { return u.email_verified; });
+      var n = state.users.filter(function (u) { return !u.email_verified; });
+      showSheet('Email verification', y.length + ' of ' + state.users.length + ' verified',
+        heading('Verified') + peopleList(y) +
+        (n.length ? heading('Not verified') + peopleList(n) : ''));
+    },
+    twofa: function () {
+      var y = state.users.filter(function (u) { return u.totp_enabled; });
+      var n = state.users.filter(function (u) { return !u.totp_enabled; });
+      showSheet('Two-factor', y.length + ' of ' + state.users.length + ' protected',
+        heading('Authenticator on') + peopleList(y) +
+        (n.length ? heading('No second factor') + peopleList(n) : ''));
+    },
+    accounts: function () {
+      showSheet('Accounts per person', 'most first',
+        kvList(state.users.slice().sort(byCount('account_count')).map(function (u) {
+          return [esc(u.display_name), num(u.account_count)];
+        })));
+    },
+    txns: function () {
+      showSheet('Transactions per person', 'counts only, never amounts',
+        kvList(state.users.slice().sort(byCount('transaction_count')).map(function (u) {
+          return [esc(u.display_name), num(u.transaction_count)];
+        })));
+    },
+    downloads: function () {
+      var d = state.lastDownloads;
+      if (!d) return;
+      var parts = [];
+      Object.keys(d.by_version || {}).forEach(function (k) { parts.push(['version ' + esc(k), num(d.by_version[k])]); });
+      Object.keys(d.by_platform || {}).forEach(function (k) { parts.push([esc(k), num(d.by_platform[k])]); });
+
+      // Newest first, empty days dropped: a list of thirty zeroes is not a
+      // reading, it is scrolling.
+      var busy = d.series.slice().reverse().filter(function (p) { return p.count > 0; });
+
+      showSheet('Downloads', num(d.total) + ' over ' + d.days + ' days',
+        (parts.length ? kvList(parts) : '') +
+        heading('Days with downloads') +
+        (busy.length
+          ? kvList(busy.map(function (p) { return [esc(day(p.date)), num(p.count)]; }))
+          : '<p class="empty">No downloads recorded yet.</p>'));
+    }
+  };
+
+  function openView(name) { if (VIEWS[name]) VIEWS[name](); }
+
+  $('tiles').addEventListener('click', function (ev) {
+    var tl = ev.target.closest('.tile[data-view]');
+    if (tl) openView(tl.getAttribute('data-view'));
+  });
+  $('tiles').addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    var tl = ev.target.closest('.tile[data-view]');
+    if (!tl) return;
+    ev.preventDefault();            // stop Space scrolling the page
+    openView(tl.getAttribute('data-view'));
+  });
+
+  /** One person, opened from their row. */
+  function openUser(u) {
+    showSheet(u.display_name, 'counts only - no amounts are available to this panel', kvList([
+      ['Email', esc(u.email)],
+      ['Joined', esc(day(u.created_at))],
+      ['Currency', esc(u.currency)],
+      ['Transactions', num(u.transaction_count)],
+      ['Accounts', num(u.account_count)],
+      ['Status', u.is_active ? 'active' : 'suspended'],
+      ['Email verified', u.email_verified ? 'yes' : 'no'],
+      ['Two-factor', u.totp_enabled ? 'on' : 'off'],
+      ['Administrator', u.is_admin ? 'yes' : 'no']
+    ]));
+  }
 
   /* ---------------- ranges, refresh ---------------- */
 
@@ -660,7 +864,7 @@ td .who span { font-size: 11.5px; color: var(--ink-3); }
     });
   }
   wireRange('dlRange', 'dl', function () {
-    api('/admin/downloads?days=' + state.dl).then(function (d) { drawChart('dlChart','dlFrom','dlTo','dlChips', d, 'volt'); });
+    api('/admin/downloads?days=' + state.dl).then(function (d) { state.lastDownloads = d; drawChart('dlChart','dlFrom','dlTo','dlChips', d, 'volt'); });
   });
   wireRange('grRange', 'gr', function () {
     api('/admin/growth?days=' + state.gr).then(function (d) { drawChart('grChart','grFrom','grTo','grChips', d); });
@@ -694,6 +898,7 @@ td .who span { font-size: 11.5px; color: var(--ink-3); }
       fetch(API + '/app/version').then(function (r) { return r.json(); }).catch(function () { return null; })
     ]).then(function (r) {
       renderOverview(r[0]);
+      state.lastDownloads = r[1];
       drawChart('dlChart','dlFrom','dlTo','dlChips', r[1], 'volt');
       drawChart('grChart','grFrom','grTo','grChips', r[2]);
       state.users = r[3];
