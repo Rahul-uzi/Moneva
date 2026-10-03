@@ -38,3 +38,50 @@
   color: var(--moneva-coral);
   font-weight: 500;
 }
+
+/*
+  The reveal button on a password field.
+
+  Positioned over the input rather than beside it, so adding it does not
+  change the field's width or the form's rhythm on any of the four screens
+  that use FormField.
+*/
+.form-input-wrap {
+  position: relative;
+  display: block;
+}
+
+/* Room for the button, so a long password never runs underneath it. */
+.form-input.has-reveal {
+  padding-right: 46px;
+}
+
+.form-reveal {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 38px: a real tap target. An 18px icon alone is a miss waiting to happen
+     on a phone, and this is the control someone reaches for precisely when
+     they are already unsure what they typed. */
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--moneva-text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.form-reveal:hover { color: var(--moneva-text); background: var(--moneva-overlay-weak); }
+.form-reveal:active { color: var(--moneva-text); }
+.form-reveal:focus-visible {
+  outline: 2px solid var(--moneva-blue);
+  outline-offset: 2px;
+  color: var(--moneva-text);
+}

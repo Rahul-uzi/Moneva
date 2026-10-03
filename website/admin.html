@@ -228,6 +228,21 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(205, 255, 74, 0.1);
 }
 
+/* Reveal, laid over the field so adding it changes no spacing. */
+.pw { position: relative; }
+.pw input { padding-right: 46px; }
+.pw button {
+  position: absolute;
+  top: 11px; right: 5px;
+  width: 36px; height: 38px;
+  display: grid; place-items: center;
+  padding: 0; border: 0; background: transparent;
+  color: var(--ink-3);
+  font-family: var(--mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.pw button:hover { color: var(--ink); background: var(--overlay-weak); }
+
 .msg {
   margin: 0 0 14px;
   padding: 10px 12px;
@@ -423,7 +438,13 @@ td .who span { font-size: 12px; color: var(--ink-3); }
       <input id="email" type="email" autocomplete="username" required>
 
       <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" required>
+      <div class="pw">
+        <input id="password" type="password" autocomplete="current-password" required>
+        <!-- tabindex -1: tabbing out of the password field should reach Sign
+             in, which is where somebody typing a password is heading. -->
+        <button type="button" id="reveal" tabindex="-1"
+                aria-label="Show password" aria-pressed="false">show</button>
+      </div>
 
       <div id="totpRow" class="hidden">
         <label for="totp">Authenticator code</label>
@@ -592,6 +613,18 @@ td .who span { font-size: 12px; color: var(--ink-3); }
       $('loginBtn').disabled = false;
       $('loginBtn').textContent = 'Sign in';
     });
+  });
+
+  /* A 22-character passphrase typed blind on a phone fails often enough that
+     people choose a weaker one instead. Starts hidden and stays hidden until
+     asked - it is still a password. */
+  $('reveal').addEventListener('click', function () {
+    var input = $('password');
+    var show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    this.textContent = show ? 'hide' : 'show';
+    this.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    this.setAttribute('aria-pressed', show ? 'true' : 'false');
   });
 
   $('outBtn').addEventListener('click', function () {

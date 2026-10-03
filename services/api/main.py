@@ -40,6 +40,26 @@ import os
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,capacitor://localhost,http://localhost")
 origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
 
+#: This project's own site, allowed whether or not anybody set ALLOWED_ORIGINS.
+#:
+#: The admin panel is served from the website and talks to this API, which is a
+#: different origin - so without this the browser blocks it before the request
+#: is ever made. That failed in the least helpful way possible: the preflight
+#: came back 400 with no allow-origin header, the page saw only "failed to
+#: fetch", and it looked exactly like a wrong password.
+#:
+#: Not left to the environment variable, because that variable already existed
+#: and already did not contain this - the whole class of bug is "the deploy
+#: works until one env var is missing a value nobody remembers". These two are
+#: ours; they belong in the code that needs them.
+SITE_ORIGINS = [
+    "https://moneva.monev.workers.dev",
+    "https://moneva.live",
+]
+for site in SITE_ORIGINS:
+    if site not in origins:
+        origins.append(site)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins if os.getenv("ENVIRONMENT") == "production" else ["*"],
