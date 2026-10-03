@@ -5,22 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
 <!--
-  MONEVA admin.
+  MONEVA Control.
 
-  UNLISTED, AND THAT IS NOT THE SECURITY. Nothing links here and the
-  crawlers are told to stay away, but an unlisted URL is one shared link, one
-  browser history and one log file away from being public. The protection is
-  that every endpoint behind this page requires an admin account and answers
+  UNLISTED, AND THAT IS NOT THE SECURITY. Nothing links here and crawlers are
+  told to stay away, but an unlisted URL is one shared link, one browser
+  history and one log file away from being public. The protection is that
+  every endpoint behind this page requires an admin account and answers
   everybody else with 404 - the same thing the API says about a path that does
-  not exist, so a wrong guess learns nothing.
+  not exist, so a wrong guess learns nothing rather than learning there is a
+  door here.
 
-  WHAT IT CAN SHOW. Counts. The API has no route that returns somebody's
-  amounts, balances or merchants to an admin, so this page could not display
-  them if it tried. "312 transactions" tells you this is a real user; what
-  those transactions were is none of the panel's business.
+  WHAT IT CAN SHOW. Counts. No route behind this page returns an amount, a
+  balance, a description or a merchant, so this page could not display one if
+  it tried. "312 transactions" says somebody is a real user; what those
+  transactions were is none of the panel's business.
 
-  The token lives in sessionStorage, not localStorage: closing the tab ends
-  the session, which is the right default for a page that lists your users.
+  The token lives in sessionStorage: closing the tab ends the session, which is
+  the right default for a page that lists your users.
 -->
 <title>MONEVA Control</title>
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
@@ -34,33 +35,30 @@
 
 <style>
 :root {
-  /* The site's own tokens, so this is unmistakably the same product. */
-  --bg: #0A0B0D;
-  --surface: #131519;
-  --card: #14171B;
-  --border: #2A2F38;
-  --hairline: rgba(245, 244, 239, 0.09);
+  --bg: #07080A;
+  --card: #101318;
+  --card-2: #141821;
+  --border: #242A35;
+  --hairline: rgba(245, 244, 239, 0.07);
   --volt: #CDFF4A;
+  --cyan: #4AE3FF;
   --ember: #FF6B4A;
   --amber: #E8B62C;
   --ink: #F5F4EF;
   --ink-2: #9CA3AD;
-  --ink-3: #8A929D;
-  --overlay-weak: rgba(245, 244, 239, 0.05);
+  --ink-3: #7C848F;
+  --weak: rgba(245, 244, 239, 0.05);
   --volt-wash: rgba(205, 255, 74, 0.12);
-  --volt-line: rgba(205, 255, 74, 0.28);
+  --volt-line: rgba(205, 255, 74, 0.3);
 
   --sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --display: 'Archivo', var(--sans);
-  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-
-  --r-sm: 10px;
-  --r-md: 16px;
-  --r-lg: 22px;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --r: 14px;
+  --r-lg: 20px;
 }
 
 * { box-sizing: border-box; }
-
 html, body { margin: 0; padding: 0; }
 
 body {
@@ -73,377 +71,221 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The one piece of atmosphere: a faint grid and a single volt bloom behind
-   everything. Fixed, so it does not travel with the scroll and turn into
-   motion sickness, and pointer-events:none so it is purely decorative. */
+/* Atmosphere: a grid that drifts, two colour blooms, and a scan sweep. All
+   fixed and pointer-events:none, and all of it stops dead under
+   prefers-reduced-motion - a dashboard somebody stares at should not be
+   something they have to endure. */
 .field {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(900px 520px at 78% -8%, rgba(205, 255, 74, 0.10), transparent 62%),
-    radial-gradient(700px 480px at 10% 108%, rgba(255, 107, 74, 0.07), transparent 60%),
-    linear-gradient(rgba(245,244,239,0.028) 1px, transparent 1px) 0 0 / 100% 46px,
-    linear-gradient(90deg, rgba(245,244,239,0.028) 1px, transparent 1px) 0 0 / 46px 100%;
+    radial-gradient(1000px 560px at 82% -10%, rgba(205,255,74,0.11), transparent 60%),
+    radial-gradient(760px 520px at 6% 106%, rgba(74,227,255,0.07), transparent 58%),
+    linear-gradient(rgba(245,244,239,0.022) 1px, transparent 1px) 0 0 / 100% 44px,
+    linear-gradient(90deg, rgba(245,244,239,0.022) 1px, transparent 1px) 0 0 / 44px 100%;
+  animation: drift 26s linear infinite;
 }
+@keyframes drift { to { background-position: 0 0, 0 0, 0 44px, 44px 0; } }
 
-.wrap {
-  position: relative;
-  z-index: 1;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 22px 16px 80px;
+.scan {
+  position: fixed; left: 0; right: 0; height: 160px; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(205,255,74,0.045), transparent);
+  animation: sweep 9s ease-in-out infinite;
 }
+@keyframes sweep { 0%,100% { top: -170px; } 50% { top: 100%; } }
 
-/* ---------- top bar ---------- */
+.wrap { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 20px 16px 90px; }
+
+/* ---------- bar ---------- */
 .bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  margin-bottom: 22px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: linear-gradient(180deg, rgba(245,244,239,0.045), rgba(245,244,239,0.012));
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 13px 16px; margin-bottom: 18px;
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(245,244,239,0.05), rgba(245,244,239,0.012));
   backdrop-filter: blur(10px);
 }
-
 .glyph {
-  width: 34px; height: 34px;
-  flex-shrink: 0;
-  display: grid; place-items: center;
-  border-radius: 10px;
-  background: var(--volt);
-  color: #10130A;
-  font-family: var(--display);
-  font-weight: 900;
-  font-size: 17px;
+  width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: 10px; background: var(--volt); color: #0b0d07;
+  font-family: var(--display); font-weight: 900; font-size: 17px;
 }
+.bar h1 { margin: 0; font-family: var(--display); font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
+.bar .sub { margin: 0; font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); }
+.spacer { flex: 1; }
 
-.bar h1 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
+.led { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; }
+.led i { width: 7px; height: 7px; border-radius: 50%; background: var(--volt); box-shadow: 0 0 0 0 rgba(205,255,74,0.5); animation: ping 2.4s ease-out infinite; }
+.led.warn i { background: var(--amber); }
+.led.bad i  { background: var(--ember); animation: none; }
+@keyframes ping { 70% { box-shadow: 0 0 0 9px rgba(205,255,74,0); } 100% { box-shadow: 0 0 0 0 rgba(205,255,74,0); } }
 
-.bar .sub {
-  margin: 0;
-  font-size: 12px;
-  color: var(--ink-3);
+/* ---------- controls ---------- */
+button, select {
+  font: inherit; cursor: pointer; color: var(--ink);
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--weak); padding: 8px 13px;
+  transition: background 140ms ease, border-color 140ms ease, transform 90ms ease, color 140ms ease;
 }
-
-.bar .spacer { flex: 1; }
-
-/* A quiet live marker - it is the only thing on the page that moves. */
-.pulse {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-family: var(--mono); font-size: 11px;
-  color: var(--ink-3);
-  text-transform: uppercase; letter-spacing: 0.08em;
-}
-.pulse i {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--volt);
-  box-shadow: 0 0 0 0 rgba(205, 255, 74, 0.55);
-  animation: ping 2.4s ease-out infinite;
-}
-@keyframes ping {
-  70%  { box-shadow: 0 0 0 9px rgba(205, 255, 74, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(205, 255, 74, 0); }
-}
-
-/* ---------- buttons ---------- */
-button {
-  font: inherit;
-  cursor: pointer;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border);
-  background: var(--overlay-weak);
-  color: var(--ink);
-  padding: 9px 14px;
-  transition: background 140ms ease, border-color 140ms ease, transform 100ms ease;
-}
-button:hover { background: rgba(245,244,239,0.1); border-color: #3A4150; }
+button:hover, select:hover { background: rgba(245,244,239,0.1); border-color: #39404E; }
 button:active { transform: scale(0.98); }
-button:focus-visible { outline: 2px solid var(--volt); outline-offset: 2px; }
-button[disabled] { opacity: 0.5; cursor: not-allowed; }
-
-button.primary {
-  background: var(--volt);
-  border-color: var(--volt);
-  color: #10130A;
-  font-weight: 700;
-}
-button.primary:hover { background: #d7ff6b; }
-
-button.danger { color: var(--ember); border-color: rgba(255,107,74,0.35); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--volt); outline-offset: 2px; }
+button[disabled] { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--volt); border-color: var(--volt); color: #0b0d07; font-weight: 700; }
+button.primary:hover { background: #d9ff6f; }
+button.danger { color: var(--ember); border-color: rgba(255,107,74,0.33); }
 button.danger:hover { background: rgba(255,107,74,0.1); }
+button.ghost { background: transparent; }
+button.on { background: var(--volt-wash); border-color: var(--volt-line); color: var(--volt); }
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; padding: 7px 12px; font-family: var(--mono); font-size: 11.5px; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.on { background: var(--volt-wash); color: var(--volt); }
 
 /* ---------- sign in ---------- */
 .gate {
-  max-width: 400px;
-  margin: 9vh auto 0;
-  padding: 28px 26px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  max-width: 400px; margin: 8vh auto 0; padding: 28px 26px;
+  border: 1px solid var(--border); border-radius: var(--r-lg);
   background: linear-gradient(180deg, rgba(245,244,239,0.05), rgba(245,244,239,0.015));
   backdrop-filter: blur(12px);
 }
-.gate h2 {
-  margin: 0 0 4px;
-  font-family: var(--display);
-  font-size: 23px;
-  font-weight: 800;
-  letter-spacing: -0.015em;
-}
-.gate p.hint { margin: 0 0 20px; font-size: 13px; color: var(--ink-3); }
+.gate h2 { margin: 0 0 4px; font-family: var(--display); font-size: 23px; font-weight: 800; letter-spacing: -0.015em; }
+.gate .hint { margin: 0 0 20px; font-size: 13px; color: var(--ink-3); }
 
-label {
-  display: block;
-  font-family: var(--mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-3);
-  margin: 0 0 6px;
-}
-
+label { display: block; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin: 0 0 6px; }
 input {
-  width: 100%;
-  font: inherit;
-  color: var(--ink);
-  background: rgba(10, 11, 13, 0.6);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 11px 13px;
-  margin-bottom: 15px;
+  width: 100%; font: inherit; color: var(--ink);
+  background: rgba(7,8,10,0.65); border: 1px solid var(--border);
+  border-radius: 10px; padding: 11px 13px; margin-bottom: 15px;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
-input:focus {
-  outline: none;
-  border-color: var(--volt-line);
-  box-shadow: 0 0 0 3px rgba(205, 255, 74, 0.1);
-}
+input:focus { outline: none; border-color: var(--volt-line); box-shadow: 0 0 0 3px rgba(205,255,74,0.1); }
 
-/* Reveal, laid over the field so adding it changes no spacing. */
+/* Reveal, laid over the field so it changes no spacing. */
 .pw { position: relative; }
-.pw input { padding-right: 46px; }
-.pw button {
-  position: absolute;
-  top: 11px; right: 5px;
-  width: 36px; height: 38px;
-  display: grid; place-items: center;
-  padding: 0; border: 0; background: transparent;
-  color: var(--ink-3);
-  font-family: var(--mono); font-size: 10px;
-  text-transform: uppercase; letter-spacing: 0.06em;
+.pw input { padding-right: 52px; }
+.pw > button {
+  position: absolute; top: 5px; right: 5px; width: 42px; height: 38px;
+  display: grid; place-items: center; padding: 0; border: 0; background: transparent;
+  color: var(--ink-3); font-family: var(--mono); font-size: 10px;
+  text-transform: uppercase; letter-spacing: 0.06em; border-radius: 8px;
 }
-.pw button:hover { color: var(--ink); background: var(--overlay-weak); }
+.pw > button:hover { color: var(--volt); background: var(--weak); }
 
-.msg {
-  margin: 0 0 14px;
-  padding: 10px 12px;
-  border-radius: var(--r-sm);
-  font-size: 13px;
-  border: 1px solid rgba(255,107,74,0.3);
-  background: rgba(255,107,74,0.08);
-  color: #ffb6a1;
-}
+.msg { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; font-size: 13px;
+  border: 1px solid rgba(255,107,74,0.3); background: rgba(255,107,74,0.08); color: #ffb6a1; }
 
-/* ---------- stat tiles ---------- */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-  gap: 12px;
-  margin-bottom: 22px;
-}
-
+/* ---------- tiles ---------- */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 11px; margin-bottom: 18px; }
 .tile {
-  position: relative;
-  overflow: hidden;
-  padding: 16px 16px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--card);
+  position: relative; overflow: hidden; padding: 14px 15px 13px;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--card);
+  transition: border-color 160ms ease, transform 160ms ease;
 }
-/* One hairline of volt along the top edge - the whole tile glowing would make
-   eight equally important things, which is no hierarchy at all. */
-.tile::before {
-  content: '';
-  position: absolute; inset: 0 0 auto 0; height: 1px;
-  background: linear-gradient(90deg, transparent, var(--volt-line), transparent);
-}
-.tile .k {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--ink-3);
-  margin-bottom: 8px;
-}
-.tile .v {
-  font-family: var(--display);
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  font-variant-numeric: tabular-nums;
-}
-.tile .n { margin-top: 5px; font-size: 12px; color: var(--ink-3); }
+.tile:hover { border-color: #39404E; transform: translateY(-1px); }
+.tile::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--volt-line), transparent); }
+.tile .k { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-3); margin-bottom: 7px; }
+.tile .v { font-family: var(--display); font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.tile .n { margin-top: 4px; font-size: 11.5px; color: var(--ink-3); }
 .tile.accent .v { color: var(--volt); }
+.tile.cyan .v { color: var(--cyan); }
+.tile.cyan::before { background: linear-gradient(90deg, transparent, rgba(74,227,255,0.3), transparent); }
 
 /* ---------- panels ---------- */
-.panel {
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: var(--card);
-  margin-bottom: 22px;
-  overflow: hidden;
-}
-.panel > header {
-  display: flex; align-items: center; gap: 12px;
-  padding: 15px 18px;
-  border-bottom: 1px solid var(--hairline);
-}
-.panel > header h2 {
-  margin: 0;
-  font-family: var(--display);
-  font-size: 15px;
-  font-weight: 800;
-}
-.panel > header .spacer { flex: 1; }
-.panel .body { padding: 18px; }
+.panel { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--card); margin-bottom: 18px; overflow: hidden; }
+.panel > header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 13px 16px; border-bottom: 1px solid var(--hairline); }
+.panel > header h2 { margin: 0; font-family: var(--display); font-size: 14.5px; font-weight: 800; }
+.panel .body { padding: 16px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
 
-/* ---------- download chart ---------- */
-.chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 132px;
-  padding-top: 8px;
-}
-.chart .col {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  height: 100%;
-}
-.chart .col i {
-  display: block;
-  width: 100%;
-  /* 3px even at zero, so a quiet day reads as a measured zero rather than as
-     a gap where the data failed to load. */
-  min-height: 3px;
-  border-radius: 3px 3px 0 0;
-  background: linear-gradient(180deg, var(--volt), rgba(205,255,74,0.28));
-}
-.chart .col[data-zero='1'] i { background: var(--overlay-weak); }
+/* ---------- charts ---------- */
+.chart { display: flex; align-items: flex-end; gap: 3px; height: 124px; padding-top: 6px; }
+.chart .col { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; cursor: default; }
+.chart .col i { display: block; width: 100%; min-height: 3px; border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--volt), rgba(205,255,74,0.25));
+  transition: filter 140ms ease; }
+.chart .col:hover i { filter: brightness(1.35); }
+.chart.cyan .col i { background: linear-gradient(180deg, var(--cyan), rgba(74,227,255,0.22)); }
+.chart .col[data-zero='1'] i { background: var(--weak); }
+.axis { display: flex; justify-content: space-between; margin-top: 7px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
 
-.axis {
-  display: flex; justify-content: space-between;
-  margin-top: 8px;
-  font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
-}
-
-.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.chip {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 5px 11px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-family: var(--mono); font-size: 11.5px;
-  color: var(--ink-2);
-}
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border: 1px solid var(--border);
+  border-radius: 999px; font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
 .chip b { color: var(--ink); font-weight: 700; }
+.chip.volt { border-color: var(--volt-line); color: var(--volt); }
+
+/* ---------- health ---------- */
+.health { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.hitem { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--card-2); }
+.hitem .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; background: var(--ink-3); }
+.hitem.ok .dot { background: var(--volt); box-shadow: 0 0 10px rgba(205,255,74,0.6); }
+.hitem.bad .dot { background: var(--ember); box-shadow: 0 0 10px rgba(255,107,74,0.5); }
+.hitem .t { font-size: 12.5px; }
+.hitem .t b { display: block; font-weight: 700; }
+.hitem .t span { color: var(--ink-3); font-family: var(--mono); font-size: 10.5px; word-break: break-all; }
 
 /* ---------- table ---------- */
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--hairline); }
+.toolbar input { margin: 0; flex: 1; min-width: 160px; }
 .scroller { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-th, td {
-  text-align: left;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--hairline);
-  white-space: nowrap;
-}
-th {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--ink-3);
-  font-weight: 500;
-}
-tbody tr:hover { background: rgba(245,244,239,0.028); }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--hairline); white-space: nowrap; }
+th { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); font-weight: 500; cursor: pointer; user-select: none; }
+th:hover { color: var(--ink); }
+th[data-dir]::after { content: ' \25B4'; color: var(--volt); }
+th[data-dir='desc']::after { content: ' \25BE'; }
+tbody tr { transition: background 120ms ease; }
+tbody tr:hover { background: rgba(245,244,239,0.03); }
 tbody tr:last-child td { border-bottom: 0; }
 td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 td .who { display: flex; flex-direction: column; gap: 2px; }
 td .who b { font-weight: 700; }
-td .who span { font-size: 12px; color: var(--ink-3); }
+td .who span { font-size: 11.5px; color: var(--ink-3); }
 
-.tag {
-  display: inline-block;
-  padding: 2.5px 8px;
-  border-radius: 999px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  border: 1px solid var(--border);
-  color: var(--ink-2);
-}
+.tag { display: inline-block; padding: 2.5px 8px; border-radius: 999px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; border: 1px solid var(--border); color: var(--ink-2); }
 .tag.on { color: var(--volt); border-color: var(--volt-line); background: var(--volt-wash); }
 .tag.off { color: var(--ember); border-color: rgba(255,107,74,0.3); background: rgba(255,107,74,0.08); }
 .tag.admin { color: var(--amber); border-color: rgba(232,182,44,0.35); background: rgba(232,182,44,0.1); }
 
-.empty { padding: 34px 18px; text-align: center; color: var(--ink-3); font-size: 14px; }
+/* A bar inside the cell, so activity is comparable at a glance instead of
+   being a column of numbers to read one at a time. */
+.meter { display: block; height: 3px; margin-top: 4px; border-radius: 2px; background: var(--weak); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--volt); }
 
-.foot {
-  margin-top: 26px;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-3);
-  text-align: center;
-}
-
+.empty { padding: 32px 16px; text-align: center; color: var(--ink-3); font-size: 14px; }
+.foot { margin-top: 22px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); text-align: center; }
 .hidden { display: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse i { animation: none; }
+  .field, .scan, .led i { animation: none !important; }
   * { transition: none !important; }
+  .scan { display: none; }
 }
-
-@media (max-width: 560px) {
-  .bar { flex-wrap: wrap; }
-  .tile .v { font-size: 25px; }
-}
+@media (max-width: 560px) { .tile .v { font-size: 24px; } }
 </style>
 </head>
 <body>
 <div class="field" aria-hidden="true"></div>
+<div class="scan" aria-hidden="true"></div>
 
 <div class="wrap">
 
-  <!-- ---------------- sign in ---------------- -->
   <section id="gate" class="gate">
     <h2>MONEVA Control</h2>
     <p class="hint">Sign in with an administrator account.</p>
     <div id="gateError" class="msg hidden" role="alert"></div>
-
-    <form id="loginForm" autocomplete="on">
+    <form id="loginForm">
       <label for="email">Email</label>
       <input id="email" type="email" autocomplete="username" required>
 
       <label for="password">Password</label>
       <div class="pw">
         <input id="password" type="password" autocomplete="current-password" required>
-        <!-- tabindex -1: tabbing out of the password field should reach Sign
-             in, which is where somebody typing a password is heading. -->
-        <button type="button" id="reveal" tabindex="-1"
-                aria-label="Show password" aria-pressed="false">show</button>
+        <!-- tabindex -1: tabbing out of the password should reach Sign in,
+             which is where somebody typing a password is heading. -->
+        <button type="button" id="reveal" tabindex="-1" aria-label="Show password" aria-pressed="false">show</button>
       </div>
 
       <div id="totpRow" class="hidden">
@@ -455,7 +297,6 @@ td .who span { font-size: 12px; color: var(--ink-3); }
     </form>
   </section>
 
-  <!-- ---------------- panel ---------------- -->
   <main id="panel" class="hidden">
     <div class="bar">
       <div class="glyph">M</div>
@@ -464,49 +305,90 @@ td .who span { font-size: 12px; color: var(--ink-3); }
         <p class="sub" id="who">&nbsp;</p>
       </div>
       <div class="spacer"></div>
-      <span class="pulse"><i></i><span id="stamp">live</span></span>
+      <span class="led" id="liveLed"><i></i><span id="stamp">live</span></span>
+      <button id="autoBtn" class="ghost" title="Refresh every 30 seconds">auto</button>
       <button id="refreshBtn">Refresh</button>
-      <button id="outBtn">Sign out</button>
+      <button id="outBtn" class="ghost">Sign out</button>
     </div>
 
     <div class="grid" id="tiles"></div>
 
     <section class="panel">
       <header>
-        <h2>Download traffic</h2>
+        <h2>System</h2>
         <div class="spacer"></div>
-        <span class="chip" id="dlRange">last 30 days</span>
+        <span class="chip" id="verChip">&mdash;</span>
       </header>
-      <div class="body">
-        <div class="chart" id="chart"></div>
-        <div class="axis"><span id="axisFrom"></span><span id="axisTo"></span></div>
-        <div class="legend" id="dlLegend"></div>
-      </div>
+      <div class="body"><div class="health" id="health"></div></div>
     </section>
+
+    <div class="cols">
+      <section class="panel">
+        <header>
+          <h2>Downloads</h2>
+          <div class="spacer"></div>
+          <span class="seg" id="dlRange">
+            <button data-d="7">7d</button><button data-d="30" class="on">30d</button><button data-d="90">90d</button>
+          </span>
+        </header>
+        <div class="body">
+          <div class="chart" id="dlChart"></div>
+          <div class="axis"><span id="dlFrom"></span><span id="dlTo"></span></div>
+          <div class="chips" id="dlChips"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <header>
+          <h2>Signups</h2>
+          <div class="spacer"></div>
+          <span class="seg" id="grRange">
+            <button data-d="7">7d</button><button data-d="30" class="on">30d</button><button data-d="90">90d</button>
+          </span>
+        </header>
+        <div class="body">
+          <div class="chart cyan" id="grChart"></div>
+          <div class="axis"><span id="grFrom"></span><span id="grTo"></span></div>
+          <div class="chips" id="grChips"></div>
+        </div>
+      </section>
+    </div>
 
     <section class="panel">
       <header>
         <h2>Users</h2>
         <div class="spacer"></div>
         <span class="chip" id="userCount"></span>
+        <button id="csvBtn" class="ghost" title="Download this table as CSV">Export</button>
       </header>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search name or email&hellip;" autocomplete="off">
+        <span class="seg" id="filter">
+          <button data-f="all" class="on">All</button>
+          <button data-f="active">Active</button>
+          <button data-f="suspended">Suspended</button>
+          <button data-f="real">Has data</button>
+          <button data-f="dormant">Dormant</button>
+        </span>
+      </div>
       <div class="scroller">
         <table>
           <thead>
             <tr>
-              <th>Person</th><th>Joined</th><th>Txns</th><th>Accts</th>
+              <th data-s="display_name">Person</th>
+              <th data-s="created_at" data-dir="desc">Joined</th>
+              <th data-s="transaction_count">Txns</th>
+              <th data-s="account_count">Accts</th>
               <th>Status</th><th>Security</th><th></th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
-        <div id="noUsers" class="empty hidden">No users yet.</div>
+        <div id="noUsers" class="empty hidden">Nothing matches that.</div>
       </div>
     </section>
 
-    <p class="foot">
-      Counts only &mdash; this panel cannot read anybody&rsquo;s transactions, balances or merchants.
-    </p>
+    <p class="foot">Counts only &mdash; this panel cannot read anybody&rsquo;s transactions, balances or merchants.</p>
   </main>
 </div>
 
@@ -514,67 +396,63 @@ td .who span { font-size: 12px; color: var(--ink-3); }
 (function () {
   'use strict';
 
-  /* The API is on Render; this page is served from Cloudflare. Same origin is
-     never the case here, so the base URL is explicit. */
   var API = 'https://moneva.onrender.com/api';
-
-  /* sessionStorage, not localStorage: closing the tab ends the session. The
-     right default for a page that lists your users on a shared machine. */
   var KEY = 'moneva_admin_token';
 
   var $ = function (id) { return document.getElementById(id); };
   var token = null;
-  try { token = sessionStorage.getItem(KEY); } catch (e) { token = null; }
+  try { token = sessionStorage.getItem(KEY); } catch (e) {}
+
+  var state = { users: [], sort: 'created_at', dir: 'desc', filter: 'all', q: '', dl: 30, gr: 30, auto: null };
 
   function setToken(t) {
     token = t;
     try { t ? sessionStorage.setItem(KEY, t) : sessionStorage.removeItem(KEY); } catch (e) {}
   }
 
-  function fail(msg) {
-    var box = $('gateError');
-    box.textContent = msg;
-    box.classList.remove('hidden');
-  }
+  function fail(m) { var b = $('gateError'); b.textContent = m; b.classList.remove('hidden'); }
 
   function api(path, opts) {
     opts = opts || {};
-    var headers = opts.headers || {};
-    headers['Content-Type'] = 'application/json';
-    if (token) headers['Authorization'] = 'Bearer ' + token;
-    return fetch(API + path, {
-      method: opts.method || 'GET',
-      headers: headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined
-    }).then(function (res) {
-      if (res.status === 204) return null;
-      return res.json().catch(function () { return null; }).then(function (data) {
-        if (!res.ok) {
-          var err = new Error((data && data.detail) || ('HTTP ' + res.status));
-          err.status = res.status;
-          throw err;
-        }
-        return data;
+    var h = { 'Content-Type': 'application/json' };
+    if (token) h.Authorization = 'Bearer ' + token;
+    return fetch(API + path, { method: opts.method || 'GET', headers: h, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (res) {
+        if (res.status === 204) return null;
+        return res.json().catch(function () { return null; }).then(function (d) {
+          if (!res.ok) { var e = new Error((d && d.detail) || ('HTTP ' + res.status)); e.status = res.status; throw e; }
+          return d;
+        });
       });
-    });
   }
 
   var nf = new Intl.NumberFormat('en-IN');
   function num(n) { return nf.format(n || 0); }
+  function day(iso) { try { return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }); } catch (e) { return iso; } }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
 
-  function day(iso) {
-    try {
-      return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
-    } catch (e) { return iso; }
-  }
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
+  /* Counts roll up to their value. Purely decorative, and skipped entirely
+     for anyone who asked for less motion. */
+  var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function countTo(el, target) {
+    if (still || target < 2) { el.textContent = num(target); return; }
+    var t0 = performance.now(), dur = 520;
+    (function step(now) {
+      var p = Math.min(1, (now - t0) / dur);
+      el.textContent = num(Math.round(target * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(step);
+    })(t0);
   }
 
   /* ---------------- sign in ---------------- */
+
+  $('reveal').addEventListener('click', function () {
+    var i = $('password'), show = i.type === 'password';
+    i.type = show ? 'text' : 'password';
+    this.textContent = show ? 'hide' : 'show';
+    this.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    this.setAttribute('aria-pressed', show ? 'true' : 'false');
+  });
 
   $('loginForm').addEventListener('submit', function (ev) {
     ev.preventDefault();
@@ -584,178 +462,260 @@ td .who span { font-size: 12px; color: var(--ink-3); }
 
     var code = $('totp').value.trim();
     var step = code
-      ? api('/auth/2fa/verify', { method: 'POST', body: { challenge_token: window.__challenge, code: code } })
+      ? api('/auth/2fa/verify', { method: 'POST', body: { challenge_token: window.__ch, code: code } })
       : api('/auth/login', { method: 'POST', body: { email: $('email').value.trim(), password: $('password').value } });
 
-    step.then(function (data) {
-      // Password was right but the account has an authenticator on it. Ask for
-      // the code and come back through the other branch.
-      if (data && data.requires_2fa) {
-        window.__challenge = data.challenge_token;
+    step.then(function (d) {
+      if (d && d.requires_2fa) {
+        window.__ch = d.challenge_token;
         $('totpRow').classList.remove('hidden');
         $('totp').focus();
         fail('Enter the code from your authenticator.');
         return;
       }
-      if (!data || !data.access_token) throw new Error('No token returned.');
-      setToken(data.access_token);
-      return open();
+      if (!d || !d.access_token) throw new Error('No token returned.');
+      setToken(d.access_token);
+      return openPanel();
     }).catch(function (err) {
-      // A non-admin gets 404 from every admin route, so that is what "you are
-      // not an admin" looks like here. Said plainly rather than as a raw code.
-      if (err.status === 404) {
-        setToken(null);
-        fail('That account cannot open this panel.');
-      } else {
-        fail(err.message || 'Could not sign in.');
-      }
+      // A non-admin gets 404 from every admin route, so that is what "not an
+      // admin" looks like from here.
+      if (err.status === 404) { setToken(null); fail('That account cannot open this panel.'); }
+      else fail(err.message || 'Could not sign in.');
     }).then(function () {
       $('loginBtn').disabled = false;
       $('loginBtn').textContent = 'Sign in';
     });
   });
 
-  /* A 22-character passphrase typed blind on a phone fails often enough that
-     people choose a weaker one instead. Starts hidden and stays hidden until
-     asked - it is still a password. */
-  $('reveal').addEventListener('click', function () {
-    var input = $('password');
-    var show = input.type === 'password';
-    input.type = show ? 'text' : 'password';
-    this.textContent = show ? 'hide' : 'show';
-    this.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-    this.setAttribute('aria-pressed', show ? 'true' : 'false');
-  });
-
   $('outBtn').addEventListener('click', function () {
     setToken(null);
+    stopAuto();
     $('panel').classList.add('hidden');
     $('gate').classList.remove('hidden');
   });
 
+  /* ---------------- tiles ---------------- */
+
+  function tile(k, v, n, cls) {
+    return '<div class="tile ' + (cls || '') + '"><div class="k">' + esc(k) + '</div>' +
+      '<div class="v" data-to="' + v + '">0</div>' + (n ? '<div class="n">' + esc(n) + '</div>' : '') + '</div>';
+  }
+
+  function renderOverview(o) {
+    var pct = o.total_users ? Math.round((o.verified_users / o.total_users) * 100) : 0;
+    $('tiles').innerHTML = [
+      tile('Users', o.total_users, num(o.active_users) + ' active', 'accent'),
+      tile('New this week', o.new_users_7d, 'last 7 days'),
+      tile('Verified', o.verified_users, pct + '% of accounts'),
+      tile('Two-factor', o.users_with_2fa, 'authenticator on'),
+      tile('Accounts', o.total_accounts, 'across all users'),
+      tile('Transactions', o.total_transactions, 'recorded'),
+      tile('Downloads', o.total_downloads, num(o.downloads_7d) + ' this week', 'cyan'),
+      tile('Downloads 24h', o.downloads_24h, 'last day', 'cyan')
+    ].join('');
+    Array.prototype.forEach.call($('tiles').querySelectorAll('.v'), function (el) {
+      countTo(el, parseInt(el.getAttribute('data-to'), 10) || 0);
+    });
+    $('stamp').textContent = new Date(o.generated_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  /* ---------------- charts ---------------- */
+
+  function drawChart(elId, fromId, toId, chipsId, d, chipClass) {
+    var peak = d.series.reduce(function (m, p) { return Math.max(m, p.count); }, 0);
+    $(elId).innerHTML = d.series.map(function (p) {
+      var h = peak > 0 ? Math.round((p.count / peak) * 100) : 0;
+      return '<div class="col" data-zero="' + (p.count ? '0' : '1') + '" title="' + esc(p.date) + ' — ' + p.count + '">' +
+        '<i style="height:' + Math.max(h, 2) + '%"></i></div>';
+    }).join('');
+    $(fromId).textContent = d.series.length ? day(d.series[0].date) : '';
+    $(toId).textContent = d.series.length ? day(d.series[d.series.length - 1].date) : '';
+
+    var chips = ['<span class="chip ' + (chipClass || '') + '"><b>' + num(d.total) + '</b> total</span>'];
+    Object.keys(d.by_version || {}).forEach(function (k) { chips.push('<span class="chip">' + esc(k) + ' <b>' + num(d.by_version[k]) + '</b></span>'); });
+    Object.keys(d.by_platform || {}).forEach(function (k) { chips.push('<span class="chip">' + esc(k) + ' <b>' + num(d.by_platform[k]) + '</b></span>'); });
+    $(chipsId).innerHTML = chips.join('');
+  }
+
+  /* ---------------- system ---------------- */
+
+  function renderHealth(h, v) {
+    var items = [];
+    function row(ok, title, detail) {
+      return '<div class="hitem ' + (ok ? 'ok' : 'bad') + '"><span class="dot"></span>' +
+        '<span class="t"><b>' + esc(title) + '</b><span>' + esc(detail) + '</span></span></div>';
+    }
+    items.push(row(!!h, 'API', h ? (h.service || 'up') + ' · v' + (h.version || '?') : 'unreachable'));
+    if (h && h.ai) {
+      items.push(row(h.ai.enabled, 'Assistant', h.ai.enabled ? 'enabled' : 'rule engine only'));
+      if (h.ai.groq) items.push(row(h.ai.groq.key_configured && !h.ai.groq.last_error, 'Groq', h.ai.groq.last_error || h.ai.groq.model));
+      if (h.ai.gemini) items.push(row(h.ai.gemini.key_configured && !h.ai.gemini.last_error, 'Gemini', h.ai.gemini.last_error || h.ai.gemini.model));
+    }
+    if (h && h.email) items.push(row(!!h.email.configured, 'Email', h.email.route || 'not configured'));
+    if (v) items.push(row(!!v.version_code, 'Release', 'v' + v.version_name + ' · code ' + v.version_code));
+    $('health').innerHTML = items.join('');
+    $('verChip').textContent = v ? 'app v' + v.version_name : '—';
+  }
+
+  /* ---------------- users ---------------- */
+
+  function visibleUsers() {
+    var q = state.q.toLowerCase();
+    var out = state.users.filter(function (u) {
+      if (q && (u.display_name + ' ' + u.email).toLowerCase().indexOf(q) < 0) return false;
+      if (state.filter === 'active') return u.is_active;
+      if (state.filter === 'suspended') return !u.is_active;
+      if (state.filter === 'real') return u.transaction_count > 0;
+      if (state.filter === 'dormant') return u.transaction_count === 0;
+      return true;
+    });
+    var k = state.sort, dir = state.dir === 'asc' ? 1 : -1;
+    return out.sort(function (a, b) {
+      var x = a[k], y = b[k];
+      if (typeof x === 'string') return x.localeCompare(y) * dir;
+      return (x - y) * dir;
+    });
+  }
+
+  function renderUsers() {
+    var rows = visibleUsers();
+    var busiest = state.users.reduce(function (m, u) { return Math.max(m, u.transaction_count); }, 0);
+    $('userCount').textContent = rows.length + ' of ' + state.users.length;
+    $('noUsers').classList.toggle('hidden', rows.length > 0);
+
+    $('rows').innerHTML = rows.map(function (u) {
+      var sec = [];
+      if (u.is_admin) sec.push('<span class="tag admin">admin</span>');
+      sec.push('<span class="tag ' + (u.totp_enabled ? 'on' : '') + '">' + (u.totp_enabled ? '2FA' : 'no 2FA') + '</span>');
+      sec.push('<span class="tag ' + (u.email_verified ? 'on' : '') + '">' + (u.email_verified ? 'verified' : 'unverified') + '</span>');
+      var w = busiest ? Math.round((u.transaction_count / busiest) * 100) : 0;
+
+      return '<tr>' +
+        '<td><div class="who"><b>' + esc(u.display_name) + '</b><span>' + esc(u.email) + '</span></div></td>' +
+        '<td class="num">' + esc(day(u.created_at)) + '</td>' +
+        '<td class="num">' + num(u.transaction_count) + '<span class="meter"><i style="width:' + w + '%"></i></span></td>' +
+        '<td class="num">' + num(u.account_count) + '</td>' +
+        '<td><span class="tag ' + (u.is_active ? 'on' : 'off') + '">' + (u.is_active ? 'active' : 'suspended') + '</span></td>' +
+        '<td>' + sec.join(' ') + '</td>' +
+        '<td><button class="' + (u.is_active ? 'danger' : '') + '" data-id="' + esc(u.id) + '" data-to="' + (!u.is_active) + '">' +
+          (u.is_active ? 'Suspend' : 'Restore') + '</button></td></tr>';
+    }).join('');
+  }
+
+  $('search').addEventListener('input', function () { state.q = this.value; renderUsers(); });
+
+  $('filter').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-f]'); if (!b) return;
+    state.filter = b.getAttribute('data-f');
+    Array.prototype.forEach.call(this.children, function (c) { c.classList.toggle('on', c === b); });
+    renderUsers();
+  });
+
+  document.querySelector('thead').addEventListener('click', function (ev) {
+    var th = ev.target.closest('th[data-s]'); if (!th) return;
+    var k = th.getAttribute('data-s');
+    state.dir = (state.sort === k && state.dir === 'desc') ? 'asc' : 'desc';
+    state.sort = k;
+    Array.prototype.forEach.call(this.querySelectorAll('th'), function (x) { x.removeAttribute('data-dir'); });
+    th.setAttribute('data-dir', state.dir);
+    renderUsers();
+  });
+
+  $('csvBtn').addEventListener('click', function () {
+    var rows = visibleUsers();
+    var head = ['email', 'display_name', 'joined', 'transactions', 'accounts', 'active', 'admin', '2fa', 'verified'];
+    var body = rows.map(function (u) {
+      return [u.email, u.display_name, u.created_at, u.transaction_count, u.account_count,
+              u.is_active, u.is_admin, u.totp_enabled, u.email_verified]
+        // Quoted and doubled: a display name with a comma in it would
+        // otherwise shift every later column by one.
+        .map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+    });
+    var blob = new Blob([head.join(',') + '\n' + body.join('\n')], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'moneva-users-' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $('rows').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-id]'); if (!b) return;
+    var to = b.getAttribute('data-to') === 'true';
+    if (!window.confirm(to ? 'Restore this account?' : 'Suspend this account? They will not be able to sign in.')) return;
+    b.disabled = true;
+    api('/admin/users/' + b.getAttribute('data-id') + '/active?active=' + to, { method: 'POST' })
+      .then(load)
+      .catch(function (e) { window.alert(e.message || 'Could not change that account.'); b.disabled = false; });
+  });
+
+  /* ---------------- ranges, refresh ---------------- */
+
+  function wireRange(id, key, fn) {
+    $(id).addEventListener('click', function (ev) {
+      var b = ev.target.closest('button[data-d]'); if (!b) return;
+      state[key] = parseInt(b.getAttribute('data-d'), 10);
+      Array.prototype.forEach.call(this.children, function (c) { c.classList.toggle('on', c === b); });
+      fn();
+    });
+  }
+  wireRange('dlRange', 'dl', function () {
+    api('/admin/downloads?days=' + state.dl).then(function (d) { drawChart('dlChart','dlFrom','dlTo','dlChips', d, 'volt'); });
+  });
+  wireRange('grRange', 'gr', function () {
+    api('/admin/growth?days=' + state.gr).then(function (d) { drawChart('grChart','grFrom','grTo','grChips', d); });
+  });
+
+  function stopAuto() { if (state.auto) { clearInterval(state.auto); state.auto = null; } $('autoBtn').classList.remove('on'); }
+  $('autoBtn').addEventListener('click', function () {
+    if (state.auto) return stopAuto();
+    // 30s. Often enough to feel live, rare enough that a sleeping free-tier
+    // API is not being woken on a timer all day.
+    state.auto = setInterval(load, 30000);
+    this.classList.add('on');
+  });
+
   $('refreshBtn').addEventListener('click', function () { load(); });
 
-  /* ---------------- the panel ---------------- */
-
-  function open() {
+  function openPanel() {
     $('gate').classList.add('hidden');
     $('panel').classList.remove('hidden');
     return load();
   }
 
-  function tile(k, v, note, accent) {
-    return '<div class="tile' + (accent ? ' accent' : '') + '">' +
-      '<div class="k">' + esc(k) + '</div>' +
-      '<div class="v">' + esc(v) + '</div>' +
-      (note ? '<div class="n">' + esc(note) + '</div>' : '') +
-      '</div>';
-  }
-
-  function renderOverview(o) {
-    $('tiles').innerHTML = [
-      tile('Users', num(o.total_users), num(o.active_users) + ' active', true),
-      tile('New this week', num(o.new_users_7d), 'last 7 days'),
-      tile('Verified', num(o.verified_users), 'email confirmed'),
-      tile('Two-factor on', num(o.users_with_2fa), 'authenticator'),
-      tile('Accounts', num(o.total_accounts), 'across all users'),
-      tile('Transactions', num(o.total_transactions), 'recorded'),
-      tile('Downloads', num(o.total_downloads), num(o.downloads_7d) + ' this week', true),
-      tile('Downloads 24h', num(o.downloads_24h), 'last day')
-    ].join('');
-    $('stamp').textContent = new Date(o.generated_at).toLocaleTimeString('en-IN',
-      { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function renderDownloads(d) {
-    var peak = d.series.reduce(function (m, p) { return Math.max(m, p.count); }, 0);
-    $('chart').innerHTML = d.series.map(function (p) {
-      // Scaled against the busiest day so the shape is readable at any volume.
-      var pct = peak > 0 ? Math.round((p.count / peak) * 100) : 0;
-      return '<div class="col" data-zero="' + (p.count ? '0' : '1') +
-        '" title="' + esc(p.date) + ' — ' + p.count + '">' +
-        '<i style="height:' + Math.max(pct, 2) + '%"></i></div>';
-    }).join('');
-
-    $('axisFrom').textContent = d.series.length ? day(d.series[0].date) : '';
-    $('axisTo').textContent = d.series.length ? day(d.series[d.series.length - 1].date) : '';
-    $('dlRange').textContent = 'last ' + d.days + ' days · ' + num(d.total) + ' total';
-
-    var chips = [];
-    Object.keys(d.by_version || {}).forEach(function (v) {
-      chips.push('<span class="chip">v' + esc(v) + ' <b>' + num(d.by_version[v]) + '</b></span>');
-    });
-    Object.keys(d.by_platform || {}).forEach(function (p) {
-      chips.push('<span class="chip">' + esc(p) + ' <b>' + num(d.by_platform[p]) + '</b></span>');
-    });
-    $('dlLegend').innerHTML = chips.join('') ||
-      '<span class="chip">no downloads recorded yet</span>';
-  }
-
-  function renderUsers(rows) {
-    $('userCount').textContent = rows.length + (rows.length === 1 ? ' person' : ' people');
-    $('noUsers').classList.toggle('hidden', rows.length > 0);
-
-    $('rows').innerHTML = rows.map(function (u) {
-      var security = [];
-      if (u.is_admin) security.push('<span class="tag admin">admin</span>');
-      security.push('<span class="tag ' + (u.totp_enabled ? 'on' : '') + '">' +
-        (u.totp_enabled ? '2FA' : 'no 2FA') + '</span>');
-      security.push('<span class="tag ' + (u.email_verified ? 'on' : '') + '">' +
-        (u.email_verified ? 'verified' : 'unverified') + '</span>');
-
-      return '<tr>' +
-        '<td><div class="who"><b>' + esc(u.display_name) + '</b><span>' + esc(u.email) + '</span></div></td>' +
-        '<td class="num">' + esc(day(u.created_at)) + '</td>' +
-        '<td class="num">' + num(u.transaction_count) + '</td>' +
-        '<td class="num">' + num(u.account_count) + '</td>' +
-        '<td><span class="tag ' + (u.is_active ? 'on' : 'off') + '">' +
-          (u.is_active ? 'active' : 'suspended') + '</span></td>' +
-        '<td>' + security.join(' ') + '</td>' +
-        '<td><button class="' + (u.is_active ? 'danger' : '') + '" data-id="' + esc(u.id) +
-          '" data-to="' + (u.is_active ? 'false' : 'true') + '">' +
-          (u.is_active ? 'Suspend' : 'Restore') + '</button></td>' +
-        '</tr>';
-    }).join('');
-  }
-
-  $('rows').addEventListener('click', function (ev) {
-    var btn = ev.target.closest('button[data-id]');
-    if (!btn) return;
-    var to = btn.getAttribute('data-to') === 'true';
-    // Confirmed because it signs somebody out of their own money.
-    if (!window.confirm(to ? 'Restore this account?' : 'Suspend this account? They will not be able to sign in.')) return;
-    btn.disabled = true;
-    api('/admin/users/' + btn.getAttribute('data-id') + '/active?active=' + to, { method: 'POST' })
-      .then(load)
-      .catch(function (err) { window.alert(err.message || 'Could not change that account.'); btn.disabled = false; });
-  });
-
   function load() {
     return Promise.all([
       api('/admin/overview'),
-      api('/admin/downloads?days=30'),
-      api('/admin/users?limit=200')
+      api('/admin/downloads?days=' + state.dl),
+      api('/admin/growth?days=' + state.gr),
+      api('/admin/users?limit=500'),
+      // Public, and allowed to fail without taking the panel down with it.
+      fetch(API + '/health').then(function (r) { return r.json(); }).catch(function () { return null; }),
+      fetch(API + '/app/version').then(function (r) { return r.json(); }).catch(function () { return null; })
     ]).then(function (r) {
       renderOverview(r[0]);
-      renderDownloads(r[1]);
-      renderUsers(r[2]);
-      var me = r[2].filter(function (u) { return u.is_admin; })[0];
-      $('who').textContent = me ? 'signed in as ' + me.email : '';
+      drawChart('dlChart','dlFrom','dlTo','dlChips', r[1], 'volt');
+      drawChart('grChart','grFrom','grTo','grChips', r[2]);
+      state.users = r[3];
+      renderUsers();
+      renderHealth(r[4], r[5]);
+      var me = r[3].filter(function (u) { return u.is_admin; })[0];
+      $('who').textContent = me ? me.email : '';
+      $('liveLed').classList.remove('bad');
     }).catch(function (err) {
       if (err.status === 401 || err.status === 403 || err.status === 404) {
-        setToken(null);
+        setToken(null); stopAuto();
         $('panel').classList.add('hidden');
         $('gate').classList.remove('hidden');
         fail(err.status === 404 ? 'That account cannot open this panel.' : 'Session expired. Sign in again.');
         return;
       }
-      window.alert('Could not load: ' + (err.message || 'unknown error'));
+      $('liveLed').classList.add('bad');
+      $('stamp').textContent = 'offline';
     });
   }
 
-  // A token already in this tab - go straight in, and fall back to the sign-in
-  // screen if it is stale.
-  if (token) open();
+  if (token) openPanel();
 })();
 </script>
 </body>

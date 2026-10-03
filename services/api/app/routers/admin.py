@@ -196,6 +196,56 @@ async def set_user_active(
     )
 
 
+@router.get("/growth", response_model=DownloadStats)
+async def growth(
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+    days: int = Query(30, ge=1, le=365),
+):
+    """Signups per day, and what people did with the account afterwards.
+
+    Reuses DownloadStats because the shape is identical - a daily series plus
+    two breakdowns - and inventing a second model with the same fields would
+    mean two things to keep in step for no gain. `by_version` carries the
+    currencies people signed up with and `by_platform` carries whether they
+    ever recorded anything, which is the number that separates a signup from
+    a user.
+    """
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    rows = (await db.execute(
+        select(User.created_at, User.currency, User.id).where(User.created_at >= since)
+    )).all()
+
+    active_ids = {
+        r[0] for r in (await db.execute(
+            select(Transaction.user_id).distinct()
+        )).all()
+    }
+
+    by_day: dict[str, int] = {}
+    by_currency: dict[str, int] = {}
+    engaged = {"recorded something": 0, "never recorded": 0}
+    for created_at, currency, uid in rows:
+        when = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+        key = when.date().isoformat()
+        by_day[key] = by_day.get(key, 0) + 1
+        by_currency[currency or "?"] = by_currency.get(currency or "?", 0) + 1
+        engaged["recorded something" if uid in active_ids else "never recorded"] += 1
+
+    series: List[DownloadPoint] = []
+    start = (datetime.now(timezone.utc) - timedelta(days=days - 1)).date()
+    for i in range(days):
+        d = (start + timedelta(days=i)).isoformat()
+        series.append(DownloadPoint(date=d, count=by_day.get(d, 0)))
+
+    return DownloadStats(
+        total=len(rows), days=days, series=series,
+        by_version=dict(sorted(by_currency.items(), key=lambda kv: -kv[1])),
+        by_platform={k: v for k, v in engaged.items() if v},
+    )
+
+
 @router.get("/downloads", response_model=DownloadStats)
 async def downloads(
     _admin: User = Depends(require_admin),

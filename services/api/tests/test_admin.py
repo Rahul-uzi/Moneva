@@ -201,3 +201,30 @@ class TestDownloadTraffic:
     async def test_downloads_are_not_reachable_without_the_panel(self, api):
         client, _f, _a, plain_id = api
         assert (await client.get("/api/admin/downloads", headers=auth(plain_id))).status_code == 404
+
+
+class TestGrowth:
+    async def test_it_charts_signups_and_separates_real_users(self, api):
+        """A signup that never recorded anything is not a user yet.
+
+        That split is the whole point of the panel's growth view: two accounts
+        exist, and only one of them has ever put a transaction in.
+        """
+        client, _f, admin_id, _p = api
+        res = await client.get("/api/admin/growth?days=30", headers=auth(admin_id))
+        assert res.status_code == 200, res.text
+        g = res.json()
+        assert g["total"] == 2
+        assert len(g["series"]) == 30
+        assert g["by_platform"]["recorded something"] == 1
+        assert g["by_platform"]["never recorded"] == 1
+
+    async def test_growth_leaks_no_amount(self, api):
+        client, _f, admin_id, _p = api
+        body = (await client.get("/api/admin/growth", headers=auth(admin_id))).text
+        assert str(SECRET_AMOUNT) not in body
+        assert SECRET_TEXT not in body
+
+    async def test_growth_is_admin_only(self, api):
+        client, _f, _a, plain_id = api
+        assert (await client.get("/api/admin/growth", headers=auth(plain_id))).status_code == 404
