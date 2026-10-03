@@ -702,3 +702,71 @@ class ReconcileResponse(BaseModel):
     #: None when the balance already matched and nothing was written.
     adjustment_transaction_id: Optional[uuid.UUID] = None
     message: str
+
+
+# --------------------------------------------------------------------------
+# Admin panel.
+#
+# Every figure below is a COUNT. None of these models carries an amount, a
+# balance, a description or a merchant: the panel answers "how many" and
+# never "how much", so a leaked admin session exposes usage, not anybody's
+# financial life.
+# --------------------------------------------------------------------------
+
+class AdminOverview(BaseModel):
+    total_users: int
+    active_users: int
+    verified_users: int
+    users_with_2fa: int
+    new_users_7d: int
+    total_accounts: int
+    total_transactions: int
+    total_downloads: int
+    downloads_24h: int
+    downloads_7d: int
+    generated_at: datetime
+
+
+class AdminUserRow(BaseModel):
+    id: str
+    email: str
+    display_name: str
+    created_at: datetime
+    is_active: bool
+    is_admin: bool
+    totp_enabled: bool
+    email_verified: bool
+    currency: str
+    #: How much they use it, which is the question. Not what they spent.
+    transaction_count: int
+    account_count: int
+
+
+class DownloadPoint(BaseModel):
+    date: str
+    count: int
+
+
+class DownloadStats(BaseModel):
+    total: int
+    days: int
+    series: List[DownloadPoint]
+    by_version: dict
+    by_platform: dict
+
+
+class DownloadHit(BaseModel):
+    """What the website's download button reports.
+
+    Public and unauthenticated - it is fired from a static page by anyone
+    about to download a public file. Everything is bounded and nothing
+    identifies a person; the fields exist so a release's uptake can be read,
+    not so a visitor can be.
+    """
+    version_name: Optional[str] = Field(default=None, max_length=32)
+    source: Optional[str] = Field(default=None, max_length=32)
+    #: Bounded, but not so tightly that an unexpected value is rejected
+    #: instead of counted: the handler buckets anything it does not recognise
+    #: to "other", and a download that goes uncounted because the client sent
+    #: a slightly odd string is a worse outcome than a row saying "other".
+    platform: Optional[str] = Field(default=None, max_length=64)

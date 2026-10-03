@@ -16,6 +16,12 @@ class User(Base):
     currency = Column(String, default="INR", nullable=False)
     timezone = Column(String, default="UTC", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    # Grants the admin panel. Deliberately NOT settable through any API: there
+    # is no endpoint that promotes an account, because an endpoint that can
+    # make an admin is an endpoint that can be tricked into making one. It is
+    # set by hand in the database - a deliberate speed bump on the one
+    # privilege that can see every other account.
+    is_admin = Column(Boolean, default=False, nullable=False)
     notif_bills = Column(Boolean, default=True, nullable=False)
     notif_budgets = Column(Boolean, default=True, nullable=False)
     notif_goals = Column(Boolean, default=True, nullable=False)
@@ -405,3 +411,33 @@ class Emi(Base):
 
     # Relationships
     user = relationship("User", back_populates="emis")
+
+
+class AppDownload(Base):
+    """One recorded tap on a download link.
+
+    Downloads were not measured at all: the Worker serving the site is
+    assets-only, so Cloudflare hands the APK straight off its edge and nothing
+    anywhere counts it.
+
+    Recorded from the page by a beacon rather than by routing the file through
+    the API. A redirect would have put a sleeping free-tier service in front of
+    the one button on the site that has to feel instant - a cold start is the
+    better part of a minute, which reads as a broken download. The beacon
+    cannot block it: the file still comes straight from Cloudflare.
+
+    Deliberately holds NO address and NO identifier. A download is interesting
+    as a count, and this is a public endpoint anyone can post to, so there is
+    nothing here worth stealing and nothing to tie a row to a person.
+    """
+    __tablename__ = "app_downloads"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    #: Which release was offered, so a release's uptake can be read off.
+    version_name = Column(String, nullable=True)
+    #: "website" today; room for another surface later without a migration.
+    source = Column(String, nullable=True)
+    #: Coarse only - "android", "windows", "other". Never the full user agent,
+    #: which is close enough to a fingerprint to be worth not keeping.
+    platform = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.db.database import engine
 from app.models.models import Base
 from app.routers import (
+    admin,
     app_release,
     auth,
     accounts,
@@ -103,6 +104,7 @@ app.include_router(notifications.router, prefix=settings.API_PREFIX)
 app.include_router(profile.router, prefix=settings.API_PREFIX)
 app.include_router(ai.router, prefix=settings.API_PREFIX)
 app.include_router(emis.router, prefix=settings.API_PREFIX)
+app.include_router(admin.router, prefix=settings.API_PREFIX)
 
 @app.get("/health", tags=["Health"])
 @app.get("/api/health", tags=["Health"])

@@ -23,6 +23,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.ratelimit import SlidingWindow, client_ip, enforce
+from app.models.models import AppDownload
+from app.schemas.schemas import DownloadHit
 from app.core.security import get_current_user
 from app.db.database import get_db
 from app.models.models import User
@@ -128,3 +130,57 @@ async def report_crash(
         (payload.stack or "")[:2000],
     )
     return {"received": True}
+
+
+# A download is one deliberate human act, so this is generous for a real
+# person and useless for inflating a counter from one address.
+DOWNLOAD_BY_IP = SlidingWindow(limit=30, window_seconds=3600, name="download-ip")
+
+
+@router.post("/download-hit", status_code=status.HTTP_204_NO_CONTENT)
+async def record_download(
+    payload: DownloadHit,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Counts a tap on the website's download button.
+
+    Reported by a beacon from the page rather than by serving the file through
+    here. Routing the APK through this service would put a sleeping free-tier
+    instance in front of the one button on the site that has to feel instant -
+    a cold start is the better part of a minute, which reads as a broken
+    download. The file still comes straight from Cloudflare's edge; only the
+    count comes here, and it cannot delay or break the download because
+    nothing waits for it.
+
+    Unauthenticated, because the page it fires from is public and the file it
+    counts is public. It therefore stores NO address and NO identifier: the IP
+    is used for the rate limit and never written down.
+
+    Returns 204 whatever happens. A counter that makes a visitor's download
+    look like it failed would be worse than no counter.
+    """
+    try:
+        enforce(DOWNLOAD_BY_IP, client_ip(request))
+    except Exception:
+        # Over the limit. Silently not counted - the visitor is downloading a
+        # public file and owes this endpoint nothing.
+        return
+
+    platform = (payload.platform or "").strip().lower()
+    if platform not in ("android", "windows", "mac", "linux", "ios", "other"):
+        platform = "other"
+
+    try:
+        db.add(AppDownload(
+            version_name=(payload.version_name or "").strip()[:32] or None,
+            source=(payload.source or "website").strip()[:32],
+            platform=platform,
+            created_at=datetime.now(timezone.utc),
+        ))
+        await db.commit()
+    except Exception:
+        # The database being unavailable must not surface on a download
+        # button. The count is the least important thing on this page.
+        await db.rollback()
+    return

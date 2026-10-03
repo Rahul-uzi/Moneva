@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<!--
+  MONEVA admin.
+
+  UNLISTED, AND THAT IS NOT THE SECURITY. Nothing links here and the
+  crawlers are told to stay away, but an unlisted URL is one shared link, one
+  browser history and one log file away from being public. The protection is
+  that every endpoint behind this page requires an admin account and answers
+  everybody else with 404 - the same thing the API says about a path that does
+  not exist, so a wrong guess learns nothing.
+
+  WHAT IT CAN SHOW. Counts. The API has no route that returns somebody's
+  amounts, balances or merchants to an admin, so this page could not display
+  them if it tried. "312 transactions" tells you this is a real user; what
+  those transactions were is none of the panel's business.
+
+  The token lives in sessionStorage, not localStorage: closing the tab ends
+  the session, which is the right default for a page that lists your users.
+-->
+<title>MONEVA Control</title>
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="data:,">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+:root {
+  /* The site's own tokens, so this is unmistakably the same product. */
+  --bg: #0A0B0D;
+  --surface: #131519;
+  --card: #14171B;
+  --border: #2A2F38;
+  --hairline: rgba(245, 244, 239, 0.09);
+  --volt: #CDFF4A;
+  --ember: #FF6B4A;
+  --amber: #E8B62C;
+  --ink: #F5F4EF;
+  --ink-2: #9CA3AD;
+  --ink-3: #8A929D;
+  --overlay-weak: rgba(245, 244, 239, 0.05);
+  --volt-wash: rgba(205, 255, 74, 0.12);
+  --volt-line: rgba(205, 255, 74, 0.28);
+
+  --sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --display: 'Archivo', var(--sans);
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The one piece of atmosphere: a faint grid and a single volt bloom behind
+   everything. Fixed, so it does not travel with the scroll and turn into
+   motion sickness, and pointer-events:none so it is purely decorative. */
+.field {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(900px 520px at 78% -8%, rgba(205, 255, 74, 0.10), transparent 62%),
+    radial-gradient(700px 480px at 10% 108%, rgba(255, 107, 74, 0.07), transparent 60%),
+    linear-gradient(rgba(245,244,239,0.028) 1px, transparent 1px) 0 0 / 100% 46px,
+    linear-gradient(90deg, rgba(245,244,239,0.028) 1px, transparent 1px) 0 0 / 46px 100%;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 22px 16px 80px;
+}
+
+/* ---------- top bar ---------- */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(245,244,239,0.045), rgba(245,244,239,0.012));
+  backdrop-filter: blur(10px);
+}
+
+.glyph {
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  background: var(--volt);
+  color: #10130A;
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 17px;
+}
+
+.bar h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.bar .sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.bar .spacer { flex: 1; }
+
+/* A quiet live marker - it is the only thing on the page that moves. */
+.pulse {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.pulse i {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--volt);
+  box-shadow: 0 0 0 0 rgba(205, 255, 74, 0.55);
+  animation: ping 2.4s ease-out infinite;
+}
+@keyframes ping {
+  70%  { box-shadow: 0 0 0 9px rgba(205, 255, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(205, 255, 74, 0); }
+}
+
+/* ---------- buttons ---------- */
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--overlay-weak);
+  color: var(--ink);
+  padding: 9px 14px;
+  transition: background 140ms ease, border-color 140ms ease, transform 100ms ease;
+}
+button:hover { background: rgba(245,244,239,0.1); border-color: #3A4150; }
+button:active { transform: scale(0.98); }
+button:focus-visible { outline: 2px solid var(--volt); outline-offset: 2px; }
+button[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+button.primary {
+  background: var(--volt);
+  border-color: var(--volt);
+  color: #10130A;
+  font-weight: 700;
+}
+button.primary:hover { background: #d7ff6b; }
+
+button.danger { color: var(--ember); border-color: rgba(255,107,74,0.35); }
+button.danger:hover { background: rgba(255,107,74,0.1); }
+
+/* ---------- sign in ---------- */
+.gate {
+  max-width: 400px;
+  margin: 9vh auto 0;
+  padding: 28px 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(245,244,239,0.05), rgba(245,244,239,0.015));
+  backdrop-filter: blur(12px);
+}
+.gate h2 {
+  margin: 0 0 4px;
+  font-family: var(--display);
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+.gate p.hint { margin: 0 0 20px; font-size: 13px; color: var(--ink-3); }
+
+label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  margin: 0 0 6px;
+}
+
+input {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: rgba(10, 11, 13, 0.6);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+  margin-bottom: 15px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+input:focus {
+  outline: none;
+  border-color: var(--volt-line);
+  box-shadow: 0 0 0 3px rgba(205, 255, 74, 0.1);
+}
+
+.msg {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  border: 1px solid rgba(255,107,74,0.3);
+  background: rgba(255,107,74,0.08);
+  color: #ffb6a1;
+}
+
+/* ---------- stat tiles ---------- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 16px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+/* One hairline of volt along the top edge - the whole tile glowing would make
+   eight equally important things, which is no hierarchy at all. */
+.tile::before {
+  content: '';
+  position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--volt-line), transparent);
+}
+.tile .k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-3);
+  margin-bottom: 8px;
+}
+.tile .v {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.tile .n { margin-top: 5px; font-size: 12px; color: var(--ink-3); }
+.tile.accent .v { color: var(--volt); }
+
+/* ---------- panels ---------- */
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+.panel > header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+.panel > header h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 800;
+}
+.panel > header .spacer { flex: 1; }
+.panel .body { padding: 18px; }
+
+/* ---------- download chart ---------- */
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 132px;
+  padding-top: 8px;
+}
+.chart .col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+}
+.chart .col i {
+  display: block;
+  width: 100%;
+  /* 3px even at zero, so a quiet day reads as a measured zero rather than as
+     a gap where the data failed to load. */
+  min-height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--volt), rgba(205,255,74,0.28));
+}
+.chart .col[data-zero='1'] i { background: var(--overlay-weak); }
+
+.axis {
+  display: flex; justify-content: space-between;
+  margin-top: 8px;
+  font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+}
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: var(--mono); font-size: 11.5px;
+  color: var(--ink-2);
+}
+.chip b { color: var(--ink); font-weight: 700; }
+
+/* ---------- table ---------- */
+.scroller { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td {
+  text-align: left;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+th {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+tbody tr:hover { background: rgba(245,244,239,0.028); }
+tbody tr:last-child td { border-bottom: 0; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td .who { display: flex; flex-direction: column; gap: 2px; }
+td .who b { font-weight: 700; }
+td .who span { font-size: 12px; color: var(--ink-3); }
+
+.tag {
+  display: inline-block;
+  padding: 2.5px 8px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--border);
+  color: var(--ink-2);
+}
+.tag.on { color: var(--volt); border-color: var(--volt-line); background: var(--volt-wash); }
+.tag.off { color: var(--ember); border-color: rgba(255,107,74,0.3); background: rgba(255,107,74,0.08); }
+.tag.admin { color: var(--amber); border-color: rgba(232,182,44,0.35); background: rgba(232,182,44,0.1); }
+
+.empty { padding: 34px 18px; text-align: center; color: var(--ink-3); font-size: 14px; }
+
+.foot {
+  margin-top: 26px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse i { animation: none; }
+  * { transition: none !important; }
+}
+
+@media (max-width: 560px) {
+  .bar { flex-wrap: wrap; }
+  .tile .v { font-size: 25px; }
+}
+</style>
+</head>
+<body>
+<div class="field" aria-hidden="true"></div>
+
+<div class="wrap">
+
+  <!-- ---------------- sign in ---------------- -->
+  <section id="gate" class="gate">
+    <h2>MONEVA Control</h2>
+    <p class="hint">Sign in with an administrator account.</p>
+    <div id="gateError" class="msg hidden" role="alert"></div>
+
+    <form id="loginForm" autocomplete="on">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+
+      <div id="totpRow" class="hidden">
+        <label for="totp">Authenticator code</label>
+        <input id="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+      </div>
+
+      <button class="primary" type="submit" id="loginBtn" style="width:100%">Sign in</button>
+    </form>
+  </section>
+
+  <!-- ---------------- panel ---------------- -->
+  <main id="panel" class="hidden">
+    <div class="bar">
+      <div class="glyph">M</div>
+      <div>
+        <h1>MONEVA Control</h1>
+        <p class="sub" id="who">&nbsp;</p>
+      </div>
+      <div class="spacer"></div>
+      <span class="pulse"><i></i><span id="stamp">live</span></span>
+      <button id="refreshBtn">Refresh</button>
+      <button id="outBtn">Sign out</button>
+    </div>
+
+    <div class="grid" id="tiles"></div>
+
+    <section class="panel">
+      <header>
+        <h2>Download traffic</h2>
+        <div class="spacer"></div>
+        <span class="chip" id="dlRange">last 30 days</span>
+      </header>
+      <div class="body">
+        <div class="chart" id="chart"></div>
+        <div class="axis"><span id="axisFrom"></span><span id="axisTo"></span></div>
+        <div class="legend" id="dlLegend"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>
+        <h2>Users</h2>
+        <div class="spacer"></div>
+        <span class="chip" id="userCount"></span>
+      </header>
+      <div class="scroller">
+        <table>
+          <thead>
+            <tr>
+              <th>Person</th><th>Joined</th><th>Txns</th><th>Accts</th>
+              <th>Status</th><th>Security</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div id="noUsers" class="empty hidden">No users yet.</div>
+      </div>
+    </section>
+
+    <p class="foot">
+      Counts only &mdash; this panel cannot read anybody&rsquo;s transactions, balances or merchants.
+    </p>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* The API is on Render; this page is served from Cloudflare. Same origin is
+     never the case here, so the base URL is explicit. */
+  var API = 'https://moneva.onrender.com/api';
+
+  /* sessionStorage, not localStorage: closing the tab ends the session. The
+     right default for a page that lists your users on a shared machine. */
+  var KEY = 'moneva_admin_token';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var token = null;
+  try { token = sessionStorage.getItem(KEY); } catch (e) { token = null; }
+
+  function setToken(t) {
+    token = t;
+    try { t ? sessionStorage.setItem(KEY, t) : sessionStorage.removeItem(KEY); } catch (e) {}
+  }
+
+  function fail(msg) {
+    var box = $('gateError');
+    box.textContent = msg;
+    box.classList.remove('hidden');
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    var headers = opts.headers || {};
+    headers['Content-Type'] = 'application/json';
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    return fetch(API + path, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    }).then(function (res) {
+      if (res.status === 204) return null;
+      return res.json().catch(function () { return null; }).then(function (data) {
+        if (!res.ok) {
+          var err = new Error((data && data.detail) || ('HTTP ' + res.status));
+          err.status = res.status;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  var nf = new Intl.NumberFormat('en-IN');
+  function num(n) { return nf.format(n || 0); }
+
+  function day(iso) {
+    try {
+      return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
+    } catch (e) { return iso; }
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /* ---------------- sign in ---------------- */
+
+  $('loginForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    $('gateError').classList.add('hidden');
+    $('loginBtn').disabled = true;
+    $('loginBtn').textContent = 'Signing in…';
+
+    var code = $('totp').value.trim();
+    var step = code
+      ? api('/auth/2fa/verify', { method: 'POST', body: { challenge_token: window.__challenge, code: code } })
+      : api('/auth/login', { method: 'POST', body: { email: $('email').value.trim(), password: $('password').value } });
+
+    step.then(function (data) {
+      // Password was right but the account has an authenticator on it. Ask for
+      // the code and come back through the other branch.
+      if (data && data.requires_2fa) {
+        window.__challenge = data.challenge_token;
+        $('totpRow').classList.remove('hidden');
+        $('totp').focus();
+        fail('Enter the code from your authenticator.');
+        return;
+      }
+      if (!data || !data.access_token) throw new Error('No token returned.');
+      setToken(data.access_token);
+      return open();
+    }).catch(function (err) {
+      // A non-admin gets 404 from every admin route, so that is what "you are
+      // not an admin" looks like here. Said plainly rather than as a raw code.
+      if (err.status === 404) {
+        setToken(null);
+        fail('That account cannot open this panel.');
+      } else {
+        fail(err.message || 'Could not sign in.');
+      }
+    }).then(function () {
+      $('loginBtn').disabled = false;
+      $('loginBtn').textContent = 'Sign in';
+    });
+  });
+
+  $('outBtn').addEventListener('click', function () {
+    setToken(null);
+    $('panel').classList.add('hidden');
+    $('gate').classList.remove('hidden');
+  });
+
+  $('refreshBtn').addEventListener('click', function () { load(); });
+
+  /* ---------------- the panel ---------------- */
+
+  function open() {
+    $('gate').classList.add('hidden');
+    $('panel').classList.remove('hidden');
+    return load();
+  }
+
+  function tile(k, v, note, accent) {
+    return '<div class="tile' + (accent ? ' accent' : '') + '">' +
+      '<div class="k">' + esc(k) + '</div>' +
+      '<div class="v">' + esc(v) + '</div>' +
+      (note ? '<div class="n">' + esc(note) + '</div>' : '') +
+      '</div>';
+  }
+
+  function renderOverview(o) {
+    $('tiles').innerHTML = [
+      tile('Users', num(o.total_users), num(o.active_users) + ' active', true),
+      tile('New this week', num(o.new_users_7d), 'last 7 days'),
+      tile('Verified', num(o.verified_users), 'email confirmed'),
+      tile('Two-factor on', num(o.users_with_2fa), 'authenticator'),
+      tile('Accounts', num(o.total_accounts), 'across all users'),
+      tile('Transactions', num(o.total_transactions), 'recorded'),
+      tile('Downloads', num(o.total_downloads), num(o.downloads_7d) + ' this week', true),
+      tile('Downloads 24h', num(o.downloads_24h), 'last day')
+    ].join('');
+    $('stamp').textContent = new Date(o.generated_at).toLocaleTimeString('en-IN',
+      { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderDownloads(d) {
+    var peak = d.series.reduce(function (m, p) { return Math.max(m, p.count); }, 0);
+    $('chart').innerHTML = d.series.map(function (p) {
+      // Scaled against the busiest day so the shape is readable at any volume.
+      var pct = peak > 0 ? Math.round((p.count / peak) * 100) : 0;
+      return '<div class="col" data-zero="' + (p.count ? '0' : '1') +
+        '" title="' + esc(p.date) + ' — ' + p.count + '">' +
+        '<i style="height:' + Math.max(pct, 2) + '%"></i></div>';
+    }).join('');
+
+    $('axisFrom').textContent = d.series.length ? day(d.series[0].date) : '';
+    $('axisTo').textContent = d.series.length ? day(d.series[d.series.length - 1].date) : '';
+    $('dlRange').textContent = 'last ' + d.days + ' days · ' + num(d.total) + ' total';
+
+    var chips = [];
+    Object.keys(d.by_version || {}).forEach(function (v) {
+      chips.push('<span class="chip">v' + esc(v) + ' <b>' + num(d.by_version[v]) + '</b></span>');
+    });
+    Object.keys(d.by_platform || {}).forEach(function (p) {
+      chips.push('<span class="chip">' + esc(p) + ' <b>' + num(d.by_platform[p]) + '</b></span>');
+    });
+    $('dlLegend').innerHTML = chips.join('') ||
+      '<span class="chip">no downloads recorded yet</span>';
+  }
+
+  function renderUsers(rows) {
+    $('userCount').textContent = rows.length + (rows.length === 1 ? ' person' : ' people');
+    $('noUsers').classList.toggle('hidden', rows.length > 0);
+
+    $('rows').innerHTML = rows.map(function (u) {
+      var security = [];
+      if (u.is_admin) security.push('<span class="tag admin">admin</span>');
+      security.push('<span class="tag ' + (u.totp_enabled ? 'on' : '') + '">' +
+        (u.totp_enabled ? '2FA' : 'no 2FA') + '</span>');
+      security.push('<span class="tag ' + (u.email_verified ? 'on' : '') + '">' +
+        (u.email_verified ? 'verified' : 'unverified') + '</span>');
+
+      return '<tr>' +
+        '<td><div class="who"><b>' + esc(u.display_name) + '</b><span>' + esc(u.email) + '</span></div></td>' +
+        '<td class="num">' + esc(day(u.created_at)) + '</td>' +
+        '<td class="num">' + num(u.transaction_count) + '</td>' +
+        '<td class="num">' + num(u.account_count) + '</td>' +
+        '<td><span class="tag ' + (u.is_active ? 'on' : 'off') + '">' +
+          (u.is_active ? 'active' : 'suspended') + '</span></td>' +
+        '<td>' + security.join(' ') + '</td>' +
+        '<td><button class="' + (u.is_active ? 'danger' : '') + '" data-id="' + esc(u.id) +
+          '" data-to="' + (u.is_active ? 'false' : 'true') + '">' +
+          (u.is_active ? 'Suspend' : 'Restore') + '</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  $('rows').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('button[data-id]');
+    if (!btn) return;
+    var to = btn.getAttribute('data-to') === 'true';
+    // Confirmed because it signs somebody out of their own money.
+    if (!window.confirm(to ? 'Restore this account?' : 'Suspend this account? They will not be able to sign in.')) return;
+    btn.disabled = true;
+    api('/admin/users/' + btn.getAttribute('data-id') + '/active?active=' + to, { method: 'POST' })
+      .then(load)
+      .catch(function (err) { window.alert(err.message || 'Could not change that account.'); btn.disabled = false; });
+  });
+
+  function load() {
+    return Promise.all([
+      api('/admin/overview'),
+      api('/admin/downloads?days=30'),
+      api('/admin/users?limit=200')
+    ]).then(function (r) {
+      renderOverview(r[0]);
+      renderDownloads(r[1]);
+      renderUsers(r[2]);
+      var me = r[2].filter(function (u) { return u.is_admin; })[0];
+      $('who').textContent = me ? 'signed in as ' + me.email : '';
+    }).catch(function (err) {
+      if (err.status === 401 || err.status === 403 || err.status === 404) {
+        setToken(null);
+        $('panel').classList.add('hidden');
+        $('gate').classList.remove('hidden');
+        fail(err.status === 404 ? 'That account cannot open this panel.' : 'Session expired. Sign in again.');
+        return;
+      }
+      window.alert('Could not load: ' + (err.message || 'unknown error'));
+    });
+  }
+
+  // A token already in this tab - go straight in, and fall back to the sign-in
+  // screen if it is stale.
+  if (token) open();
+})();
+</script>
+</body>
+</html>
