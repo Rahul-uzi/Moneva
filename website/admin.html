@@ -418,7 +418,7 @@ tbody tr { cursor: pointer; }
               <th data-s="display_name">Person</th>
               <th data-s="created_at" data-dir="desc">Joined</th>
               <th data-s="transaction_count">Txns</th>
-              <th data-s="account_count">Accts</th>
+              <th data-s="account_count" title="Banks, wallets and cash pots this person set up">Money a/c</th>
               <th>Status</th><th>Security</th><th></th>
             </tr>
           </thead>
@@ -558,7 +558,7 @@ tbody tr { cursor: pointer; }
       tile('New this week', o.new_users_7d, 'last 7 days', '', 'new'),
       tile('Verified', o.verified_users, pct + '% of accounts', '', 'verified'),
       tile('Two-factor', o.users_with_2fa, 'authenticator on', '', 'twofa'),
-      tile('Accounts', o.total_accounts, 'across all users', '', 'accounts'),
+      tile('Money accounts', o.total_accounts, 'banks, wallets, cash', '', 'accounts'),
       tile('Transactions', o.total_transactions, 'recorded', '', 'txns'),
       tile('Downloads', o.total_downloads, num(o.downloads_7d) + ' this week', 'cyan', 'downloads'),
       tile('Downloads 24h', o.downloads_24h, 'last day', 'cyan', 'downloads')
@@ -793,7 +793,7 @@ tbody tr { cursor: pointer; }
         (n.length ? heading('No second factor') + peopleList(n) : ''));
     },
     accounts: function () {
-      showSheet('Accounts per person', 'most first',
+      showSheet('Money accounts per person', 'banks, wallets and cash pots - not user accounts',
         kvList(state.users.slice().sort(byCount('account_count')).map(function (u) {
           return [esc(u.display_name), num(u.account_count)];
         })));
@@ -845,7 +845,7 @@ tbody tr { cursor: pointer; }
       ['Joined', esc(day(u.created_at))],
       ['Currency', esc(u.currency)],
       ['Transactions', num(u.transaction_count)],
-      ['Accounts', num(u.account_count)],
+      ['Money accounts', num(u.account_count)],
       ['Status', u.is_active ? 'active' : 'suspended'],
       ['Email verified', u.email_verified ? 'yes' : 'no'],
       ['Two-factor', u.totp_enabled ? 'on' : 'off'],
