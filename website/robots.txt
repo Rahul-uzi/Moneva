@@ -29,6 +29,10 @@ Disallow: /README.md
 # path here tells anyone reading that the path exists. The protection is that
 # every endpoint behind that page requires an admin account and answers
 # everybody else with 404. This line only stops it turning up in a search.
+# BOTH spellings, because Cloudflare's asset server strips the extension:
+# /admin.html 307s to /admin, and a rule naming only the .html form does not
+# cover the path that is actually served. Verified live - /admin answers 200.
+Disallow: /admin
 Disallow: /admin.html
 
 Sitemap: https://moneva.monev.workers.dev/sitemap.xml
