@@ -87,13 +87,41 @@ const none: CategorySuggestion = {
 };
 
 /**
+ * How the money travelled, which is not who was paid.
+ *
+ * "Google Pay - Vishal" is a payment to VISHAL. Leaving the rail in the key
+ * was the single worst bug in this file: the comparison below is containment,
+ * so "googlepay" sits inside "googlepayvishal", "googlepaydmart" and every
+ * other row that went through the same app - and one bare "Google Pay" row
+ * then matched all of them. Whatever that one row was filed under spread to
+ * every payment the person ever made through that app. In real data it was
+ * Food & Dining, and a petrol pump, a supermarket and a transfer to a friend
+ * all came back as Food & Dining.
+ */
+/* A literal, not new RegExp(...). Built from a string it read '\b' as the
+   backspace character and '\s' as the letter s, so it matched nothing at all
+   and every rail stayed in the key - the bug this constant exists to fix,
+   silently reintroduced by the quoting. A literal cannot do that. */
+const RAIL =
+  /^(?:google ?pay|g ?pay|phonepe|phone ?pe|paytm|amazon ?pay|mobikwik|bhim|cred|upi|neft|imps|rtgs|ach|ecs|bank ?payment|net ?banking|debit card|credit card|card payment|paid to|sent to|payment to|received from|transfer(?:red)? (?:to|from)|to|from)\b[\s:/*,.|-]*/i;
+
+/**
  * Normalised payee, for comparing this payment against past ones.
  *
  * Bank narrations are noisy - "UPI/SWIGGY LTD/9876", "SWIGGY*ORDER" and
  * "Swiggy" are one payee - so everything but letters and digits goes, and the
- * comparison is a containment test rather than equality.
+ * comparison is containment rather than equality.
+ *
+ * The rail comes off first, repeatedly, because narrations stack them:
+ * "UPI/Google Pay/VISHAL" carries two before the name. What is left is the
+ * payee, or nothing at all - and nothing is the right answer for a row that
+ * only ever said "Google Pay", because that names no payee to learn from.
  */
-const payeeKey = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const payeeKey = (s: string): string => {
+  let text = String(s || '').trim();
+  for (let i = 0; i < 4 && RAIL.test(text); i += 1) text = text.replace(RAIL, '').trim();
+  return text.toLowerCase().replace(/[^a-z0-9]/g, '');
+};
 
 /**
  * Does this keyword appear in the text?
@@ -146,6 +174,12 @@ export const suggestCategory = (input: {
       for (const past of history) {
         if (!past.category_id || !past.description) continue;
         const pastKey = payeeKey(past.description);
+        // BOTH sides need something left after the rail comes off. A row that
+        // only ever said "Google Pay" reduces to nothing, and "" is contained
+        // in every string - so without this it stops being a universal donor
+        // by prefix and becomes one by emptiness instead, which is the same
+        // bug wearing a different coat.
+        if (pastKey.length < 3) continue;
         if (!pastKey.includes(key) && !key.includes(pastKey)) continue;
         const cat = categories.find((c) => c.id === past.category_id && c.type === type);
         if (cat) {
