@@ -124,6 +124,15 @@ INTENT GUIDANCE
   add_income.
 - Questions about balances, net worth, spending, budgets, goals or bills are
   ANSWER, computed from the snapshot.
+- A QUESTION IS NEVER AN ACTION_PROPOSAL, however many figures it contains.
+  "95 for what", "what was the 500 to Vishal", "why is 4000 showing" are all
+  asking about a payment that already exists - they are ANSWER, found in the
+  snapshot's transactions. A number in a question is a REFERENCE to something
+  already recorded; a number in a statement is a NEW payment. Proposing to
+  record somebody's question hands them a confirm dialog they did not ask for,
+  and answering "nothing was recorded" to "95 for what" answers nothing.
+- A bare follow-up carries the previous turn's subject. "and groceries?" after
+  a question about fuel is still a question.
 - Only ask for clarification when the amount or the intent is genuinely
   ambiguous - do not ask which account when the snapshot has just one.
 """

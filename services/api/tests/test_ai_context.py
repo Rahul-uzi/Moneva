@@ -202,3 +202,36 @@ class TestTheProviderChain:
         monkeypatch.setenv("GROQ_API_KEY", "your-api-key-goes-here-xxxxxxxxxx")
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         assert ai_llm.is_enabled() is False
+
+
+class TestAQuestionIsNeverAnAction:
+    """Found in the real chat history.
+
+    The user asked "From whom I need get my money back", got a good answer
+    naming Gautam Rs 95 and Vishal Rs 500, and followed up with "95 for what".
+    The assistant read that as an instruction to record Rs 95, offered a
+    confirm dialog, and when it was dismissed replied "Cancelled - nothing was
+    recorded." Which answers nothing, to a question that had an answer sitting
+    in the snapshot.
+
+    A number in a QUESTION refers to something already recorded. A number in a
+    STATEMENT is a new payment. These assert the prompt says so, because the
+    behaviour itself needs a live model to test and the instruction is the
+    thing that was missing.
+    """
+
+    def test_the_prompt_forbids_proposing_on_a_question(self):
+        from app.services.ai_llm import SYSTEM_PROMPT
+        assert "A QUESTION IS NEVER AN ACTION_PROPOSAL" in SYSTEM_PROMPT
+
+    def test_the_prompt_uses_the_real_failure_as_its_example(self):
+        from app.services.ai_llm import SYSTEM_PROMPT
+        assert "95 for what" in SYSTEM_PROMPT
+
+    def test_the_prompt_separates_a_reference_from_a_new_payment(self):
+        from app.services.ai_llm import SYSTEM_PROMPT
+        assert "REFERENCE" in SYSTEM_PROMPT and "NEW payment" in SYSTEM_PROMPT
+
+    def test_a_bare_follow_up_is_still_a_question(self):
+        from app.services.ai_llm import SYSTEM_PROMPT
+        assert "bare follow-up" in SYSTEM_PROMPT
