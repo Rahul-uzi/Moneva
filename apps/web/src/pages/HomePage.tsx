@@ -387,10 +387,22 @@ export const HomePage: React.FC = () => {
         onSuccess={() => void fetchAllData(true)}
       />
 
+      {/* categoryName was never passed here, so opening a payment from the
+          home screen showed no category at all - the modal only draws that
+          row when it is given a name. The categories were already loaded on
+          this page for the salary dialog; they simply never reached this
+          one. A category nobody can see is a category nobody can tell is
+          wrong, which is how a mis-filed row survives. Activity has always
+          passed it; same payment, same modal, same answer now. */}
       {selectedTransaction && (
         <TransactionDetailModal
           transaction={selectedTransaction}
           accountName={accounts.find((a) => a.id === selectedTransaction.account_id)?.name}
+          categoryName={
+            selectedTransaction.category_id
+              ? categories.find((c) => c.id === selectedTransaction.category_id)?.name
+              : undefined
+          }
           onClose={() => setSelectedTransaction(null)}
           onDeleted={() => void fetchAllData(true)}
         />
