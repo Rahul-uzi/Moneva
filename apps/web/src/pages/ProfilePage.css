@@ -743,3 +743,41 @@
   overflow: visible;
   text-overflow: clip;
 }
+
+/* The re-categorise preview.
+
+   A plain list, because the only question it has to answer is "do I agree
+   with these moves" - and that is read one row at a time, not scanned. */
+.recat-list {
+  max-height: 46dvh;
+  overflow-y: auto;
+  border: 1px solid var(--moneva-border);
+  border-radius: var(--radius-md);
+}
+
+.recat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+}
+.recat-row + .recat-row { border-top: 1px solid var(--moneva-border); }
+
+.recat-desc {
+  font-size: 13px;
+  font-weight: 600;
+  /* A bank narration can be long; it may wrap rather than push the move off
+     the side of a phone. */
+  overflow-wrap: anywhere;
+}
+
+.recat-move { font-size: 12px; color: var(--moneva-text-muted); }
+.recat-from { text-decoration: line-through; }
+.recat-to { color: var(--moneva-teal); font-weight: 600; }
+
+.recat-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.recat-actions > * { flex: 1; }

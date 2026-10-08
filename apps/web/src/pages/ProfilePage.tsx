@@ -25,10 +25,12 @@ import {
   MonitorSmartphone,
   Upload,
   FileText,
+  Wand2,
 } from 'lucide-react';
 import { categoryIcon } from '../utils/categoryIcons';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
 import { ConfirmationDialog } from '../components/ui/ConfirmationDialog';
 import { UpdateRow } from '../components/settings/UpdateRow';
 import {
@@ -44,7 +46,7 @@ import { runNotificationSync } from '../services/notificationSync';
 import {
   loadAutoAddSettings, saveAutoAddSettings, forgetAllTrust,
 } from '../services/autoAddStore';
-import type { User, Category } from '../types/api';
+import type { User, Category, Transaction } from '../types/api';
 import { fileToAvatarDataUrl, uploadAvatar, deleteAvatar } from '../services/avatarService';
 import {
   getBiometricStatus,
@@ -66,6 +68,7 @@ import { captureHealth } from '../utils/captureHealth';
 import { markTourPending } from '../services/tourService';
 import { exportBinaryFile } from '../services/exportService';
 import { ImportSheet } from '../components/financial/ImportSheet';
+import { planRecategorise, type Proposal } from '../utils/recategorise';
 import { SmsCaptureSection } from '../components/settings/SmsCaptureSection';
 import { LegalSheet } from '../components/settings/LegalSheet';
 import type { Account } from '../types/api';
@@ -198,6 +201,12 @@ export const ProfilePage: React.FC = () => {
   // opened rather than on page load: nothing else on this screen needs it,
   // and a settings page should not pay for a feature nobody opened.
   const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  /* The proposed repairs, held until the user has seen them. Null means no
+     preview is open; an empty array never gets here, because nothing to do is
+     reported as a toast rather than an empty dialog. */
+  const [recatPlan, setRecatPlan] = useState<Proposal[] | null>(null);
+  const [isRecatBusy, setIsRecatBusy] = useState<boolean>(false);
+  const [recatDone, setRecatDone] = useState<number>(0);
   // null when closed, so the sheet is unmounted and always reopens on the
   // tab that was asked for rather than the one last looked at.
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms' | null>(null);
@@ -1096,6 +1105,45 @@ export const ProfilePage: React.FC = () => {
         >
           <Upload size={14} /> Import a statement
         </Button>
+
+        {/* Repairing what a wrong matcher filed.
+
+            Kept beside Import because it is the same kind of job - a bulk
+            change to the ledger - and because the rows most likely to need it
+            are the ones an import brought in. It never writes without showing
+            the list first: a bulk edit nobody saw is how somebody stops
+            trusting an app that holds their money. */}
+        <p className="text-body text-xs text-muted" style={{ marginTop: 20 }}>
+          Categories were being copied from the payment app rather than the
+          payee, so unrelated payments could end up filed together. This reads
+          every expense again and lists what it would change.
+        </p>
+
+        <Button
+          variant="secondary"
+          isLoading={isRecatBusy}
+          onClick={async () => {
+            setIsRecatBusy(true);
+            try {
+              const [txRes, catRes] = await Promise.all([
+                apiClient.get<Transaction[]>('/transactions', { params: { limit: 500 } }),
+                apiClient.get<Category[]>('/categories'),
+              ]);
+              const plan = planRecategorise(txRes.data, catRes.data);
+              if (plan.length === 0) {
+                addToast('Nothing to change - every expense is already filed correctly.', 'success');
+              } else {
+                setRecatPlan(plan);
+              }
+            } catch {
+              addToast('Could not read your transactions. Try again in a moment.', 'error');
+            } finally {
+              setIsRecatBusy(false);
+            }
+          }}
+        >
+          <Wand2 size={14} /> Re-check categories
+        </Button>
       </Card>
 
       {/* 6b. Privacy and terms.
@@ -1592,6 +1640,76 @@ export const ProfilePage: React.FC = () => {
           onImported={() => { void restoreSession(); }}
           accounts={importAccounts}
         />
+      )}
+
+      {recatPlan && (
+        <Modal
+          isOpen
+          onClose={() => { setRecatPlan(null); setRecatDone(0); }}
+          title={'Re-check categories'}
+        >
+          <p className="text-body text-xs text-muted" style={{ marginBottom: 14 }}>
+            {recatPlan.length} {recatPlan.length === 1 ? 'expense would move' : 'expenses would move'}.
+            Nothing is changed until you confirm, and no category is ever cleared -
+            a payment that cannot be placed is left exactly as it is.
+          </p>
+
+          <div className="recat-list">
+            {recatPlan.map((p) => (
+              <div className="recat-row" key={p.id}>
+                <span className="recat-desc">{p.description}</span>
+                <span className="recat-move">
+                  <span className="recat-from">{p.fromName || 'Uncategorised'}</span>
+                  {' \u2192 '}
+                  <span className="recat-to">{p.toName}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="recat-actions">
+            <Button variant="secondary" onClick={() => { setRecatPlan(null); setRecatDone(0); }}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              isLoading={isRecatBusy}
+              onClick={async () => {
+                setIsRecatBusy(true);
+                let ok = 0;
+                try {
+                  /* One at a time, on purpose. There is no bulk endpoint,
+                     and firing five hundred PATCHes at a free-tier instance
+                     at once is how a repair becomes an outage. */
+                  for (const p of recatPlan) {
+                    try {
+                      await apiClient.patch('/transactions/' + p.id, { category_id: p.toId });
+                      ok += 1;
+                      setRecatDone(ok);
+                    } catch {
+                      /* Skip this row and keep going: a partial repair is
+                         worth more than stopping at the first failure. */
+                    }
+                  }
+                  addToast(
+                    ok === recatPlan.length
+                      ? ok + ' expenses re-filed.'
+                      : ok + ' of ' + recatPlan.length + ' re-filed - run it again for the rest.',
+                    ok > 0 ? 'success' : 'error',
+                  );
+                } finally {
+                  setIsRecatBusy(false);
+                  setRecatPlan(null);
+                  setRecatDone(0);
+                }
+              }}
+            >
+              {isRecatBusy && recatDone > 0
+                ? 'Saving ' + recatDone + '/' + recatPlan.length
+                : 'Apply ' + recatPlan.length + ' changes'}
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );
