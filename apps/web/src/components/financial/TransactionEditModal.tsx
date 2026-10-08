@@ -93,22 +93,39 @@ export const TransactionEditModal: React.FC<Props> = ({
     }
   };
 
+  /* Two jobs, one component.
+
+     Reached from "Add a note" it is a note editor and shows only the note.
+     Somebody who wanted to write a line to themselves was being handed the
+     amount, the description, the category and the date as well - four ways to
+     change a payment by accident while typing a reminder.
+
+     Reached from "Edit" it is still the whole form. Same fields; only the ones
+     on screen differ. */
   return (
-    <Modal isOpen={!!transaction} onClose={onClose} title="Edit Transaction">
+    <Modal
+      isOpen={!!transaction}
+      onClose={onClose}
+      title={focusNotes ? (transaction.notes ? 'Edit note' : 'Add a note') : 'Edit Transaction'}
+    >
       <form onSubmit={handleSave} className="tx-edit-form">
         {error && <div className="form-error-banner">{error}</div>}
 
-        <AmountInput valuePaise={amountPaise} onChangePaise={setAmountPaise} label="Amount" />
+        {!focusNotes && (
+          <AmountInput valuePaise={amountPaise} onChangePaise={setAmountPaise} label="Amount" />
+        )}
 
-        <FormField
-          label="Description"
-          type="text"
-          placeholder="e.g. Zomato dinner"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-        />
+        {!focusNotes && (
+          <FormField
+            label="Description"
+            type="text"
+            placeholder="e.g. Zomato dinner"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        )}
 
-        {!isTransfer && (
+        {!focusNotes && !isTransfer && (
           <div className="select-group">
             <label className="form-label">Category</label>
             <select
@@ -128,12 +145,14 @@ export const TransactionEditModal: React.FC<Props> = ({
           </div>
         )}
 
-        <FormField
-          label="Date & Time"
-          type="datetime-local"
-          value={txDate}
-          onChange={(e) => setTxDate(e.target.value)}
-        />
+        {!focusNotes && (
+          <FormField
+            label="Date & Time"
+            type="datetime-local"
+            value={txDate}
+            onChange={(e) => setTxDate(e.target.value)}
+          />
+        )}
 
         {/* Kept apart from Description on purpose. The description is what the
             row is titled by and what the category and the logo are matched
@@ -155,6 +174,7 @@ export const TransactionEditModal: React.FC<Props> = ({
           />
           <span className="tx-edit-note-hint">
             Just for you. It never changes the category or the name on the row.
+            {focusNotes && ' Nothing else about this payment is touched.'}
           </span>
         </div>
 
@@ -163,7 +183,7 @@ export const TransactionEditModal: React.FC<Props> = ({
             Cancel
           </Button>
           <Button type="submit" variant="primary" isLoading={isSaving}>
-            Save changes
+            {focusNotes ? 'Save note' : 'Save changes'}
           </Button>
         </div>
       </form>
