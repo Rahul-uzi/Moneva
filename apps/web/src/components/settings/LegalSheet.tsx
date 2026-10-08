@@ -17,9 +17,17 @@
  *
  * WHAT IS DELIBERATELY NOT OMITTED. Every claim below is checked against the
  * code, including the inconvenient one: using the Assistant sends your
- * balances, recent transactions, budgets, goals and bills to Google. That is
- * the single most surprising thing this app does with data, so it gets its own
- * paragraph instead of hiding inside a list of "service providers". The terms
+ * balances, recent transactions, budgets, goals and bills to Groq and to
+ * Google. That is the single most surprising thing this app does with data, so
+ * it gets its own paragraph instead of hiding inside a list of "service
+ * providers".
+ *
+ * THIS PARAGRAPH GOES STALE SILENTLY. It said "eight most recent
+ * transactions" and named only Google; by then the Assistant was sending
+ * sixty with their categories, the last ten messages of the conversation, and
+ * sending them to Groq first. Nothing failed - a privacy page cannot fail, it
+ * can only be wrong. Anything that changes what leaves the device changes
+ * this text in the same commit. The terms
  * likewise say plainly that automatic capture can be WRONG, rather than
  * implying the figures are authoritative.
  */
@@ -204,13 +212,29 @@ const Privacy: React.FC<{ live: LiveState | null }> = ({ live }) => (
 
     <h3>Who else can see your money</h3>
     <p>
-      <strong>Google, but only if you use the Assistant.</strong> Asking the
-      Assistant a question sends your account balances, your eight most recent
-      transactions, this month&rsquo;s spending by category, and your budgets,
-      goals and bills to Google&rsquo;s Gemini service so it can answer. Your
-      name, email and password are not sent. If you would rather this never
-      happened, do not use the Assistant &mdash; every other part of MONEVA
-      works without it.
+      <strong>Groq and Google, but only if you use the Assistant.</strong>{' '}
+      Asking the Assistant a question sends your account balances, your sixty
+      most recent transactions with their categories, this month&rsquo;s
+      spending by category, your budgets, goals and bills, and the last ten
+      messages of that conversation, to whichever model answers. Groq is asked
+      first; Google&rsquo;s Gemini answers when Groq cannot. Your name, email
+      and password are never sent.
+    </p>
+    <p>
+      Both are used on their free tiers, and that matters. Google&rsquo;s terms
+      for the unpaid Gemini API say the content you send may be used to improve
+      Google&rsquo;s products and that human reviewers may read it, and they
+      ask developers not to send personal or confidential information to it.
+      Your figures are personal by definition. We tell you this rather than
+      bury it: if you would rather it never happened,{' '}
+      <strong>do not use the Assistant</strong> &mdash; every other part of
+      MONEVA works without it, and nothing else in the app sends anything to
+      either company.
+    </p>
+    <p>
+      Your conversations with the Assistant are <strong>not</strong> used to
+      train anything of ours, and we do not keep them. They are stored on this
+      phone only, never uploaded, and deleting a conversation deletes it.
     </p>
     <p>
       <strong>Our hosting provider</strong> stores the database holding your

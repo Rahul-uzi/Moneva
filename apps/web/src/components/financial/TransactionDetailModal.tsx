@@ -133,10 +133,14 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             </div>
           )}
 
-          <div className="detail-row">
-            <span className="detail-label">Mutation ID</span>
-            <span className="detail-val text-mono">{transaction.client_mutation_id}</span>
-          </div>
+          {/* The mutation id is not shown. It is a real and load-bearing
+              thing - it is what makes importing the same statement twice land
+              on the rows already there - but it is addressed to the server,
+              not to the person looking at a payment they made. A 36-character
+              hex string on a screen that otherwise reads "Indian Oil, Rs 500,
+              8 October" tells them nothing and looks like something leaking
+              out of the machinery. It is still on the record, still returned
+              by the API, and still what support would ask for. */}
 
           <div className="detail-row">
             <span className="detail-label">Sync Status</span>
