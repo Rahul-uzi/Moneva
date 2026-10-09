@@ -11,6 +11,7 @@ import { TransactionDetailModal } from '../components/financial/TransactionDetai
 import { SalaryConfirmationModal } from '../components/financial/SalaryConfirmationModal';
 import { RecurringSalaryModal } from '../components/financial/RecurringSalaryModal';
 import { DueSalaryCard } from '../components/financial/DueSalaryCard';
+import { OwedCard } from '../components/financial/OwedCard';
 import { PaydayCard } from '../components/financial/PaydayCard';
 import { PendingPayments } from '../components/financial/PendingPayments';
 import { ErrorState, EmptyState } from '../components/ui/States';
@@ -26,6 +27,7 @@ import type {
   RecurringIncome,
   FinancialSummary, Account, Budget, SavingsGoal, Bill, Transaction, SalaryUsage, DueIncome,
   Category,
+  PersonDebt,
 } from '../types/api';
 import './HomePage.css';
 
@@ -61,6 +63,7 @@ export const HomePage: React.FC = () => {
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [salaryUsage, setSalaryUsage] = useState<SalaryUsage | null>(null);
   const [dueIncome, setDueIncome] = useState<DueIncome[]>([]);
+  const [debts, setDebts] = useState<PersonDebt[]>([]);
   const [salaryStreams, setSalaryStreams] = useState<RecurringIncome[]>([]);
   /**
    * What this device had already seen when the page opened. Captured once so
@@ -156,6 +159,14 @@ export const HomePage: React.FC = () => {
             .catch(() => ({ data: [] as RecurringIncome[] })),
           (d) => setSalaryStreams(d),
         ),
+        // Who still has the user's money. Optional like the rest: no debts,
+        // no card, and a failure here never costs them the dashboard.
+        settle(
+          apiClient
+            .get<PersonDebt[]>('/debts')
+            .catch(() => ({ data: [] as PersonDebt[] })),
+          (d) => setDebts(d),
+        ),
       ]);
 
       if (isMounted) setError(null);
@@ -245,6 +256,10 @@ export const HomePage: React.FC = () => {
         accounts={accounts}
         onResolved={() => void fetchAllData(true)}
       />
+
+      {/* 3b. Money lent to people, which no balance can show. Renders
+             nothing at all when there is none outstanding. */}
+      <OwedCard debts={debts} onResolved={() => void fetchAllData(true)} />
 
       {/* 3. This month's income vs spending */}
       {salaryUsage && (

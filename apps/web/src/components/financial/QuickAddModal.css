@@ -1,105 +1,547 @@
-.quick-add-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* ==========================================================================
+   The add sheet.
+
+   One accent colour carries the whole entry: ember for money out, voltage
+   for money in. It lives in two registered custom properties, so switching
+   between Expense and Income ANIMATES every dependent colour at once - the
+   currency sign, the switch, the chosen chips - instead of snapping them one
+   by one. (An unregistered custom property cannot be interpolated; the
+   @property rules are what make the transition possible.)
+
+   The shared form rules other screens use (.form-select, .select-group,
+   .form-error-banner) are NOT here any more - they moved to index.css.
+   ========================================================================== */
+
+@property --qa-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #FF6B4A;
 }
 
-.type-tabs {
+@property --qa-fill {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #E24F2B;
+}
+
+.qa {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition:
+    --qa-accent var(--dur-base) var(--ease-out),
+    --qa-fill var(--dur-base) var(--ease-out);
+}
+
+.qa[data-type='expense'] {
+  --qa-accent: var(--moneva-figure-expense);
+  --qa-fill: var(--moneva-coral);
+}
+
+.qa[data-type='income'] {
+  --qa-accent: var(--moneva-figure-income);
+  --qa-fill: var(--moneva-blue);
+}
+
+/* ---- the switch -------------------------------------------------------- */
+
+.qa-switch {
+  position: relative;
   display: grid;
-  /* Counted by the browser, not by hand. This was 1fr 1fr 1fr against three
-     buttons; dropping Transfer left the third column sitting there as a gap
-     the size of a button, because nothing tied the track count to the number
-     of children. auto-flow does, so the next change cannot reintroduce it. */
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  gap: 6px;
-  background-color: var(--moneva-bg);
+  grid-template-columns: 1fr 1fr;
   padding: 4px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
+  background: var(--moneva-overlay);
   border: 1px solid var(--moneva-border);
 }
 
-.tab-btn {
-  padding: 10px 0;
-  border-radius: var(--radius-sm);
+.qa-switch-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--qa-fill) 22%, var(--moneva-surface));
+  border: 1px solid color-mix(in srgb, var(--qa-accent) 45%, transparent);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.qa[data-type='income'] .qa-switch-thumb {
+  transform: translateX(100%);
+}
+
+.qa-switch-option {
+  position: relative; /* above the thumb */
+  z-index: 1;
+  padding: 9px 0;
   border: none;
   background: transparent;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   color: var(--moneva-text-secondary);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.qa-switch-option[aria-checked='true'] {
+  color: var(--qa-accent);
+}
+
+.qa-switch-option:focus-visible {
+  outline: 2px solid var(--qa-accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-full);
+}
+
+/* ---- the shortcut line ---------------------------------------------- */
+
+.qa-shortcuts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-height: 22px;
+  animation: qaRise var(--dur-base) var(--ease-out) both;
+}
+
+.qa-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+.qa-link:hover,
+.qa-link:focus-visible {
+  color: var(--qa-accent);
+}
+
+.qa-link:focus-visible {
+  outline: 2px solid var(--qa-accent);
+  outline-offset: 2px;
+}
+
+.qa-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--moneva-text-muted);
+}
+
+/* ---- who --------------------------------------------------------------- */
+
+.qa-payee {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px;
+  border-radius: var(--radius-md);
+  background: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.qa-payee.is-focused {
+  border-color: var(--qa-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--qa-accent) 18%, transparent);
+}
+
+.qa-payee-label {
+  /* Never squashed by a long name in the field beside it. */
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--moneva-text-muted);
+}
+
+.qa-payee-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-family);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+}
+
+.qa-payee-input::placeholder {
+  font-weight: 500;
+  color: var(--moneva-text-muted);
+}
+
+.qa-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -6px;
+}
+
+/* ---- chips: categories, suggestions, accounts -------------------------- */
+
+.qa-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Every category in view, wrapping onto as many lines as it needs.
+   This was one sideways-scrolling row faded out at the right edge to hint
+   that there was more - and on the phone the fade simply greyed out the last
+   chips: "Other Income" and "Other" read as blurred or missing. Eleven
+   categories wrap to about three short lines, nothing is hidden, and nothing
+   has to be found by swiping. */
+.qa-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qa-chip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qa-chip {
+  --qa-dot: var(--moneva-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--moneva-border);
+  background: var(--moneva-surface);
   font-family: var(--font-family);
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
+  color: var(--moneva-text-secondary);
   cursor: pointer;
-  transition: var(--transition-fast);
+  animation: qaRise var(--dur-base) var(--ease-out) both;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
 }
 
-.tab-active {
+.qa-chip:active {
+  transform: scale(0.95);
+}
+
+.qa-chip:focus-visible {
+  outline: 2px solid var(--qa-accent);
+  outline-offset: 2px;
+}
+
+.qa-chip.is-selected {
+  color: var(--moneva-text-main);
+  border-color: var(--qa-accent);
+  background: color-mix(in srgb, var(--qa-accent) 16%, var(--moneva-surface));
+}
+
+.qa-chip-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--qa-dot);
+  /* A category's colour is the user's, not ours: a lime dot vanished on the
+     light ground. A faint ring in the text colour keeps any colour visible on
+     either theme without changing it. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--moneva-text-main) 22%, transparent);
+}
+
+.qa-chip-auto {
+  color: var(--qa-accent);
+  animation: qaPop var(--dur-base) var(--ease-out) both;
+}
+
+/* Names, not categories: lighter, borderless and without a colour dot, so
+   the row of people never reads as a second row of categories. */
+.qa-chip-suggest {
+  padding: 6px 11px;
+  border-color: transparent;
+  background: var(--moneva-overlay);
+  font-weight: 500;
+}
+
+.qa-chip-suggest.is-recent {
   color: var(--moneva-text-main);
 }
 
-.tab-expense { background-color: rgba(255, 107, 74, 0.2); color: var(--moneva-coral); }
-.tab-income { background-color: rgba(205, 255, 74, 0.2); color: var(--moneva-teal); }
-
-.income-salary-shortcut {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: linear-gradient(135deg, rgba(205, 255, 74, 0.15) 0%, var(--moneva-accent-panel-base) 100%);
-  border: 1px solid var(--moneva-blue);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
+.qa-chip-suggest svg {
+  color: var(--moneva-text-muted);
 }
 
-.shortcut-text {
+.qa-chip-add {
+  border-style: dashed;
+  color: var(--moneva-text-muted);
+}
+
+.qa-reason {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--moneva-text-muted);
+  animation: qaRise var(--dur-base) var(--ease-out) both;
+}
+
+/* Placeholders while the categories are on their way: the shape of chips,
+   with no words to misread as an answer. */
+.qa-chip-skeleton {
+  height: 33px;
+  padding: 0;
+  border-color: transparent;
+  background: var(--moneva-overlay);
+  animation: qaPulse 1.2s ease-in-out infinite;
+  cursor: default;
+}
+
+/* ---- the folded details ------------------------------------------------ */
+
+.qa-pills {
   display: flex;
-  align-items: center;
   gap: 6px;
 }
 
-.shortcut-btns {
-  display: flex;
+.qa-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-.select-group {
-  display: flex;
-  flex-direction: column;
   gap: 6px;
-}
-
-.form-select {
-  width: 100%;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  background-color: var(--moneva-surface);
+  /* The three share the row; each shrinks before any of them wraps. */
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 8px 11px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--moneva-border);
+  background: var(--moneva-overlay-weak);
+  font-family: var(--font-family);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.qa-pill svg {
+  flex-shrink: 0;
+}
+
+/* Who gives way when the row is tight. Seen on a real phone: an account
+   called "State bank of India" squeezed the other two to "No..." and "No...",
+   and the date and the note became indistinguishable. A long account name is
+   the one thing here that stays recognisable when cut, so it shrinks first;
+   a written note next; the date - "Now", "Yesterday, 9:30 pm" - never. */
+.qa-pill-account {
+  flex-shrink: 8;
+}
+
+.qa-pill-note {
+  flex-shrink: 4;
+  /* An empty note pill says "Note" in full; only a written note is cut. */
+  min-width: fit-content;
+}
+
+.qa-pill-note.has-value {
+  min-width: 0;
+}
+
+.qa-pill-when {
+  flex-shrink: 0;
+}
+
+.qa-pill-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qa-pill.is-open,
+.qa-pill.has-value {
   color: var(--moneva-text-main);
+  border-color: color-mix(in srgb, var(--qa-accent) 55%, var(--moneva-border));
+}
+
+.qa-pill-skeleton {
+  color: var(--moneva-text-muted);
+  animation: qaPulse 1.2s ease-in-out infinite;
+  cursor: default;
+}
+
+.qa-pill.is-warning {
+  color: var(--moneva-text-on-warning);
+  border-style: dashed;
+}
+
+.qa-pill:focus-visible {
+  outline: 2px solid var(--qa-accent);
+  outline-offset: 2px;
+}
+
+.qa-pill-chevron {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.qa-pill.is-open .qa-pill-chevron {
+  transform: rotate(180deg);
+}
+
+/* The drawer folds by animating its grid row from 0fr to 1fr - the one way
+   to transition to an intrinsic height without measuring it in script. When
+   closed it is also visibility:hidden (delayed until the fold has finished),
+   so nothing inside a closed drawer can be tabbed into. */
+.qa-drawer {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  margin-top: -14px; /* cancels the form gap while closed */
+  transition:
+    grid-template-rows var(--dur-base) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out),
+    margin-top var(--dur-base) var(--ease-out),
+    visibility 0s linear var(--dur-base);
+}
+
+.qa-drawer[data-open='true'] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  margin-top: 0;
+  transition:
+    grid-template-rows var(--dur-base) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out),
+    margin-top var(--dur-base) var(--ease-out),
+    visibility 0s;
+}
+
+.qa-drawer-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.qa-when {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qa-field {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moneva-border);
+  background: var(--moneva-surface);
   font-family: var(--font-family);
   font-size: 14px;
+  color: var(--moneva-text-main);
   outline: none;
+  color-scheme: dark;
+  transition: border-color var(--dur-fast) var(--ease-out);
 }
 
-.form-select:focus {
-  border-color: var(--moneva-blue);
+:root[data-theme='light'] .qa-field {
+  color-scheme: light;
 }
 
-.empty-selection-box {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: var(--moneva-surface);
-  border: 1px dashed var(--moneva-border);
+.qa-field:focus {
+  border-color: var(--qa-accent);
+}
+
+/* ---- saving ------------------------------------------------------------ */
+
+.qa-error {
+  padding: 9px 12px;
   border-radius: var(--radius-md);
-  padding: 10px 14px;
-}
-
-.form-error-banner {
-  background-color: rgba(255, 107, 74, 0.15);
-  border: 1px solid var(--moneva-coral);
-  color: var(--moneva-text-on-danger);
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--moneva-figure-expense) 50%, transparent);
+  background: color-mix(in srgb, var(--moneva-figure-expense) 12%, transparent);
   font-size: 13px;
   text-align: center;
+  color: var(--moneva-text-on-danger);
+  animation: qaShake 0.32s var(--ease-out) both;
 }
 
+.qa-error-retry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.qa-error-retry .qa-link {
+  color: var(--moneva-text-main);
+  text-decoration: underline;
+}
+
+.qa-save {
+  margin-top: 2px;
+  min-height: 48px;
+  font-weight: 700;
+  transition:
+    background-color var(--dur-base) var(--ease-out),
+    background var(--dur-base) var(--ease-out),
+    transform var(--dur-press) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+.qa-save:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+/* ---- motion ------------------------------------------------------------ */
+
+@keyframes qaRise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes qaPop {
+  from { opacity: 0; transform: scale(0.4) rotate(-30deg); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes qaPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes qaShake {
+  0%, 100% { transform: none; }
+  25% { transform: translateX(-4px); }
+  60% { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qa,
+  .qa *,
+  .qa *::before,
+  .qa *::after {
+    animation: none !important;
+    transition-duration: 0ms !important;
+    transition-delay: 0ms !important;
+  }
+}

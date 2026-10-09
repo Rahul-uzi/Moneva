@@ -117,7 +117,7 @@ export const BillModal: React.FC<BillModalProps> = ({
         <FormField
           label="Bill Name"
           type="text"
-          placeholder="e.g. Electricity, WiFi Fiber, Rent"
+          placeholder="What the bill is for"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />

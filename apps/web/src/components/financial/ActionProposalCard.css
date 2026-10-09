@@ -79,3 +79,57 @@
   flex: 1 1 auto;
   white-space: nowrap;
 }
+
+.proposal-note {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--moneva-text-muted);
+}
+
+/* ---- a spending plan --------------------------------------------------- */
+.plan-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--moneva-border);
+  font-size: 13.5px;
+}
+
+.plan-line-name {
+  min-width: 0;
+  color: var(--moneva-text-main);
+}
+
+.plan-line-amount {
+  /* The figure is the point of the row; it never wraps or shrinks. */
+  flex-shrink: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--moneva-text-main);
+}
+
+.plan-line-was {
+  font-weight: 500;
+  color: var(--moneva-text-muted);
+}
+
+.plan-line-total {
+  border-bottom: none;
+  padding-top: 9px;
+}
+
+.plan-line-total .plan-line-name {
+  font-weight: 600;
+}

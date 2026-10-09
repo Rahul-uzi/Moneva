@@ -76,7 +76,7 @@ export const RegisterPage: React.FC = () => {
           <FormField
             label="Full Name / Display Name"
             type="text"
-            placeholder="John Doe"
+            placeholder="Your name"
             error={errors.display_name?.message}
             {...register('display_name')}
           />

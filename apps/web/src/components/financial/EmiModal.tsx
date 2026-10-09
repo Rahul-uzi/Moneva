@@ -177,7 +177,7 @@ export const EmiModal: React.FC<Props> = ({
         <FormField
           label="What is being paid off"
           type="text"
-          placeholder="e.g. iPhone 16, Fridge"
+          placeholder="What you bought"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />

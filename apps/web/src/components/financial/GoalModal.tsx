@@ -102,7 +102,7 @@ export const GoalModal: React.FC<GoalModalProps> = ({
         <FormField
           label="Goal Name"
           type="text"
-          placeholder="e.g. Emergency Fund, New Laptop, Vacation"
+          placeholder="What you are saving for"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />

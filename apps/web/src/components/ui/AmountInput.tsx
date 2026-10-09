@@ -19,6 +19,14 @@ interface AmountInputProps {
    * and refusing the minus there makes the correct figure untypeable.
    */
   allowNegative?: boolean;
+  /**
+   * 'hero' is the add sheet's big centred figure: no box, no visible label.
+   * The label is still given to the input for screen readers - a hero amount
+   * is the most important field on that screen, not an unlabelled one.
+   */
+  variant?: 'default' | 'hero';
+  /** Colours the currency sign, so the figure can follow the entry's type. */
+  accent?: string;
 }
 
 export const AmountInput: React.FC<AmountInputProps> = ({
@@ -28,7 +36,10 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   label = 'Amount',
   error,
   allowNegative = false,
+  variant = 'default',
+  accent,
 }) => {
+  const isHero = variant === 'hero';
   const [displayVal, setDisplayVal] = useState<string>(() => {
     try {
       return valuePaise ? groupIndianDigits(paiseToRupeesString(valuePaise)) : '';
@@ -125,14 +136,25 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   const activeError = error || localError;
 
   return (
-    <div className="amount-input-wrapper">
-      {label && <label className="form-label">{label}</label>}
+    <div className={`amount-input-wrapper ${isHero ? 'amount-input-hero' : ''}`}>
+      {label && !isHero && <label className="form-label">{label}</label>}
       <div className={`amount-input-box ${activeError ? 'input-box-error' : ''}`}>
-        <span className="currency-symbol">{currencySymbol}</span>
+        <span
+          className="currency-symbol"
+          style={accent ? { color: accent } : undefined}
+        >
+          {currencySymbol}
+        </span>
         <input
+          aria-label={isHero ? label : undefined}
+          /* The hero figure is sized to its own text so the currency sign
+             stays beside it. CSS field-sizing would do this, but not every
+             WebView has it, and without it the sign drifts to the far edge
+             of an empty box. Half a ch of slack keeps the caret off it. */
+          style={isHero ? { width: `${Math.max((displayVal || '0').length, 1) + 0.5}ch` } : undefined}
           type="text"
           inputMode="decimal"
-          placeholder="0.00"
+          placeholder={isHero ? '0' : '0.00'}
           className="amount-field"
           value={displayVal}
           onChange={handleChange}

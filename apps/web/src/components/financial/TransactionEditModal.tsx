@@ -119,7 +119,7 @@ export const TransactionEditModal: React.FC<Props> = ({
           <FormField
             label="Description"
             type="text"
-            placeholder="e.g. Zomato dinner"
+            placeholder="What it was for"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />

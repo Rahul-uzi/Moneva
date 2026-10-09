@@ -73,7 +73,7 @@ export const RecurringSalaryModal: React.FC<RecurringSalaryModalProps> = ({
     setError(null);
 
     if (!source.trim()) {
-      setError('Please enter a source name (e.g. Employer, Client).');
+      setError('Enter who pays you.');
       return;
     }
 
@@ -206,7 +206,7 @@ export const RecurringSalaryModal: React.FC<RecurringSalaryModalProps> = ({
             <FormField
               label="Source / Employer Name"
               type="text"
-              placeholder="e.g. Acme Corp, Tech Retainer"
+              placeholder="Who pays you"
               value={source}
               onChange={(e) => setSource(e.target.value)}
             />

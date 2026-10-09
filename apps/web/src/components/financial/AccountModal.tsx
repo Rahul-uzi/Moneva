@@ -172,7 +172,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         <FormField
           label="Account Name"
           type="text"
-          placeholder="e.g. HDFC Bank, Cash Wallet"
+          placeholder="Account name"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
@@ -237,7 +237,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 label="Why? (optional)"
                 type="text"
                 maxLength={140}
-                placeholder="e.g. some cash spends were never recorded"
+                placeholder="Why it changed (optional)"
                 value={balanceNote}
                 onChange={(e) => setBalanceNote(e.target.value)}
               />

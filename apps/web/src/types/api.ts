@@ -236,3 +236,26 @@ export interface SalaryUsage {
   has_salary_configured: boolean;
   currency: string;
 }
+
+
+/**
+ * Money lent to a person, or borrowed from one.
+ *
+ * A reminder, not a balance: the rupees left the bank when they were lent and
+ * the ledger recorded that already. Nothing here is part of net worth.
+ */
+export interface PersonDebt {
+  id: string;
+  person: string;
+  /** 'owed_to_me' or 'i_owe'. */
+  direction: string;
+  amount_minor: number;
+  repaid_minor: number;
+  /** What is still outstanding. Computed by the API so it cannot disagree. */
+  outstanding_minor: number;
+  note?: string | null;
+  occurred_on?: string | null;
+  settled_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}

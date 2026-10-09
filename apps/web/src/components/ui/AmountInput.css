@@ -44,3 +44,61 @@
   border-color: var(--moneva-coral) !important;
   box-shadow: 0 0 0 2px rgba(255, 107, 74, 0.18);
 }
+
+/* ---- hero: the add sheet's big centred figure ------------------------- */
+/* Everything is scoped under .amount-input-hero so the boxed field used by
+   every other form is untouched. */
+.amount-input-hero {
+  align-items: center;
+}
+
+.amount-input-hero .amount-input-box {
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 0 2px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.amount-input-hero .amount-input-box:focus-within {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.amount-input-hero .currency-symbol {
+  margin-right: 0;
+  font-size: 30px;
+  font-weight: 600;
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+.amount-input-hero .amount-field {
+  /* Width comes from the component, measured in ch from the typed text. */
+  min-width: 1.5ch;
+  max-width: 100%;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.amount-input-hero .amount-field::placeholder {
+  color: var(--moneva-text-muted);
+  opacity: 0.55;
+}
+
+.amount-input-hero .input-box-error {
+  border-color: transparent !important;
+  box-shadow: none;
+}
+
+.amount-input-hero .input-box-error .amount-field {
+  color: var(--moneva-figure-expense);
+}
+
+.amount-input-hero .error-message {
+  text-align: center;
+}

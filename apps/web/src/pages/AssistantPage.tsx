@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Send, Sparkles, AlertCircle, ShieldCheck, Plus, History } from 'lucide-react';
 import { Logo } from '../components/ui/Logo';
 import { ActionProposalCard, type ProposedAction } from '../components/financial/ActionProposalCard';
 import { QuickAddModal } from '../components/financial/QuickAddModal';
 import { apiClient } from '../services/apiClient';
+import { formatMonetaryValue } from '../utils/money';
 import { withProposalCancelled } from '../utils/proposals';
 import { useUiStore } from '../stores/useUiStore';
 import {
@@ -35,9 +36,19 @@ interface AIResponseData {
   response_type: 'ANSWER' | 'ACTION_PROPOSAL' | 'CLARIFICATION_REQUIRED' | 'ERROR' | 'OFFLINE';
   message: string;
   proposal?: {
-    type: 'add_expense' | 'add_income' | 'bill_payment' | 'goal_contribution' | 'create_budget' | 'create_goal' | 'create_bill';
+    type: ProposedAction['type'];
     amount_minor: number;
     description: string;
+    person?: string | null;
+    debt_direction?: string | null;
+    debt_id?: string | null;
+    plan_items?: Array<{
+      category_id: string;
+      category_name: string;
+      amount_minor: number;
+      current_minor?: number | null;
+    }> | null;
+    plan_unmatched?: string[] | null;
     account_id?: string;
     account_name?: string;
     to_account_id?: string;
@@ -119,6 +130,7 @@ const buildSuggestions = (ctx: {
 export const AssistantPage: React.FC = () => {
   const { refreshTrigger } = useOutletContext<OutletContextType>() || {};
   const { isOnline, addToast } = useUiStore();
+  const navigate = useNavigate();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState<string>('');
@@ -281,6 +293,16 @@ export const AssistantPage: React.FC = () => {
           billId: propData.bill_id,
           savingsGoalName: propData.savings_goal_name,
           savingsGoalId: propData.savings_goal_id,
+          person: propData.person || undefined,
+          debtDirection: propData.debt_direction || undefined,
+          debtId: propData.debt_id || undefined,
+          planItems: propData.plan_items?.map((l) => ({
+            categoryId: l.category_id,
+            categoryName: l.category_name,
+            amountPaise: l.amount_minor,
+            currentPaise: l.current_minor ?? null,
+          })),
+          planUnmatched: propData.plan_unmatched || undefined,
         };
 
         const proposalMsg: Message = {
@@ -330,7 +352,45 @@ export const AssistantPage: React.FC = () => {
   const handleConfirmProposal = async (proposal: ProposedAction) => {
     const clientMutationId = crypto.randomUUID();
 
-    if (proposal.type === 'bill_payment' && proposal.billId) {
+    /* A debt is a note about a person, not a transaction, so it goes nowhere
+       near /transactions. Writing it as an expense as well would record the
+       same rupees twice - once when they were lent, once here - and then a
+       third time when the repayment arrives as income. */
+    if (proposal.type === 'budget_plan') {
+      const lines = proposal.planItems ?? [];
+      await apiClient.post('/budgets/plan', {
+        items: lines.map((l) => ({ category_id: l.categoryId, limit_amount_minor: l.amountPaise })),
+      });
+      addToast(`Plan saved: ${lines.length} budget${lines.length === 1 ? '' : 's'} for this month.`, 'success');
+      // Asked and answered, so go and look at it - which is what saying yes
+      // to "save to your Plan tab?" means.
+      navigate('/plan');
+      return;
+    }
+
+    if (proposal.type === 'remember_debt') {
+      await apiClient.post('/debts', {
+        person: proposal.person,
+        amount_minor: proposal.amountPaise,
+        direction: proposal.debtDirection === 'i_owe' ? 'i_owe' : 'owed_to_me',
+        note: proposal.description,
+      });
+      addToast(`Noted. ${proposal.person} is on your list.`, 'success');
+    } else if (proposal.type === 'settle_debt') {
+      // Without a matched debt there is nothing to settle, and inventing one
+      // would leave a second row saying the opposite of the first.
+      if (!proposal.debtId) {
+        addToast(
+          `No open loan for ${proposal.person || 'that person'} to settle.`,
+          'error',
+        );
+        return;
+      }
+      await apiClient.post(`/debts/${proposal.debtId}/repay`, {
+        amount_minor: proposal.amountPaise,
+      });
+      addToast('Settled.', 'success');
+    } else if (proposal.type === 'bill_payment' && proposal.billId) {
       if (!proposal.accountId && accounts.length > 0) {
         proposal.accountId = accounts[0].id;
       }
@@ -381,7 +441,12 @@ export const AssistantPage: React.FC = () => {
     const confirmMsg: Message = {
       id: crypto.randomUUID(),
       sender: 'assistant',
-      text: `✓ Action "${proposal.description}" of ₹${(proposal.amountPaise / 100).toFixed(2)} has been recorded into your live ledger.`,
+      // A reminder is not "recorded into your ledger" - saying so would be
+      // the one thing a debt is designed never to imply.
+      text:
+        proposal.type === 'remember_debt' || proposal.type === 'settle_debt'
+          ? `✓ ${proposal.type === 'remember_debt' ? 'Noted' : 'Settled'}: ${proposal.person} · ${formatMonetaryValue(proposal.amountPaise)}.`
+          : `✓ Action "${proposal.description}" of ₹${(proposal.amountPaise / 100).toFixed(2)} has been recorded into your live ledger.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setMessages((prev) => [...prev, confirmMsg]);

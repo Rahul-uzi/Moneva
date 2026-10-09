@@ -692,3 +692,41 @@ html.is-native-app body {
 @media (prefers-reduced-motion: reduce) {
   .toggle-checkbox::after { transition: none; }
 }
+
+/* ---- shared form controls ----------------------------------------------
+   These lived in QuickAddModal.css, and twelve other screens - accounts,
+   bills, budgets, EMIs, goals, salary, editing a transaction, the profile -
+   were styled by them only because that stylesheet happened to be loaded on
+   every page. Redesigning the add sheet would have stripped every one of
+   them. A rule used everywhere belongs where everything can see it. */
+.select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-select {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background-color: var(--moneva-surface);
+  border: 1px solid var(--moneva-border);
+  color: var(--moneva-text-main);
+  font-family: var(--font-family);
+  font-size: 14px;
+  outline: none;
+}
+
+.form-select:focus {
+  border-color: var(--moneva-blue);
+}
+
+.form-error-banner {
+  background-color: rgba(255, 107, 74, 0.15);
+  border: 1px solid var(--moneva-coral);
+  color: var(--moneva-text-on-danger);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  text-align: center;
+}

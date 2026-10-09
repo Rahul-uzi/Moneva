@@ -83,7 +83,7 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
       // no balance, and the box is right there to clear for a one-off bonus.
       setIsRecurring(true);
       setAmountPaise(recurringSalary ? recurringSalary.amount_minor : 0);
-      setSourceName(recurringSalary ? recurringSalary.source : 'Monthly Salary');
+      setSourceName(recurringSalary ? recurringSalary.source : '');
       setTxDate(nowForDateTimeInput());
     }, 0);
     return () => clearTimeout(timer);
@@ -156,21 +156,33 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
         transaction_type: 'income',
         amount_minor: amountPaise,
         currency: 'INR',
-        description: `Salary Received: ${sourceName}`,
+        description: `Salary Received: ${sourceName.trim() || 'Monthly Salary'}`,
         transaction_date: txDate ? new Date(txDate).toISOString() : new Date().toISOString(),
         device_id: 'web-client',
       };
 
       const res = await apiClient.post<Transaction>('/transactions', payload);
 
-      if (isRecurring) {
-        // Same source updates the existing stream rather than stacking
-        // duplicates every month.
-        const existing = rules.find(
-          (r) => r.source.trim().toLowerCase() === sourceName.trim().toLowerCase(),
-        );
-        const nextMonth = new Date(txDate ? new Date(txDate) : new Date());
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
+      /* The tick decides whether a stream is CREATED. It must not decide
+         whether an existing one is ADVANCED.
+
+         It used to decide both, and the result was a payday card that lied:
+         a salary of Rs 25,000 was recorded on the 9th while the stream stayed
+         on "expected 10 Oct, Rs 12,500", so the home screen counted down to a
+         payday that had already happened. Worse, the next day the stream comes
+         due and asks for a salary that is already in the ledger - one tap from
+         recording it twice.
+
+         Two records of one fact can disagree, so the one that can be derived
+         is derived: if a stream for this source exists and a salary for it has
+         just been recorded, the stream moves on. Always. */
+      const existing = rules.find(
+        (r) => r.source.trim().toLowerCase() === (sourceName.trim() || 'Monthly Salary').toLowerCase(),
+      );
+      const nextMonth = new Date(txDate ? new Date(txDate) : new Date());
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+      if (existing || isRecurring) {
         try {
           if (existing) {
             await apiClient.patch(`/income/recurring/${existing.id}`, {
@@ -186,7 +198,7 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
             });
           }
         } catch {
-          addToast('Salary saved, but the monthly stream could not be stored.', 'error');
+          addToast('Salary saved, but the monthly stream could not be updated.', 'error');
         }
       }
 
@@ -260,7 +272,7 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
           <FormField
             label="Employer / Income Source"
             type="text"
-            placeholder="e.g. Tech Corp, Freelance Client"
+            placeholder="Who paid you"
             value={sourceName}
             onChange={(e) => setSourceName(e.target.value)}
           />
@@ -311,7 +323,8 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
               <span className="text-body font-semibold">I get this every month</span>
               <span className="text-body text-xs text-muted">
                 Saves it as a stream so next month is one tap. Nothing is added to your
-                balance until you record it.
+                balance until you record it. A stream you already have moves to next
+                month either way.
               </span>
             </span>
           </label>
