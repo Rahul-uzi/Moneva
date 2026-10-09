@@ -613,3 +613,45 @@ describe("the abbreviation half of India's banks use", () => {
     expect(parseTransactionSms('INR 200.00 dropped from the total')).toBeNull();
   });
 });
+
+/*
+ * A message written from the LENDER's point of view.
+ *
+ * "Your payment of Loan EMI Rs.5166 has been received" - the money left the
+ * user; the finance company is the one who received it. Read by the `received`
+ * rule it became income, and a real Rs 5,166 EMI was added to the balance
+ * instead of taken off it. The user reported it, so the exact wording is kept
+ * here verbatim.
+ */
+describe('a payment somebody else received', () => {
+  const EMI =
+    'Your payment of Loan EMI Rs.5166 has been received, the same has been ' +
+    'updated on Propelld(BBTPRL) dashboard.';
+
+  it('reads an EMI confirmation as money going out', () => {
+    const parsed = parseTransactionSms(EMI);
+    expect(parsed?.kind).toBe('debit');
+    expect(parsed?.amountPaise).toBe(516600);
+  });
+
+  it('reads the same shape for a loan instalment and dues', () => {
+    expect(parseTransactionSms('Your EMI of Rs.2,500 has been received. Thank you.')?.kind)
+      .toBe('debit');
+    expect(parseTransactionSms('Your instalment payment Rs 999 received successfully')?.kind)
+      .toBe('debit');
+  });
+
+  // The possessive is the whole signal, so money genuinely arriving must keep
+  // working - these are the messages the rule is NOT allowed to steal.
+  it('still reads a payment that arrived as income', () => {
+    expect(parseTransactionSms('Payment of Rs.80 received from Rahul')?.kind).toBe('credit');
+    expect(parseTransactionSms('Your payment of Rs.500 received from Vishal')?.kind)
+      .toBe('credit');
+    expect(parseTransactionSms('Rs.5000 deposited to your A/c x1234')?.kind).toBe('credit');
+  });
+
+  it('leaves a refund alone', () => {
+    expect(parseTransactionSms('Your refund payment of Rs.500 has been received')?.kind)
+      .toBe('credit');
+  });
+});

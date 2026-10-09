@@ -159,6 +159,24 @@ const DIRECTION: Array<{ id: string; kind: SmsKind; test: RegExp }> = [
   // "Sent Rs.250.00 From A/C x1234 To SWIGGY" - the verb and its preposition
   // are separated by the amount, so "sent to" as one phrase never matched it.
   { id: 'sent', kind: 'debit', test: /\b(?:sent|transferred)\s+(?:rs\.?|inr|₹)?[\s0-9.,]*(?:from|to)\b/i },
+  // "Your payment of Loan EMI Rs.5166 has been received, the same has been
+  // updated on Propelld dashboard." Written from the LENDER's point of view:
+  // the money left the user, and the finance company is the one who received
+  // it. Read by `received` just below, a real Rs 5,166 EMI was added to the
+  // balance instead of taken off it.
+  //
+  // THE POSSESSIVE IS THE WHOLE SIGNAL. Money genuinely arriving names the
+  // other side - "payment received FROM Rahul" - and never calls it YOUR
+  // payment. So "your" plus a payment noun is what makes this safe, and a
+  // "from" straight after "received" hands the message back to `received`.
+  //
+  // Refunds and reversals are excluded outright: those really are money
+  // coming back, and one of them does say "your refund has been received".
+  {
+    id: 'your-payment-received',
+    kind: 'debit',
+    test: /^(?![\s\S]*\b(?:refund(?:ed|s)?|cashback|revers(?:al|ed))\b)[\s\S]*?\byour\s+(?:[a-z]+\s+){0,2}?(?:payment|emi|instal?ment|repayment|dues?)\b[\s\S]{0,80}?\breceived\b(?!\s+from\b)/i,
+  },
   { id: 'received', kind: 'credit', test: /\b(received|deposited)\b/i },
   // Last, so "Payment of Rs.80 received from Rahul" is read by `received`.
   { id: 'payment-of', kind: 'debit', test: /\bpayment of\b/i },
