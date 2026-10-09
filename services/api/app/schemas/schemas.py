@@ -561,6 +561,21 @@ class BudgetUpdate(BaseModel):
     end_date: Optional[UtcDateTime] = None
     expected_version: Optional[int] = None
 
+class BudgetPlanItem(BaseModel):
+    category_id: uuid.UUID
+    limit_amount_minor: int = Field(ge=1, le=100_000_000_000)
+
+
+class BudgetPlanApply(BaseModel):
+    """A whole month's plan, saved as one decision.
+
+    Sent once, applied all-or-nothing: a plan the user said yes to is either in
+    their Plan tab completely or not at all - never half of it, which is a
+    plan nobody agreed to.
+    """
+    items: List[BudgetPlanItem] = Field(min_length=1, max_length=30)
+
+
 class BudgetResponse(BudgetBase):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -770,3 +785,77 @@ class DownloadHit(BaseModel):
     #: to "other", and a download that goes uncounted because the client sent
     #: a slightly odd string is a worse outcome than a row saying "other".
     platform: Optional[str] = Field(default=None, max_length=64)
+
+
+# --- MONEY LENT AND BORROWED ---------------------------------------------
+# A debt is a REMINDER, not money. Nothing here feeds a balance, a budget or
+# net worth: the rupees already left the bank and the ledger already recorded
+# that, and counting them again here would answer "how much do I have" twice,
+# differently.
+
+DEBT_DIRECTIONS = ("owed_to_me", "i_owe")
+
+
+class PersonDebtCreate(BaseModel):
+    person: str = Field(min_length=1, max_length=80)
+    amount_minor: int = Field(ge=1, le=100_000_000_000)
+    #: Defaulted rather than required: the overwhelming case is money the user
+    #: handed over and wants back.
+    direction: str = Field(default="owed_to_me")
+    note: Optional[str] = Field(default=None, max_length=300)
+    occurred_on: Optional[UtcDateTime] = None
+
+    @field_validator("direction")
+    @classmethod
+    def _known_direction(cls, v: str) -> str:
+        want = str(v).strip().lower()
+        if want not in DEBT_DIRECTIONS:
+            raise ValueError(f"direction must be one of {DEBT_DIRECTIONS}")
+        return want
+
+    @field_validator("person")
+    @classmethod
+    def _trim_person(cls, v: str) -> str:
+        name = str(v).strip()
+        if not name:
+            raise ValueError("person cannot be blank")
+        return name
+
+
+class PersonDebtUpdate(BaseModel):
+    person: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
+    note: Optional[str] = Field(default=None, max_length=300)
+    #: How much has come back in total, not an increment - a client that
+    #: retries must not be able to settle a debt twice over.
+    repaid_minor: Optional[int] = Field(default=None, ge=0, le=100_000_000_000)
+
+
+class PersonDebtRepay(BaseModel):
+    #: What came back now. Omitted means the whole outstanding balance, which
+    #: is the common case: somebody hands back what they borrowed.
+    amount_minor: Optional[int] = Field(default=None, ge=1, le=100_000_000_000)
+
+
+class PersonDebtResponse(BaseModel):
+    id: uuid.UUID
+    person: str
+    direction: str
+    amount_minor: int
+    repaid_minor: int
+    #: Derived, so the client never has to subtract - and never disagrees.
+    outstanding_minor: int
+    note: Optional[str] = None
+    occurred_on: Optional[UtcDateTime] = None
+    settled_at: Optional[UtcDateTime] = None
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
+
+    class Config:
+        from_attributes = True
+
+
+class BudgetPlanResult(BaseModel):
+    created: int
+    updated: int
+    budgets: List[BudgetResponse]

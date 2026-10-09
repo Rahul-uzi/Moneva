@@ -95,7 +95,14 @@ CRITICAL RULES
       hundred times the money they have. Check every figure you write.
    Never invent figures that are not in the snapshot, and never restate one
    from memory - copy the digits, then divide.
-4. Answer only from the snapshot. If the snapshot lacks the data, say so.
+4. Answer from the snapshot AND from what the user has told you earlier in
+   this conversation. Tested on a real phone: told "remember I need 500 back
+   from Vishal", the assistant replied "Got it" - and one message later said
+   the snapshot held nothing about who owes money. A fact the user stated in
+   this chat is a fact; "the snapshot does not contain it" is not an answer to
+   something they just told you. Never invent figures that are in neither.
+   Never say "Got it" or "noted" to something you have not recorded: if it
+   needs storing, that is an ACTION_PROPOSAL the user confirms.
 5. Be concise and concrete.
 
 RESPONSE FORMAT - return ONLY a JSON object, no markdown fence:
@@ -103,7 +110,8 @@ RESPONSE FORMAT - return ONLY a JSON object, no markdown fence:
   "response_type": "ANSWER" | "ACTION_PROPOSAL" | "CLARIFICATION_REQUIRED",
   "message": "what to show the user",
   "proposal": {            // ONLY when response_type is ACTION_PROPOSAL
-    "type": "add_expense" | "add_income" | "bill_payment" | "goal_contribution",
+    "type": "add_expense" | "add_income" | "bill_payment" | "goal_contribution"
+          | "remember_debt" | "settle_debt" | "budget_plan",
     "amount_minor": 71183,
     "currency": "INR",
     "description": "Bike fuel",
@@ -111,7 +119,12 @@ RESPONSE FORMAT - return ONLY a JSON object, no markdown fence:
     "category_name": "<one of the snapshot's category names, or null>",
     "to_account_name": null,
     "savings_goal_name": null,
-    "bill_name": null
+    "bill_name": null,
+    "person": "<only for remember_debt and settle_debt: whose debt it is>",
+    "debt_direction": "owed_to_me" | "i_owe",
+    "plan_items": [         // ONLY for budget_plan
+      {"category_name": "<a snapshot expense category>", "amount_minor": 400000}
+    ]
   },
   "clarification_prompt": "only when response_type is CLARIFICATION_REQUIRED"
 }
@@ -133,6 +146,67 @@ INTENT GUIDANCE
   and answering "nothing was recorded" to "95 for what" answers nothing.
 - A bare follow-up carries the previous turn's subject. "and groceries?" after
   a question about fuel is still a question.
+
+PEOPLE ARE NOT SHOPS
+- "who have I sent money to" means PEOPLE. Asked it, the assistant listed
+  "Panner" (a food purchase) and "Karan Medicare" (a pharmacy) as people. A
+  payee that is a business, an app, a bank, a food item or a utility is not a
+  person - leave it out, and if you cannot tell, say which ones you were unsure
+  of rather than guessing.
+
+A SPENDING PLAN IS NOT A MIRROR
+  Asked "plan how I should spend my salary", the assistant split the WHOLE
+  salary across categories in last month's proportions: 37% on eating out,
+  nothing saved, no buffer. That repeats the past with a bigger number on it.
+  A plan, in this order:
+  1. The salary, from the snapshot (a salary stream or this month's income).
+  2. What is already committed: bills, EMIs and loan repayments in the
+     snapshot, by name and amount. These come off first.
+  3. Savings, set aside on payday - 10 to 20 percent of salary - and name an
+     active savings goal if there is one.
+  4. A small buffer for the unexpected, about 5 percent.
+  5. What is left, split across the everyday categories, using recent
+     spending as a GUIDE, not a target - and say plainly which category is
+     the biggest lever and by how much trimming it would help.
+  Every rupee is allocated, the lines add up to the salary, and savings is
+  never zero unless the committed costs leave nothing - in which case say
+  that, because it is the most important thing in the answer.
+- Asking for a plan is asking for something the user may want to KEEP, so
+  answer it as an ACTION_PROPOSAL of type "budget_plan": the whole plan, in
+  rupees, goes in "message" exactly as above, and "plan_items" carries step 5
+  - the everyday spending categories and their monthly limits, in paise, one
+  per category, using the snapshot's expense category names. Leave savings,
+  the buffer, bills and EMIs OUT of plan_items: they are not spending budgets,
+  and bills already have their own place. "amount_minor" is the total of the
+  plan_items. The user sees a card asking whether to save it to their Plan
+  tab; nothing is saved unless they say yes. Do not write "I have saved" or
+  "added to your plan" in the message - it is a question, not a done thing.
+
+MONEY LENT TO PEOPLE
+  The snapshot's "debts" holds what is still outstanding in both directions:
+  "owed_to_me" is money the user handed over and expects back, "i_owe" is the
+  reverse. Both are in paise, like everything else.
+- "who do I need to take money back from", "who owes me", "what am I owed" are
+  ANSWER, read off debts.owed_to_me. Name each person and their outstanding
+  amount IN RUPEES. If the list is empty, say nothing is outstanding - do not
+  go looking through transactions for payments that might have been loans.
+- "remember I need 500 back from Vishal", "I lent Gautam 200", "note that
+  Rahul owes me 1000" are remember_debt proposals, with "person" set to the
+  name and "debt_direction" to "owed_to_me".
+- "I owe mum 2000", "remind me I borrowed 500 from Vishal" are remember_debt
+  with "debt_direction" set to "i_owe".
+- "Vishal paid me back", "settle Gautam", "got my 500 back from Vishal" are
+  settle_debt proposals naming that person. Use the outstanding amount from
+  the snapshot as amount_minor unless the user gives a smaller figure, which
+  means a part-payment.
+- A DEBT IS A REMINDER, NOT A BALANCE. Recording one changes no account, no
+  budget and no net worth: the rupees already left the bank when they were
+  lent, and the repayment will arrive as ordinary income. Never tell the user
+  that their balance or net worth includes what they are owed, and never
+  propose an add_expense for the same money as well.
+- Only propose remember_debt when the user is actually telling you about a
+  loan. "what was the 500 to Vishal" is a question about a payment that
+  already exists - ANSWER it from the transactions.
 - Only ask for clarification when the amount or the intent is genuinely
   ambiguous - do not ask which account when the snapshot has just one.
 """
@@ -412,9 +486,36 @@ async def query_llm(
             return None
         amount = _coerce_minor_units(raw.get("amount_minor"))
         ptype = raw.get("type")
-        if amount is None or ptype not in (
-            "add_expense", "add_income", "bill_payment", "goal_contribution"
+        if ptype not in (
+            "add_expense", "add_income", "bill_payment", "goal_contribution",
+            "remember_debt", "settle_debt", "budget_plan",
         ):
+            return None
+        # A plan's amount is the sum of its lines, worked out below, so the
+        # model's own total is not a reason to refuse one.
+        if amount is None and ptype != "budget_plan":
+            return None
+        # A plan with nothing in it offers the user a card that saves nothing.
+        plan_items = []
+        if ptype == "budget_plan":
+            seen = set()
+            for row in (raw.get("plan_items") or [])[:30]:
+                if not isinstance(row, dict):
+                    continue
+                name = str(row.get("category_name") or "").strip()[:60]
+                minor = _coerce_minor_units(row.get("amount_minor"))
+                if not name or minor is None or minor <= 0 or name.lower() in seen:
+                    continue
+                seen.add(name.lower())
+                plan_items.append({"category_name": name, "amount_minor": minor})
+            if not plan_items:
+                return None
+            # The total is computed, never trusted: it is shown on the card.
+            amount = sum(item["amount_minor"] for item in plan_items)
+        # A debt without a name is not a debt - it would record "somebody owes
+        # me 500", which is no more use than not recording it.
+        person = str(raw.get("person") or "").strip()[:80]
+        if ptype in ("remember_debt", "settle_debt") and not person:
             return None
         out["proposal"] = {
             "type": ptype,
@@ -426,6 +527,14 @@ async def query_llm(
             "category_name": raw.get("category_name"),
             "savings_goal_name": raw.get("savings_goal_name"),
             "bill_name": raw.get("bill_name"),
+            "person": person or None,
+            # Anything the model invents here means money the user expects
+            # back, which is the overwhelming case and the safer reading.
+            "debt_direction": (
+                "i_owe" if str(raw.get("debt_direction") or "").strip().lower() == "i_owe"
+                else "owed_to_me"
+            ),
+            "plan_items": plan_items or None,
         }
 
     if not out["message"] and rtype != "CLARIFICATION_REQUIRED":

@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import Account, Category, Transaction, Budget, SavingsGoal, Bill, RecurringIncome
+from app.models.models import Account, Category, Transaction, Budget, SavingsGoal, Bill, RecurringIncome, PersonDebt
 from app.services.finance import calculate_net_worth, calculate_cash_flow, calculate_category_breakdown, calculate_account_balance, calculate_savings_goal_progress
 
 async def get_financial_summary_tool(user_id: uuid.UUID, db: AsyncSession) -> Dict[str, Any]:
@@ -155,3 +155,42 @@ async def get_bills_tool(user_id: uuid.UUID, db: AsyncSession) -> List[Dict[str,
         }
         for b in bills
     ]
+
+
+async def get_person_debts_tool(user_id: uuid.UUID, db: AsyncSession) -> Dict[str, Any]:
+    """Who has the user's money, and whose money the user has.
+
+    Only what is still open: a settled debt is history, and listing it would
+    invite the assistant to tell somebody to chase money already returned.
+
+    These are REMINDERS, not balances. Nothing here is part of net worth -
+    the rupees left the bank when they were lent and the ledger recorded that
+    already, and the repayment will arrive as ordinary income.
+    """
+    stmt = select(PersonDebt).where(
+        and_(PersonDebt.user_id == user_id, PersonDebt.settled_at.is_(None))
+    ).order_by(PersonDebt.created_at.asc())
+    res = await db.execute(stmt)
+    debts = res.scalars().all()
+
+    owed_to_me, i_owe = [], []
+    for d in debts:
+        outstanding = max(0, int(d.amount_minor) - int(d.repaid_minor or 0))
+        if outstanding == 0:
+            continue
+        row = {
+            "id": str(d.id),
+            "person": d.person,
+            "outstanding_minor": outstanding,
+            "original_minor": int(d.amount_minor),
+            "note": d.note,
+            "since": d.occurred_on.isoformat() if d.occurred_on else None,
+        }
+        (i_owe if d.direction == "i_owe" else owed_to_me).append(row)
+
+    return {
+        "owed_to_me": owed_to_me,
+        "i_owe": i_owe,
+        "total_owed_to_me_minor": sum(r["outstanding_minor"] for r in owed_to_me),
+        "total_i_owe_minor": sum(r["outstanding_minor"] for r in i_owe),
+    }

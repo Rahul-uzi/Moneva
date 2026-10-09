@@ -86,6 +86,7 @@ class User(Base):
     refresh_sessions = relationship("RefreshSession", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     recurring_incomes = relationship("RecurringIncome", back_populates="user", cascade="all, delete-orphan")
+    person_debts = relationship("PersonDebt", back_populates="user", cascade="all, delete-orphan")
     sync_metadata = relationship("SyncMetadata", back_populates="user", cascade="all, delete-orphan")
     emis = relationship("Emi", back_populates="user", cascade="all, delete-orphan")
 
@@ -441,3 +442,45 @@ class AppDownload(Base):
     #: which is close enough to a fingerprint to be worth not keeping.
     platform = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+
+class PersonDebt(Base):
+    """Money lent to a person, or borrowed from one, and not yet squared up.
+
+    WHY THIS IS NOT A TRANSACTION. Lending is not spending - the money is
+    expected back - but it is also not a second pile of money. The rupees
+    already left the bank and the app already recorded that; what was missing
+    was any record of WHO has them and that they are coming back. So this
+    table holds the thing the ledger cannot: a name, and whether it is settled.
+
+    It deliberately does NOT alter any balance, budget or net worth. A row
+    here is a reminder, and it says so wherever it is shown. Quietly adding
+    the amount back into net worth would be a second, disagreeing answer to
+    "how much do I have" - and the repayment, when it lands, is recorded as
+    income like any other money arriving, which would then count it twice.
+    """
+    __tablename__ = "person_debts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    #: Whoever the user called them. Never matched against anything, so a
+    #: nickname is as good as a full name.
+    person = Column(String, nullable=False)
+    #: "owed_to_me" - they have the user's money. "i_owe" - the other way.
+    direction = Column(String, nullable=False, default="owed_to_me")
+    amount_minor = Column(BigInteger, nullable=False)
+    #: How much has come back so far. Partial repayments are the norm between
+    #: friends, and a row that can only be open or closed cannot hold "he gave
+    #: 200 of the 500 back".
+    repaid_minor = Column(BigInteger, nullable=False, default=0)
+    #: What it was for, in the user's words. Optional - most are obvious.
+    note = Column(String, nullable=True)
+    #: When the money changed hands, which can be well before it was recorded.
+    occurred_on = Column(DateTime(timezone=True), nullable=True)
+    #: Set once it is fully squared up. Kept rather than deleted so the user
+    #: can see that a debt existed and was settled.
+    settled_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship("User", back_populates="person_debts")

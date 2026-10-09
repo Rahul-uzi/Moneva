@@ -14,6 +14,7 @@ from app.routers import (
     auth,
     accounts,
     categories,
+    debts,
     transactions,
     finance,
     budgets,
@@ -125,6 +126,7 @@ app.include_router(profile.router, prefix=settings.API_PREFIX)
 app.include_router(ai.router, prefix=settings.API_PREFIX)
 app.include_router(emis.router, prefix=settings.API_PREFIX)
 app.include_router(admin.router, prefix=settings.API_PREFIX)
+app.include_router(debts.router, prefix=settings.API_PREFIX)
 
 @app.get("/health", tags=["Health"])
 @app.get("/api/health", tags=["Health"])

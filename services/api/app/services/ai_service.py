@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import Account, Category, Bill, SavingsGoal
+from app.models.models import Account, Category, Bill, SavingsGoal, PersonDebt, Budget
 from app.services import ai_llm
 from app.services.finance import calculate_cash_flow, calculate_account_balance
 from app.services import ai_query
@@ -20,7 +20,8 @@ from app.services.ai_tools import (
     get_recent_transactions_tool,
     get_budgets_tool,
     get_goals_tool,
-    get_bills_tool
+    get_bills_tool,
+    get_person_debts_tool,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,16 @@ class ResponseType(str, Enum):
     CLARIFICATION_REQUIRED = "CLARIFICATION_REQUIRED"
     ERROR = "ERROR"
     OFFLINE = "OFFLINE"
+
+class PlanLine(BaseModel):
+    """One line of a proposed spending plan, resolved to the user's category."""
+    category_id: str
+    category_name: str
+    amount_minor: int
+    #: This month's current budget for the category, if there is one - so the
+    #: card can say what saying yes would change, not just what it would set.
+    current_minor: Optional[int] = None
+
 
 class ProposedActionSchema(BaseModel):
     type: str # 'add_expense' | 'add_income' | 'transfer' | 'bill_payment' | 'goal_contribution' | 'create_budget' | 'create_goal' | 'create_bill'
@@ -49,6 +60,16 @@ class ProposedActionSchema(BaseModel):
     bill_id: Optional[str] = None
     bill_name: Optional[str] = None
     due_date: Optional[str] = None
+    #: Only for the debt actions: whose debt it is, and which way it runs.
+    person: Optional[str] = None
+    debt_direction: Optional[str] = None
+    #: Set only on settle_debt, by matching the name against the open debts.
+    #: The model never supplies an id, so it cannot point at another user's row.
+    debt_id: Optional[str] = None
+    #: Only for budget_plan: the lines that matched a real category...
+    plan_items: Optional[List[PlanLine]] = None
+    #: ...and the names that did not, said out loud rather than dropped quietly.
+    plan_unmatched: Optional[List[str]] = None
 
 class AIQueryResponse(BaseModel):
     response_type: ResponseType
@@ -97,6 +118,12 @@ async def _build_snapshot(user_id: uuid.UUID, db: AsyncSession) -> dict:
         "budgets": await get_budgets_tool(user_id, db),
         "goals": await get_goals_tool(user_id, db),
         "bills": await get_bills_tool(user_id, db),
+        # Who owes whom. Without this the assistant could be TOLD a
+        # debt inside one conversation and answer from the last ten
+        # messages, then forget it completely in the next chat - which
+        # is worse than never remembering, because the user stopped
+        # keeping track themselves.
+        "debts": await get_person_debts_tool(user_id, db),
     }
 
 
@@ -115,6 +142,9 @@ async def _resolve_proposal_names(
     categories = (await db.execute(select(Category).where(Category.user_id == user_id))).scalars().all()
     goals = (await db.execute(select(SavingsGoal).where(SavingsGoal.user_id == user_id))).scalars().all()
     bills = (await db.execute(select(Bill).where(Bill.user_id == user_id))).scalars().all()
+    debts = (await db.execute(select(PersonDebt).where(and_(
+        PersonDebt.user_id == user_id, PersonDebt.settled_at.is_(None)
+    )))).scalars().all()
 
     def match(items, name):
         if not name:
@@ -139,6 +169,55 @@ async def _resolve_proposal_names(
     goal = match(goals, proposal.get("savings_goal_name"))
     bill = match(bills, proposal.get("bill_name"))
 
+    # A debt action is about a PERSON, not an account or a category. Settling
+    # has to find the row that already exists: the model is given names, never
+    # ids, so the match happens here, against this user's open debts only.
+    person = str(proposal.get("person") or "").strip() or None
+    debt_id = None
+    if proposal["type"] == "settle_debt" and person:
+        want = person.lower()
+        named = [d for d in debts if d.person.lower() == want]
+        if not named:
+            named = [d for d in debts if want in d.person.lower() or d.person.lower() in want]
+        # Two open debts with the same person and nothing to choose between
+        # them: settle the oldest, which is the one that has been waiting.
+        if named:
+            debt_id = str(sorted(named, key=lambda d: d.created_at)[0].id)
+
+    # A plan names categories, never ids. Each is matched against the user's
+    # own EXPENSE categories here, and any it cannot place is reported back,
+    # so a plan line never lands silently under the wrong heading.
+    plan_items = None
+    plan_unmatched = None
+    if proposal["type"] == "budget_plan":
+        spend_cats = [c for c in categories if (c.type or "").lower() == "expense"]
+        now = datetime.now(timezone.utc)
+        current = (await db.execute(select(Budget).where(and_(
+            Budget.user_id == user_id,
+            Budget.start_date <= now,
+            Budget.end_date >= now,
+        )))).scalars().all()
+        current_by_cat = {b.category_id: int(b.limit_amount_minor) for b in current}
+
+        lines: List[PlanLine] = []
+        missing: List[str] = []
+        used = set()
+        for row in proposal.get("plan_items") or []:
+            cat = match(spend_cats, row.get("category_name"))
+            if cat is None or cat.id in used:
+                missing.append(str(row.get("category_name")))
+                continue
+            used.add(cat.id)
+            lines.append(PlanLine(
+                category_id=str(cat.id),
+                category_name=cat.name,
+                amount_minor=int(row["amount_minor"]),
+                current_minor=current_by_cat.get(cat.id),
+            ))
+        plan_items = lines
+        plan_unmatched = missing or None
+        proposal = {**proposal, "amount_minor": sum(l.amount_minor for l in lines)}
+
     return ProposedActionSchema(
         type=proposal["type"],
         amount_minor=proposal["amount_minor"],
@@ -154,6 +233,11 @@ async def _resolve_proposal_names(
         savings_goal_name=goal.name if goal else None,
         bill_id=str(bill.id) if bill else None,
         bill_name=bill.name if bill else None,
+        person=person,
+        debt_direction=proposal.get("debt_direction") or "owed_to_me",
+        debt_id=debt_id,
+        plan_items=plan_items,
+        plan_unmatched=plan_unmatched,
     )
 
 
