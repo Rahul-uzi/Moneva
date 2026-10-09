@@ -459,7 +459,7 @@ class TestAResetCodeNeverReachesAProductionLog:
 
         Mail relay did not confirm the send: 302
         RESEND_API_KEY is not set - no email sent.
-            Password reset code for rahuldhiman2080@gmail.com: 470427
+            Password reset code for someone@example.com: 123456
 
     A live code and a full address, in clear. The relay failing fell through to
     a branch written for development, which logged both unconditionally.

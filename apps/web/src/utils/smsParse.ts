@@ -77,7 +77,7 @@ const REFUSE: Array<{ id: string; test: RegExp; unless?: RegExp }> = [
  * Ordered: the first rule that matches wins, so put the specific ones first.
  *
  * The verbs further down are written from the BANK's point of view and say
- * nothing about which end of the payment you are on. "Rahul paid you Rs.80"
+ * nothing about which end of the payment you are on. "Asha paid you Rs.80"
  * contains "paid", and read by the generic rule it became an expense - money
  * arriving was subtracted from the balance instead of added to it. So the
  * rules that identify WHO received the money are settled first, before any
@@ -134,7 +134,7 @@ const DIRECTION: Array<{ id: string; kind: SmsKind; test: RegExp }> = [
 
   { id: 'debited', kind: 'debit', test: /\bdebited\b/i },
   { id: 'credited', kind: 'credit', test: /\bcredited\b/i },
-  // "Acct XXXX4489 Dr. INR 10.00" - Canara's way of saying debited, and
+  // "Acct XXXX1234 Dr. INR 10.00" - Canara's way of saying debited, and
   // Union Bank's, PNB's and Bank of Baroda's too. A real Rs 10 payment was
   // dropped here: the Android filter kept the message, this table could not
   // say which way the money went, and the parser returned null.
@@ -159,14 +159,14 @@ const DIRECTION: Array<{ id: string; kind: SmsKind; test: RegExp }> = [
   // "Sent Rs.250.00 From A/C x1234 To SWIGGY" - the verb and its preposition
   // are separated by the amount, so "sent to" as one phrase never matched it.
   { id: 'sent', kind: 'debit', test: /\b(?:sent|transferred)\s+(?:rs\.?|inr|₹)?[\s0-9.,]*(?:from|to)\b/i },
-  // "Your payment of Loan EMI Rs.5166 has been received, the same has been
-  // updated on Propelld dashboard." Written from the LENDER's point of view:
+  // "Your payment of Loan EMI Rs.2499 has been received, the same has been
+  // updated on the lender dashboard." Written from the LENDER's point of view:
   // the money left the user, and the finance company is the one who received
-  // it. Read by `received` just below, a real Rs 5,166 EMI was added to the
+  // it. Read by `received` just below, a real EMI was added to the
   // balance instead of taken off it.
   //
   // THE POSSESSIVE IS THE WHOLE SIGNAL. Money genuinely arriving names the
-  // other side - "payment received FROM Rahul" - and never calls it YOUR
+  // other side - "payment received FROM Asha" - and never calls it YOUR
   // payment. So "your" plus a payment noun is what makes this safe, and a
   // "from" straight after "received" hands the message back to `received`.
   //
@@ -178,7 +178,7 @@ const DIRECTION: Array<{ id: string; kind: SmsKind; test: RegExp }> = [
     test: /^(?![\s\S]*\b(?:refund(?:ed|s)?|cashback|revers(?:al|ed))\b)[\s\S]*?\byour\s+(?:[a-z]+\s+){0,2}?(?:payment|emi|instal?ment|repayment|dues?)\b[\s\S]{0,80}?\breceived\b(?!\s+from\b)/i,
   },
   { id: 'received', kind: 'credit', test: /\b(received|deposited)\b/i },
-  // Last, so "Payment of Rs.80 received from Rahul" is read by `received`.
+  // Last, so "Payment of Rs.80 received from Asha" is read by `received`.
   { id: 'payment-of', kind: 'debit', test: /\bpayment of\b/i },
 ];
 
@@ -225,7 +225,7 @@ const ACCOUNT_TAIL = /(?:a\/c|ac|acct|account|card)\s*(?:no\.?|ending|xx+)?\s*[x
 const REFERENCE = /(?:upi(?:\/| )?ref(?:erence)?|ref(?:erence)?|txn(?: id)?|transaction id|imps ref)(?:\s*(?:no|number)\.?)?\s*[:.# ]?\s*(?=[A-Za-z0-9]*[0-9])([A-Za-z0-9]{4,25})\b/i;
 
 /**
- * "UPI: 625820566755" - the rail's name, a colon, and the number, with the
+ * "UPI: 412345678901" - the rail's name, a colon, and the number, with the
  * word "reference" nowhere in it. Canara writes this, and it is why a real
  * Rs 10 payment arrived with no reference to identify it by.
  *
@@ -246,8 +246,8 @@ const REFERENCE = /(?:upi(?:\/| )?ref(?:erence)?|ref(?:erence)?|txn(?: id)?|tran
  *
  * The separator is deliberately NOT required, and was at first. A mutation
  * proved no test could tell the difference, and the reason turned out to be
- * that requiring it is simply wrong: banks write "UPI 625820566755" as
- * readily as "UPI: 625820566755", and insisting on the colon refuses a real
+ * that requiring it is simply wrong: banks write "UPI 412345678901" as
+ * readily as "UPI: 412345678901", and insisting on the colon refuses a real
  * reference to guard against nothing the two rules above do not already stop.
  */
 const BARE_RAIL_REFERENCE =
@@ -300,7 +300,7 @@ const NOTIFICATION_CHROME =
   /\b(?:tap|swipe|click|press)\s+(?:to|here|for)\b[\s\S]*$|\bview\s+(?:details?|more|transaction)\b[\s\S]*$|\bopen\s+(?:the\s+)?app\b[\s\S]*$/i;
 
 /**
- * "Karan paid you Rs.45" - the payer's name comes BEFORE the verb.
+ * "Arjun paid you Rs.45" - the payer's name comes BEFORE the verb.
  *
  * There is no preposition anywhere in that sentence, so the search above
  * cannot see the name at all, and every payment phrased this way was filed
@@ -400,7 +400,7 @@ function usable(raw: string): string | undefined {
 
 function findMerchant(body: string, kind: SmsKind): string | undefined {
   // "Tap to view" is not a payee. Removed first, so it cannot be mined for a
-  // name and cannot run onto the end of a real one ("Karan Tap").
+  // name and cannot run onto the end of a real one ("Arjun Tap").
   const text = body.replace(NOTIFICATION_CHROME, ' ');
 
   // A name sitting before the verb is invisible to the preposition search, so

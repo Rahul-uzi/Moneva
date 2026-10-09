@@ -77,7 +77,7 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
       // remembered nothing. `has_salary_configured` stayed false, the home
       // card kept offering to set up a salary that had been set up several
       // times, and the next payday prompted nobody. One real account ended up
-      // with a Rs 12,500 salary transaction and zero recurring rules.
+      // with a salary transaction and zero recurring rules.
       //
       // A salary is monthly; that is what makes it a salary. The rule touches
       // no balance, and the box is right there to clear for a one-off bonus.
@@ -167,8 +167,8 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
          whether an existing one is ADVANCED.
 
          It used to decide both, and the result was a payday card that lied:
-         a salary of Rs 25,000 was recorded on the 9th while the stream stayed
-         on "expected 10 Oct, Rs 12,500", so the home screen counted down to a
+         a salary was recorded a day early while the stream still said
+         "expected tomorrow", so the home screen counted down to a
          payday that had already happened. Worse, the next day the stream comes
          due and asks for a salary that is already in the ledger - one tap from
          recording it twice.

@@ -18,7 +18,7 @@ interface PastRow {
  *
  * The sheet has always saved "Payee - note", so the name is everything before
  * the first " - ". Rows the SMS reader wrote look nothing like a name
- * ("UPI/DR/412345678901/GAUTAM K/SBIN/..."), and offering one back as a
+ * ("UPI/DR/412345678901/GOPAL K/SBIN/..."), and offering one back as a
  * suggestion would be noise, so anything carrying a long run of digits or
  * running past a sensible name length is left out.
  */

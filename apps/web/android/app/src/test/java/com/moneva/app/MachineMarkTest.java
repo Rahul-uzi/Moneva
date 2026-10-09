@@ -93,7 +93,7 @@ public class MachineMarkTest {
     public void aPersonalMessageWithAnAmountIsStillRefused() {
         // The whole reason the verb requirement existed. A machine mark is
         // what lifts it, and this has none.
-        assertFalse(kept(MESSAGES, "Karan", "₹500 to Karan"));
+        assertFalse(kept(MESSAGES, "Arjun", "₹500 to Arjun"));
         assertFalse(kept(MESSAGES, "Mum", "send me 161.70 when you can"));
         assertFalse(kept(MESSAGES, "Anita", "the McDonald's bill was ₹161.70"));
     }
@@ -105,7 +105,7 @@ public class MachineMarkTest {
          * pin quoted in a message is a long number and nothing more - keying
          * on digits alone would read half the inbox.
          */
-        assertFalse(kept(MESSAGES, "Karan", "₹500 - call me on 9876543210"));
+        assertFalse(kept(MESSAGES, "Arjun", "₹500 - call me on 9876543210"));
         assertFalse(kept(MESSAGES, "Mum", "₹161.70 for 528417003921 pieces"));
     }
 

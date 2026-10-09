@@ -21,7 +21,7 @@ const stream: RecurringIncome = {
   id: 'stream-1',
   user_id: 'u1',
   source: 'Infosys',
-  amount_minor: 2500000,
+  amount_minor: 3150000,
   frequency: 'monthly',
   next_occurrence: '2026-10-10T00:00:00Z',
   anchor_day: 10,
@@ -31,7 +31,7 @@ const stream: RecurringIncome = {
 };
 
 const income: IncomeLike = {
-  amountPaise: 2500000,
+  amountPaise: 3150000,
   at: new Date('2026-10-08T09:00:00Z'),
   text: 'Infosys salary',
 };
@@ -46,7 +46,7 @@ describe('SalaryStreamPrompt', () => {
   it('names the stream and shows both figures', () => {
     render(<SalaryStreamPrompt match={match()} income={income} onDone={() => {}} />);
     expect(screen.getByText('Infosys')).toBeTruthy();
-    expect(screen.getAllByText(/25,000/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/31,500/).length).toBeGreaterThanOrEqual(2);
   });
 
   // The whole point: the money is already saved, so this sheet must never

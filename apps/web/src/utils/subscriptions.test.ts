@@ -333,7 +333,7 @@ describe('a subscription whose price actually changed', () => {
 /**
  * Which prefixes may be stripped, and which are the merchant itself.
  *
- * The strip existed so "Google Pay - Karan" and "Karan" could meet. Written as
+ * The strip existed so "Google Pay - Arjun" and "Arjun" could meet. Written as
  * "any <something> - ", it ate the merchant instead: "Third Wave Coffee -
  * Mumbai" reduced to "mumbai", so two unrelated shops in the same city grouped
  * into one row and were offered as a single subscription to cancel.
@@ -346,7 +346,7 @@ describe('telling a rail prefix from the merchant name', () => {
   it('strips a real payment rail', () => {
     expect(subscriptionKey('Google Pay - Netflix')).toBe('netflix');
     expect(subscriptionKey('PhonePe - Netflix')).toBe('netflix');
-    expect(subscriptionKey('WhatsApp Pay - Karan')).toBe('karan');
+    expect(subscriptionKey('WhatsApp Pay - Arjun')).toBe('arjun');
   });
 
   it('leaves a merchant whose own name carries a dash', () => {
@@ -449,7 +449,7 @@ describe('naming a subscription found in a statement', () => {
   });
 
   it('drops a payment rail prefix, keeping the person', () => {
-    expect(subscriptionName('Google Pay - Karan')).toBe('Karan');
+    expect(subscriptionName('Google Pay - Arjun')).toBe('Arjun');
   });
 
   it('never returns an empty name', () => {

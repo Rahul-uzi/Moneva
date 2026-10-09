@@ -7,7 +7,7 @@ import { suggestCategory } from './categorise';
  * History matching compares a normalised payee by CONTAINMENT, because bank
  * narrations are noisy and "UPI/SWIGGY LTD/9876" and "Swiggy" are one payee.
  * The payment rail was being left in that key, and "googlepay" sits inside
- * "googlepayvishal", "googlepaydmart" and every other row that travelled
+ * "googlepayneha", "googlepaydmart" and every other row that travelled
  * through the same app. One bare "Google Pay" row therefore matched all of
  * them, and whatever it was filed under spread to every payment the person
  * ever made with that app.
@@ -48,9 +48,9 @@ describe('a bare payment-app row no longer infects every other payment', () => {
   });
 
   it('leaves money sent to a person uncategorised rather than guessing', () => {
-    // There is nothing in "Vishal" that places it, and a wrong category is
+    // There is nothing in "Neha" that places it, and a wrong category is
     // worse than none - it is what quietly corrupts a budget.
-    const s = ask('Google Pay - Vishal');
+    const s = ask('Google Pay - Neha');
     expect(s.categoryId).toBeNull();
   });
 
@@ -93,8 +93,8 @@ describe('what history is still allowed to do', () => {
   });
 
   it('does not match two different people through a shared rail', () => {
-    const s = ask('Google Pay - Karan', [
-      { description: 'Google Pay - Vishal', category_id: 'exp-Food & Dining' },
+    const s = ask('Google Pay - Arjun', [
+      { description: 'Google Pay - Neha', category_id: 'exp-Food & Dining' },
     ]);
     expect(s.categoryId).toBeNull();
   });
@@ -103,7 +103,7 @@ describe('what history is still allowed to do', () => {
 describe('money coming in is untouched by any of this', () => {
   it('files a credit as income, never as a spending category', () => {
     const s = suggestCategory({
-      merchant: 'Google Pay - KARAN SHARMA', text: 'Google Pay - KARAN SHARMA',
+      merchant: 'Google Pay - ARJUN MEHTA', text: 'Google Pay - ARJUN MEHTA',
       kind: 'credit', categories: CATEGORIES, history: POISON,
     });
     expect(s.categoryName).toBe('Other Income');

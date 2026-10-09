@@ -1,7 +1,7 @@
 """The assistant's half of remembering who owes what.
 
 The user's own words for what they wanted: "remember that I need to get 500 rs
-back from vishal - when I ask you, just tell to whom I need to take money back".
+back from neha - when I ask you, just tell to whom I need to take money back".
 
 That is two separate abilities. Being TOLD a debt is a proposal the user
 confirms; being ASKED about it is read straight off the snapshot. The second is
@@ -45,19 +45,19 @@ class TestBeingToldAboutADebt:
 
         monkeypatch.setattr(ai_llm, "_call_groq", groq)
         monkeypatch.setattr(ai_llm, "_call_gemini", gemini_unused)
-        return asyncio.run(ai_llm.query_llm("remember vishal owes me 500", self._snapshot()))
+        return asyncio.run(ai_llm.query_llm("remember neha owes me 500", self._snapshot()))
 
     def test_a_named_debt_comes_through(self, monkeypatch):
         out = self._run(monkeypatch, """
             {"response_type": "ACTION_PROPOSAL",
-             "message": "I will note that Vishal owes you Rs 500.00.",
+             "message": "I will note that Neha owes you Rs 500.00.",
              "proposal": {"type": "remember_debt", "amount_minor": 50000,
-                          "description": "Lent to Vishal", "person": "Vishal",
+                          "description": "Lent to Neha", "person": "Neha",
                           "debt_direction": "owed_to_me"}}
         """)
         assert out is not None
         assert out["proposal"]["type"] == "remember_debt"
-        assert out["proposal"]["person"] == "Vishal"
+        assert out["proposal"]["person"] == "Neha"
         assert out["proposal"]["amount_minor"] == 50000
         assert out["proposal"]["debt_direction"] == "owed_to_me"
 
@@ -84,7 +84,7 @@ class TestBeingToldAboutADebt:
         out = self._run(monkeypatch, """
             {"response_type": "ACTION_PROPOSAL", "message": "Noted.",
              "proposal": {"type": "remember_debt", "amount_minor": 50000,
-                          "description": "Lent", "person": "Vishal",
+                          "description": "Lent", "person": "Neha",
                           "debt_direction": "sideways"}}
         """)
         assert out["proposal"]["debt_direction"] == "owed_to_me"
@@ -93,7 +93,7 @@ class TestBeingToldAboutADebt:
         out = self._run(monkeypatch, """
             {"response_type": "ACTION_PROPOSAL", "message": "Done.",
              "proposal": {"type": "delete_everything", "amount_minor": 1,
-                          "description": "x", "person": "Vishal"}}
+                          "description": "x", "person": "Neha"}}
         """)
         assert out is None
 
@@ -118,7 +118,7 @@ async def _user_with_debt(db: AsyncSession, **over) -> tuple[uuid.UUID, PersonDe
         display_name="Debt Tester",
     )
     db.add(user)
-    fields = dict(person="Vishal", direction="owed_to_me", amount_minor=50000, repaid_minor=0)
+    fields = dict(person="Neha", direction="owed_to_me", amount_minor=50000, repaid_minor=0)
     fields.update(over)
     debt = PersonDebt(id=uuid.uuid4(), user_id=user.id, **fields)
     db.add(debt)
@@ -133,7 +133,7 @@ async def test_the_snapshot_says_who_owes_what(db_session: AsyncSession):
     user_id, _ = await _user_with_debt(db_session)
     out = await get_person_debts_tool(user_id, db_session)
 
-    assert [d["person"] for d in out["owed_to_me"]] == ["Vishal"]
+    assert [d["person"] for d in out["owed_to_me"]] == ["Neha"]
     assert out["owed_to_me"][0]["outstanding_minor"] == 50000
     assert out["total_owed_to_me_minor"] == 50000
     assert out["i_owe"] == []
@@ -168,12 +168,12 @@ async def test_settling_by_name_finds_the_existing_debt(db_session: AsyncSession
     user_id, debt = await _user_with_debt(db_session)
 
     resolved = await _resolve_proposal_names(
-        {"type": "settle_debt", "amount_minor": 50000, "description": "Vishal paid back",
-         "person": "vishal"},
+        {"type": "settle_debt", "amount_minor": 50000, "description": "Neha paid back",
+         "person": "neha"},
         user_id, db_session,
     )
     assert resolved.debt_id == str(debt.id)
-    assert resolved.person == "vishal"
+    assert resolved.person == "neha"
 
 
 @pytest.mark.asyncio
@@ -193,7 +193,7 @@ async def test_one_users_debt_is_never_settled_for_another(db_session: AsyncSess
     theirs, _ = await _user_with_debt(db_session, person="Nobody", amount_minor=100)
 
     resolved = await _resolve_proposal_names(
-        {"type": "settle_debt", "amount_minor": 50000, "description": "x", "person": "Vishal"},
+        {"type": "settle_debt", "amount_minor": 50000, "description": "x", "person": "Neha"},
         theirs, db_session,
     )
     assert resolved.debt_id is None, "a debt was matched across users"

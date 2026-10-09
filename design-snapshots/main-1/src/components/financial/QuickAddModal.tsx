@@ -347,7 +347,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
                 <FormField
                   label="Who is it going to?"
                   type="text"
-                  placeholder="e.g. Rahul, landlord, ICICI ...4821"
+                  placeholder="e.g. Asha, landlord, ICICI ...4821"
                   value={customPayee}
                   onChange={(e) => setCustomPayee(e.target.value)}
                 />

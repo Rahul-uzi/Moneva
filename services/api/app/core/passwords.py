@@ -80,8 +80,8 @@ def _normalise(password: str) -> str:
 def _tokens(*sources: Optional[str]) -> list[str]:
     """Words worth refusing, taken from what the attacker already knows.
 
-    An email yields its local part and the parts of that ("rahul.dhiman" gives
-    "rahul" and "dhiman"); a display name yields its words. Anything under four
+    An email yields its local part and the parts of that ("asha.verma" gives
+    "asha" and "verma"); a display name yields its words. Anything under four
     characters is dropped - refusing every password containing a three-letter
     name would reject far more good passwords than bad ones.
     """

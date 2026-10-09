@@ -94,7 +94,7 @@ final class PaymentNotificationFilter {
      * These keep the STRICT test. Their notifications carry other people's
      * conversation, so a message has to look like a receipt - an amount and a
      * verb saying money moved - before it is written down. The leniency added
-     * for payment apps deliberately does not reach here: "500 to Karan" from a
+     * for payment apps deliberately does not reach here: "500 to Arjun" from a
      * friend must stay unread.
      */
     static final Set<String> SMS_PACKAGES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
@@ -229,7 +229,7 @@ final class PaymentNotificationFilter {
      *
      * The difference this leans on is POSITION: a receipt puts the amount
      * immediately after the verb and marks it with a unit - "You sent Rs.500",
-     * "Karan paid you Rs.45". Conversation does not - "sent you the 200 rs
+     * "Arjun paid you Rs.45". Conversation does not - "sent you the 200 rs
      * pic", "i paid you 500 last week" - because the number is a detail in a
      * sentence rather than the subject of it.
      *
@@ -255,7 +255,7 @@ final class PaymentNotificationFilter {
      *   - A conversational app (WhatsApp) must look like a receipt. Almost
      *     everything it posts is nobody's business.
      *   - A messaging app carrying bank SMS must show an amount AND a verb
-     *     saying money moved. "500 to Karan" from a friend stays unread.
+     *     saying money moved. "500 to Arjun" from a friend stays unread.
      *   - A dedicated payment app only has to show an amount. Everything
      *     Google Pay puts in the shade is about a payment, and demanding a
      *     verb of it is what lost a real one - see below.

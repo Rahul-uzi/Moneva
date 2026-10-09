@@ -42,7 +42,7 @@ describe('a statement row gets a category', () => {
     // Credits have no merchant table, so the fallback matters more here: a
     // statement is mostly transfers from people, and "Other Income" is a true
     // answer where blank is merely an empty one.
-    expect(file({ raw: 'Google Pay - KARAN SHARMA', cleaned: 'Google Pay', direction: 'credit' })
+    expect(file({ raw: 'Google Pay - ARJUN MEHTA', cleaned: 'Google Pay', direction: 'credit' })
       .categoryId).toBe('inc-Other Income');
   });
 

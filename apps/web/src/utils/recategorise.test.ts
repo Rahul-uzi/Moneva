@@ -64,10 +64,10 @@ describe('it repairs the rows the bug mis-filed', () => {
 
 describe('what it refuses to touch', () => {
   it('never clears a category it cannot replace', () => {
-    // "Vishal" places nothing. Leaving a hand-picked category alone matters
+    // "Neha" places nothing. Leaving a hand-picked category alone matters
     // more than tidiness - this is somebody's ledger, not a cache.
     const p = planRecategorise(
-      [tx({ description: 'Google Pay - Vishal', category_id: 'exp-Other' })],
+      [tx({ description: 'Google Pay - Neha', category_id: 'exp-Other' })],
       CATEGORIES,
     );
     expect(p).toHaveLength(0);
@@ -83,7 +83,7 @@ describe('what it refuses to touch', () => {
 
   it('ignores income', () => {
     const p = planRecategorise(
-      [tx({ transaction_type: 'income', description: 'Google Pay - KARAN', category_id: 'inc-Other Income' })],
+      [tx({ transaction_type: 'income', description: 'Google Pay - ARJUN', category_id: 'inc-Other Income' })],
       CATEGORIES,
     );
     expect(p).toHaveLength(0);

@@ -45,7 +45,7 @@ describe('reading one alert', () => {
   });
 
   it('reads money coming in as a credit', () => {
-    const p = alertToProposal(alert({ text: '₹500 received from Rahul' }));
+    const p = alertToProposal(alert({ text: '₹500 received from Asha' }));
     expect(p!.kind).toBe('credit');
     expect(p!.amountPaise).toBe(50000);
   });
@@ -56,7 +56,7 @@ describe('reading one alert', () => {
     for (const text of [
       'Your OTP is 123456 for a txn of Rs.500. Do not share.',
       'Rs.500 transaction failed on your card',
-      'Rahul is requesting ₹500 via UPI',
+      'Asha is requesting ₹500 via UPI',
       'Get a pre-approved loan up to Rs.5,00,000',
       'Rs.2000 will be debited on 10-09-26 towards your SIP',
       'Available balance in a/c XX4321 is Rs.12,345.00',

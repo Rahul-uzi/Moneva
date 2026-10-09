@@ -59,20 +59,20 @@ async def test_lend_and_get_it_all_back(api_client: AsyncClient):
     headers = await _signed_in(api_client)
 
     created = await api_client.post("/api/debts", json={
-        "person": "Vishal",
+        "person": "Neha",
         "amount_minor": 50000,
         "note": "Helped him out",
     }, headers=headers)
     assert created.status_code == 201, created.text
     debt = created.json()
-    assert debt["person"] == "Vishal"
+    assert debt["person"] == "Neha"
     assert debt["direction"] == "owed_to_me"
     assert debt["outstanding_minor"] == 50000
     assert debt["settled_at"] is None
 
     # Open debts are what the user is asked about, so they are the default.
     listed = (await api_client.get("/api/debts", headers=headers)).json()
-    assert [d["person"] for d in listed] == ["Vishal"]
+    assert [d["person"] for d in listed] == ["Neha"]
 
     repaid = await api_client.post(f"/api/debts/{debt['id']}/repay", json={}, headers=headers)
     assert repaid.status_code == 200, repaid.text
@@ -90,7 +90,7 @@ async def test_lend_and_get_it_all_back(api_client: AsyncClient):
 async def test_part_of_it_comes_back(api_client: AsyncClient):
     headers = await _signed_in(api_client)
     debt = (await api_client.post("/api/debts", json={
-        "person": "Gautam", "amount_minor": 50000,
+        "person": "Gopal", "amount_minor": 50000,
     }, headers=headers)).json()
 
     half = await api_client.post(
@@ -111,7 +111,7 @@ async def test_a_second_repayment_cannot_overpay_or_reopen(api_client: AsyncClie
     """A retried tap must not make the debt go negative or come back."""
     headers = await _signed_in(api_client)
     debt = (await api_client.post("/api/debts", json={
-        "person": "Vishal", "amount_minor": 50000,
+        "person": "Neha", "amount_minor": 50000,
     }, headers=headers)).json()
 
     await api_client.post(f"/api/debts/{debt['id']}/repay", json={}, headers=headers)
@@ -144,7 +144,7 @@ async def test_lending_the_same_person_twice_is_two_debts(api_client: AsyncClien
     headers = await _signed_in(api_client)
     for _ in range(2):
         res = await api_client.post("/api/debts", json={
-            "person": "Vishal", "amount_minor": 50000,
+            "person": "Neha", "amount_minor": 50000,
         }, headers=headers)
         assert res.status_code == 201
 
@@ -157,7 +157,7 @@ async def test_lending_the_same_person_twice_is_two_debts(api_client: AsyncClien
 async def test_correcting_the_amount_reopens_or_closes(api_client: AsyncClient):
     headers = await _signed_in(api_client)
     debt = (await api_client.post("/api/debts", json={
-        "person": "Vishal", "amount_minor": 50000,
+        "person": "Neha", "amount_minor": 50000,
     }, headers=headers)).json()
     await api_client.post(f"/api/debts/{debt['id']}/repay", json={}, headers=headers)
 
@@ -189,7 +189,7 @@ async def test_recording_a_debt_moves_no_money(api_client: AsyncClient):
     assert before["balance_paise"] == 100000
 
     await api_client.post("/api/debts", json={
-        "person": "Vishal", "amount_minor": 50000,
+        "person": "Neha", "amount_minor": 50000,
     }, headers=headers)
     after = (await api_client.get(f"/api/accounts/{acc['id']}", headers=headers)).json()
 
@@ -204,7 +204,7 @@ async def test_one_user_cannot_see_or_settle_anothers_debt(api_client: AsyncClie
     theirs = await _signed_in(api_client)
 
     debt = (await api_client.post("/api/debts", json={
-        "person": "Vishal", "amount_minor": 50000,
+        "person": "Neha", "amount_minor": 50000,
     }, headers=mine)).json()
 
     assert (await api_client.get("/api/debts", headers=theirs)).json() == []
@@ -226,7 +226,7 @@ async def test_rejects_a_blank_name_and_a_zero_amount(api_client: AsyncClient):
         "person": "   ", "amount_minor": 50000,
     }, headers=headers)).status_code in (400, 422)
     assert (await api_client.post("/api/debts", json={
-        "person": "Vishal", "amount_minor": 0,
+        "person": "Neha", "amount_minor": 0,
     }, headers=headers)).status_code in (400, 422)
 
 

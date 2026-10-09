@@ -204,8 +204,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
     if (categoryTouched) return;
     const name = merchant.trim();
     /* Never guess from half a name. While the field still has the cursor,
-       "Gau" matched Gautam's history and announced "you filed Gau under Food
-       before" - but "Gau" might be Gaurav. Mid-typing, only a name the sheet
+       "Gop" matched Gopal's history and announced "you filed Gop under Food
+       before" - but "Gop" might be Gopika. Mid-typing, only a name the sheet
        already knows exactly (a tapped suggestion, a full catalogue name) is
        allowed to pick; anything else waits until the user leaves the field. */
     const halfTyped = payeeFocused && !knownNames.has(name.toLowerCase());

@@ -103,7 +103,7 @@ public class GooglePayNotificationTest {
      *
      * Letting a payment app past without a verb is safe because Google Pay
      * posts nothing but payments. The Messages app posts whatever anybody
-     * sends you. If the same leniency reached it, "500 to Karan" from a friend
+     * sends you. If the same leniency reached it, "500 to Arjun" from a friend
      * would be an amount, with no verb and no marketing - and would be written
      * to disk and offered back as a transaction.
      *
@@ -121,7 +121,7 @@ public class GooglePayNotificationTest {
         // The exact shape the payment-app leniency now accepts - and the exact
         // shape a friend's message takes. The package is the only difference,
         // and it has to be the whole difference.
-        assertFalse(keptFromMessages("Karan", "₹500 to Karan"));
+        assertFalse(keptFromMessages("Arjun", "₹500 to Arjun"));
         assertFalse(keptFromMessages("Mum", "161.70 for the groceries"));
         assertFalse(keptFromMessages("Anita", "₹161.70 McDonald's"));
     }
@@ -154,7 +154,7 @@ public class GooglePayNotificationTest {
     @Test
     public void aRequestForMoneyIsNotAPayment() {
         // Nothing has moved yet. Storing this would invent a transaction.
-        assertFalse(kept("Karan is requesting ₹500", "Tap to pay"));
+        assertFalse(kept("Arjun is requesting ₹500", "Tap to pay"));
         assertFalse(kept("Payment request", "Anita requested ₹161.70"));
     }
 

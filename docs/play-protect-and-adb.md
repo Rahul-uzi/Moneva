@@ -125,7 +125,7 @@ vaguer language; the specifics are what make the appeal answerable.
 > **A message is only read if it looks machine-written.** An amount alone is
 > not enough: the text must also carry a movement verb, a transaction
 > reference, a masked account number or a running balance. Personal messages
-> are left alone by construction - "₹500 to Karan" from a friend is refused,
+> are left alone by construction - "₹500 to Arjun" from a friend is refused,
 > and there is a test asserting exactly that.
 >
 > **The app requests no other sensitive permission.** No contacts, no call log,

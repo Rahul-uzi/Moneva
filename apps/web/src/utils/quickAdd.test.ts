@@ -8,14 +8,14 @@ import {
 
 describe('payeeFromDescription', () => {
   it('takes the name before the note', () => {
-    expect(payeeFromDescription('Gautam - chai')).toBe('Gautam');
+    expect(payeeFromDescription('Gopal - chai')).toBe('Gopal');
     expect(payeeFromDescription('Swiggy')).toBe('Swiggy');
   });
 
   // The SMS reader writes bank narrations, and offering one of those back as
   // "someone you paid" would be noise in the one place meant to save typing.
   it('refuses a bank narration as a name', () => {
-    expect(payeeFromDescription('UPI/DR/412345678901/GAUTAM K/SBIN')).toBeNull();
+    expect(payeeFromDescription('UPI/DR/412345678901/GOPAL K/SBIN')).toBeNull();
     expect(payeeFromDescription('Ref 9876543210 transfer')).toBeNull();
   });
 
@@ -28,19 +28,19 @@ describe('payeeFromDescription', () => {
 
 describe('buildDescription', () => {
   it('joins the two halves the way the sheet always has', () => {
-    expect(buildDescription('Gautam', 'chai')).toBe('Gautam - chai');
+    expect(buildDescription('Gopal', 'chai')).toBe('Gopal - chai');
   });
   it('keeps whichever half exists', () => {
-    expect(buildDescription('Gautam', '  ')).toBe('Gautam');
+    expect(buildDescription('Gopal', '  ')).toBe('Gopal');
     expect(buildDescription('', 'chai')).toBe('chai');
     expect(buildDescription(' ', ' ')).toBeNull();
   });
 });
 
 const history = [
-  { description: 'Vishal', transaction_type: 'expense', transaction_date: '2026-10-08T10:00:00Z' },
-  { description: 'Gautam - chai', transaction_type: 'expense', transaction_date: '2026-10-09T10:00:00Z' },
-  { description: 'Gautam', transaction_type: 'expense', transaction_date: '2026-10-01T10:00:00Z' },
+  { description: 'Neha', transaction_type: 'expense', transaction_date: '2026-10-08T10:00:00Z' },
+  { description: 'Gopal - chai', transaction_type: 'expense', transaction_date: '2026-10-09T10:00:00Z' },
+  { description: 'Gopal', transaction_type: 'expense', transaction_date: '2026-10-01T10:00:00Z' },
   { description: 'Acme Corp', transaction_type: 'income', transaction_date: '2026-10-05T10:00:00Z' },
   { description: 'UPI/DR/412345678901/X', transaction_type: 'expense', transaction_date: '2026-10-09T11:00:00Z' },
 ];
@@ -48,7 +48,7 @@ const history = [
 describe('payeeSuggestions', () => {
   it('offers the people you actually paid, newest first, once each', () => {
     const out = payeeSuggestions({ query: '', type: 'expense', history });
-    expect(out.map((s) => s.label)).toEqual(['Gautam', 'Vishal']);
+    expect(out.map((s) => s.label)).toEqual(['Gopal', 'Neha']);
     expect(out.every((s) => s.source === 'recent')).toBe(true);
   });
 
@@ -80,14 +80,14 @@ describe('payeeSuggestions', () => {
     const out = payeeSuggestions({
       query: 'g',
       type: 'expense',
-      history: [{ description: 'Gautam', transaction_type: 'expense', transaction_date: '2026-10-09' }],
+      history: [{ description: 'Gopal', transaction_type: 'expense', transaction_date: '2026-10-09' }],
     });
-    expect(out[0]).toMatchObject({ label: 'Gautam', source: 'recent' });
+    expect(out[0]).toMatchObject({ label: 'Gopal', source: 'recent' });
   });
 
   it('does not suggest the exact name already typed', () => {
-    const out = payeeSuggestions({ query: 'gautam', type: 'expense', history });
-    expect(out.map((s) => s.label.toLowerCase())).not.toContain('gautam');
+    const out = payeeSuggestions({ query: 'gopal', type: 'expense', history });
+    expect(out.map((s) => s.label.toLowerCase())).not.toContain('gopal');
   });
 
   it('does not repeat a catalogue entry you have already used', () => {

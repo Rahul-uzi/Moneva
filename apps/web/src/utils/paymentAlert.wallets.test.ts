@@ -35,9 +35,9 @@ const read = (packageName: string, title: string, text: string) => {
 
 describe('UPI apps and wallets', () => {
   it('Google Pay', () => {
-    expect(read('com.google.android.apps.nbu.paisa.user', 'Karan paid you ₹45', 'Tap to view'))
-      .toMatchObject({ kind: 'credit', rupees: 45, merchant: 'Karan',
-                       description: 'Google Pay - Karan' });
+    expect(read('com.google.android.apps.nbu.paisa.user', 'Arjun paid you ₹45', 'Tap to view'))
+      .toMatchObject({ kind: 'credit', rupees: 45, merchant: 'Arjun',
+                       description: 'Google Pay - Arjun' });
   });
 
   it('PhonePe', () => {
@@ -98,14 +98,14 @@ describe('UPI apps and wallets', () => {
  */
 describe('WhatsApp Pay', () => {
   it('reads money leaving', () => {
-    expect(read('com.whatsapp', 'Karan', 'You sent ₹500 to Karan'))
+    expect(read('com.whatsapp', 'Arjun', 'You sent ₹500 to Arjun'))
       .toMatchObject({ kind: 'debit', rupees: 500, source: 'WhatsApp Pay' });
   });
 
   it('reads money arriving, and names the payer', () => {
-    expect(read('com.whatsapp', 'Karan', 'Karan paid you ₹45'))
-      .toMatchObject({ kind: 'credit', rupees: 45, merchant: 'Karan',
-                       description: 'WhatsApp Pay - Karan' });
+    expect(read('com.whatsapp', 'Arjun', 'Arjun paid you ₹45'))
+      .toMatchObject({ kind: 'credit', rupees: 45, merchant: 'Arjun',
+                       description: 'WhatsApp Pay - Arjun' });
   });
 });
 

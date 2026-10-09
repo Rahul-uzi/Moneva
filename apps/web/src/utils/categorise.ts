@@ -89,9 +89,9 @@ const none: CategorySuggestion = {
 /**
  * How the money travelled, which is not who was paid.
  *
- * "Google Pay - Vishal" is a payment to VISHAL. Leaving the rail in the key
+ * "Google Pay - Neha" is a payment to NEHA. Leaving the rail in the key
  * was the single worst bug in this file: the comparison below is containment,
- * so "googlepay" sits inside "googlepayvishal", "googlepaydmart" and every
+ * so "googlepay" sits inside "googlepayneha", "googlepaydmart" and every
  * other row that went through the same app - and one bare "Google Pay" row
  * then matched all of them. Whatever that one row was filed under spread to
  * every payment the person ever made through that app. In real data it was
@@ -113,7 +113,7 @@ const RAIL =
  * comparison is containment rather than equality.
  *
  * The rail comes off first, repeatedly, because narrations stack them:
- * "UPI/Google Pay/VISHAL" carries two before the name. What is left is the
+ * "UPI/Google Pay/NEHA" carries two before the name. What is left is the
  * payee, or nothing at all - and nothing is the right answer for a row that
  * only ever said "Google Pay", because that names no payee to learn from.
  */

@@ -69,7 +69,7 @@ public class PaymentNotificationFilterTest {
 
     @Test
     public void readsMoneyArriving() {
-        assertTrue(gate("Rahul Dhiman paid you Rs.80"));
+        assertTrue(gate("Asha Verma paid you Rs.80"));
         assertTrue(gate("Your A/c XX1234 is credited with INR 65,000.00 by SALARY"));
     }
 
@@ -200,11 +200,11 @@ public class PaymentNotificationFilterTest {
      */
     @Test
     public void readsARealWhatsAppPayment() {
-        assertTrue(chat("You sent ₹500 to Karan"));
-        assertTrue(chat("Karan paid you ₹45"));
+        assertTrue(chat("You sent ₹500 to Arjun"));
+        assertTrue(chat("Arjun paid you ₹45"));
         assertTrue(chat("You paid Rs.250 to Swiggy"));
         assertTrue(chat("Payment of ₹1,200 received"));
-        assertTrue(chat("Karan sent you Rs.80"));
+        assertTrue(chat("Arjun sent you Rs.80"));
     }
 
     @Test

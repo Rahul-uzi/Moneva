@@ -118,15 +118,15 @@ describe('the add sheet', () => {
     expect(screen.queryByText(/Picked for you/)).toBeNull();
   });
 
-  // Seen on screen: "Gau" matched Gautam's history and the sheet announced
-  // "you filed Gau under Food before". Gau might be Gaurav.
+  // Seen on screen: "Gop" matched Gopal's history and the sheet announced
+  // "you filed Gop under Food before". Gop might be Gopika.
   it('does not guess from half a name, and does from a chosen one', async () => {
     get.mockImplementation((url: string) => {
       if (url === '/accounts') return Promise.resolve({ data: ACCOUNTS });
       if (url === '/categories') return Promise.resolve({ data: CATEGORIES });
       if (url === '/transactions') {
         return Promise.resolve({ data: [{
-          description: 'Gautam', category_id: 'cat-travel',
+          description: 'Gopal', category_id: 'cat-travel',
           transaction_type: 'expense', transaction_date: '2026-10-09T09:00:00Z',
         }] });
       }
@@ -135,11 +135,11 @@ describe('the add sheet', () => {
     await openSheet();
     const field = screen.getByLabelText('Paid to');
     fireEvent.focus(field);
-    fireEvent.change(field, { target: { value: 'Gau' } });
+    fireEvent.change(field, { target: { value: 'Gop' } });
     await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
     expect(screen.queryByText(/Picked for you/)).toBeNull();
 
-    fireEvent.click(await screen.findByRole('button', { name: /Gautam/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Gopal/ }));
     expect(await screen.findByText(/Picked for you/)).toBeTruthy();
     expect(screen.getByRole('radio', { name: /Transport/ }).getAttribute('aria-checked')).toBe('true');
   });

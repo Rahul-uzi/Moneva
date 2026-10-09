@@ -145,7 +145,7 @@ describe('staying silent when it cannot be sure', () => {
  * Money ARRIVING, in the words the phone actually uses.
  *
  * Reported from a real phone: someone sent Rs.80 and the app offered it as an
- * expense, showing -80.00. The cause was one word - "Rahul paid you Rs.80"
+ * expense, showing -80.00. The cause was one word - "Asha paid you Rs.80"
  * contains "paid", and the rule that owns "paid" means money leaving. Nothing
  * in the table looked at who the recipient was.
  *
@@ -157,12 +157,12 @@ describe('someone sending money TO you', () => {
   const incomeFrom = (body: string) => parseTransactionSms(body)?.kind;
 
   it('reads "paid you" as income, not as a payment you made', () => {
-    expect(incomeFrom('Rahul Dhiman paid you Rs.80')).toBe('credit');
-    expect(incomeFrom('Rahul paid you Rs.80.00 via UPI')).toBe('credit');
+    expect(incomeFrom('Asha Verma paid you Rs.80')).toBe('credit');
+    expect(incomeFrom('Asha paid you Rs.80.00 via UPI')).toBe('credit');
   });
 
   it('reads "sent you", which used to be read as nothing at all', () => {
-    expect(incomeFrom('Rahul Dhiman sent you Rs.80')).toBe('credit');
+    expect(incomeFrom('Asha Verma sent you Rs.80')).toBe('credit');
   });
 
   it('still reads a payment YOU made as a debit', () => {
@@ -312,29 +312,29 @@ describe('who the other party was', () => {
    * From a real ledger: Rs 45 arrived from a friend through Google Pay and was
    * filed as income from "view".
    *
-   * The alert reads "Karan paid you Rs.45 / Tap to view". Two things went
+   * The alert reads "Arjun paid you Rs.45 / Tap to view". Two things went
    * wrong at once - the phrase "Tap to view" contains "to", so the counterparty
    * search read it as a payment to somebody called "view"; and the payer's real
    * name sits BEFORE the verb, where a preposition search can never see it.
    * The row that resulted had the wrong name AND was missing the right one.
    */
   it('reads the payer whose name comes before the verb', () => {
-    expect(who('Karan paid you ₹45')).toBe('Karan');
-    expect(who('Rahul Dhiman sent you Rs.80')).toBe('Rahul Dhiman');
+    expect(who('Arjun paid you ₹45')).toBe('Arjun');
+    expect(who('Asha Verma sent you Rs.80')).toBe('Asha Verma');
   });
 
   it('never mistakes "Tap to view" for a payee', () => {
-    expect(who('Karan paid you ₹45 Tap to view')).toBe('Karan');
-    expect(who('Karan paid you ₹45.00 View details')).toBe('Karan');
+    expect(who('Arjun paid you ₹45 Tap to view')).toBe('Arjun');
+    expect(who('Arjun paid you ₹45.00 View details')).toBe('Arjun');
     // The exact row this produced in production.
-    expect(who('Karan paid you ₹45 Tap to view')).not.toBe('view');
+    expect(who('Arjun paid you ₹45 Tap to view')).not.toBe('view');
   });
 
   it('does not let chrome run onto the end of a real name', () => {
-    // Names may contain spaces, so "from Karan Tap to view" used to be read
-    // as one name: "Karan Tap".
-    expect(who('₹45 received from Karan Tap to view')).toBe('Karan');
-    expect(who('You received ₹45 from Karan Tap to view')).toBe('Karan');
+    // Names may contain spaces, so "from Arjun Tap to view" used to be read
+    // as one name: "Arjun Tap".
+    expect(who('₹45 received from Arjun Tap to view')).toBe('Arjun');
+    expect(who('You received ₹45 from Arjun Tap to view')).toBe('Arjun');
   });
 
   it('names the machine on a cash withdrawal', () => {
@@ -374,7 +374,7 @@ describe('what the transfer rules must NOT steal', () => {
   });
 
   it('still reads incoming money as income', () => {
-    expect(kindOf('Rahul Dhiman paid you Rs.80')).toBe('credit');
+    expect(kindOf('Asha Verma paid you Rs.80')).toBe('credit');
     expect(kindOf('Your A/c XX1234 is credited with INR 65,000.00 by SALARY')).toBe('credit');
     expect(kindOf('Your A/c XX1234 is credited with Rs.80.00 by a/c linked to VPA rahul@okhdfc'))
       .toBe('credit');
@@ -523,9 +523,9 @@ describe('what the new payee rules must not drag in', () => {
 
 describe("the abbreviation half of India's banks use", () => {
   /*
-   * A real payment of Rs 10 to Rahul Dhima, 15 September 2026, Canara Bank.
+   * A real payment of Rs 10 to Asha Verm, 15 September 2026, Canara Bank.
    * It never became an expense. The Android filter kept the notification -
-   * "UPI: 625820566755" and "Acct XXXX4489" are both machine marks - so the
+   * "UPI: 412345678901" and "Acct XXXX1234" are both machine marks - so the
    * message reached this parser, and this parser could not tell which way the
    * money went.
    *
@@ -536,8 +536,8 @@ describe("the abbreviation half of India's banks use", () => {
    */
 
   const CANARA_DEBIT =
-    'Dear Customer, Acct XXXX4489 Dr. INR 10.00 on 15/09/26 to Rahul  Dhima; '
-    + 'UPI: 625820566755; Bal INR 50900.Not you?SMS BLOCKUPI to 9901771222-CanaraBank';
+    'Dear Customer, Acct XXXX1234 Dr. INR 10.00 on 15/09/26 to Asha  Verm; '
+    + 'UPI: 412345678901; Bal INR 18250.Not you?SMS BLOCKUPI to 9901771222-CanaraBank';
 
   it('reads the message that went missing', () => {
     const parsed = parseTransactionSms(CANARA_DEBIT);
@@ -548,13 +548,13 @@ describe("the abbreviation half of India's banks use", () => {
 
   it('takes the account and the reference from it too', () => {
     const parsed = parseTransactionSms(CANARA_DEBIT);
-    expect(parsed?.accountTail).toBe('4489');
-    expect(parsed?.reference).toBe('625820566755');
+    expect(parsed?.accountTail).toBe('1234');
+    expect(parsed?.reference).toBe('412345678901');
   });
 
   it('reads Cr. as money arriving', () => {
     const parsed = parseTransactionSms(
-      'Dear Customer, Acct XXXX4489 Cr. INR 2500.00 on 15/09/26 by UPI: 625820566756; Bal INR 53400-CanaraBank');
+      'Dear Customer, Acct XXXX1234 Cr. INR 2500.00 on 15/09/26 by UPI: 412345678902; Bal INR 20750-CanaraBank');
     expect(parsed?.kind).toBe('credit');
     expect(parsed?.amountPaise).toBe(250000);
   });
@@ -569,7 +569,7 @@ describe("the abbreviation half of India's banks use", () => {
      */
     const parsed = parseTransactionSms(CANARA_DEBIT);
     expect(parsed?.reference).not.toBe('9901771222');
-    expect(parsed?.reference).toBe('625820566755');
+    expect(parsed?.reference).toBe('412345678901');
   });
 
   it('will not read a reference out of the middle of a word', () => {
@@ -588,10 +588,10 @@ describe("the abbreviation half of India's banks use", () => {
   it('reads the rail reference with or without the colon', () => {
     // Banks write both. An earlier version demanded the colon; a mutation
     // showed no test could tell, and the reason was that the demand was wrong.
-    expect(parseTransactionSms('Rs 10.00 debited. UPI: 625820566755')?.reference)
-      .toBe('625820566755');
-    expect(parseTransactionSms('Rs 10.00 debited. UPI 625820566755')?.reference)
-      .toBe('625820566755');
+    expect(parseTransactionSms('Rs 10.00 debited. UPI: 412345678901')?.reference)
+      .toBe('412345678901');
+    expect(parseTransactionSms('Rs 10.00 debited. UPI 412345678901')?.reference)
+      .toBe('412345678901');
   });
 
   it('will not take a short or wordy run as a reference', () => {
@@ -617,21 +617,21 @@ describe("the abbreviation half of India's banks use", () => {
 /*
  * A message written from the LENDER's point of view.
  *
- * "Your payment of Loan EMI Rs.5166 has been received" - the money left the
+ * "Your payment of Loan EMI Rs.2499 has been received" - the money left the
  * user; the finance company is the one who received it. Read by the `received`
- * rule it became income, and a real Rs 5,166 EMI was added to the balance
- * instead of taken off it. The user reported it, so the exact wording is kept
- * here verbatim.
+ * rule it became income, and a real EMI was added to the balance
+ * instead of taken off it. The shape of the message the user reported is
+ * kept here; the lender and the amount are invented.
  */
 describe('a payment somebody else received', () => {
   const EMI =
-    'Your payment of Loan EMI Rs.5166 has been received, the same has been ' +
-    'updated on Propelld(BBTPRL) dashboard.';
+    'Your payment of Loan EMI Rs.2499 has been received, the same has been ' +
+    'updated on the lender dashboard.';
 
   it('reads an EMI confirmation as money going out', () => {
     const parsed = parseTransactionSms(EMI);
     expect(parsed?.kind).toBe('debit');
-    expect(parsed?.amountPaise).toBe(516600);
+    expect(parsed?.amountPaise).toBe(249900);
   });
 
   it('reads the same shape for a loan instalment and dues', () => {
@@ -644,8 +644,8 @@ describe('a payment somebody else received', () => {
   // The possessive is the whole signal, so money genuinely arriving must keep
   // working - these are the messages the rule is NOT allowed to steal.
   it('still reads a payment that arrived as income', () => {
-    expect(parseTransactionSms('Payment of Rs.80 received from Rahul')?.kind).toBe('credit');
-    expect(parseTransactionSms('Your payment of Rs.500 received from Vishal')?.kind)
+    expect(parseTransactionSms('Payment of Rs.80 received from Asha')?.kind).toBe('credit');
+    expect(parseTransactionSms('Your payment of Rs.500 received from Neha')?.kind)
       .toBe('credit');
     expect(parseTransactionSms('Rs.5000 deposited to your A/c x1234')?.kind).toBe('credit');
   });

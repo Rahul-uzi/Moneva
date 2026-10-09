@@ -208,7 +208,7 @@ class TestAQuestionIsNeverAnAction:
     """Found in the real chat history.
 
     The user asked "From whom I need get my money back", got a good answer
-    naming Gautam Rs 95 and Vishal Rs 500, and followed up with "95 for what".
+    naming Gopal Rs 95 and Neha Rs 500, and followed up with "95 for what".
     The assistant read that as an instruction to record Rs 95, offered a
     confirm dialog, and when it was dismissed replied "Cancelled - nothing was
     recorded." Which answers nothing, to a question that had an answer sitting

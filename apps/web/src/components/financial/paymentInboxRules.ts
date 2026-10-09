@@ -87,7 +87,7 @@ export function badgeFor(kind: SmsKind): { label: string; className: string } {
  * rail the money came through. Naming the app as well restores both: the
  * monogram appears, and the row reads the way people describe these payments
  * to themselves - which is why an owner of this app, entering one by hand,
- * wrote exactly "Google pay - Gautam".
+ * wrote exactly "Google pay - Gopal".
  *
  * A merchant that IS a known brand is left alone, so its own logo wins over
  * the app's monogram: "Swiggy" is more useful than "Google Pay - Swiggy".

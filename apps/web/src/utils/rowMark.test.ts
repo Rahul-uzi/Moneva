@@ -74,13 +74,13 @@ describe('a payment to a person wears the rail', () => {
     // never the point being made: the rule here is WHICH brand gets named -
     // the rail rather than the person - and the mark type follows from
     // whether that brand has an image, exactly as it does for Swiggy above.
-    expect(rowFor('com.google.android.apps.nbu.paisa.user', 'Karan paid you ₹45', 'Tap to view'))
-      .toEqual({ description: 'Google Pay - Karan', mark: 'logo' });
+    expect(rowFor('com.google.android.apps.nbu.paisa.user', 'Arjun paid you ₹45', 'Tap to view'))
+      .toEqual({ description: 'Google Pay - Arjun', mark: 'logo' });
   });
 
   it('WhatsApp Pay to a friend shows the WhatsApp Pay monogram', () => {
-    expect(rowFor('com.whatsapp', 'Karan', 'Karan paid you ₹45'))
-      .toEqual({ description: 'WhatsApp Pay - Karan', mark: 'monogram' });
+    expect(rowFor('com.whatsapp', 'Arjun', 'Arjun paid you ₹45'))
+      .toEqual({ description: 'WhatsApp Pay - Arjun', mark: 'monogram' });
   });
 
   it('PhonePe to a person shows the PhonePe logo, which is a real file', () => {

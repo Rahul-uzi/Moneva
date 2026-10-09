@@ -26,8 +26,8 @@ interface Props {
  * money moved from a bank account into a pocket and the person is no poorer
  * for it. Recorded as an expense it drops net worth by the full amount, and
  * then drops it AGAIN when the cash is actually spent and that spend is
- * recorded. One real withdrawal of Rs 4,000 understated a net worth by
- * Rs 4,000 and was waiting to do it a second time.
+ * recorded. One real withdrawal understated a net worth by its full amount
+ * and was waiting to do it a second time.
  *
  * The general transfer feature was deliberately removed from this app - it
  * confused more people than it served. This is not that coming back. It is

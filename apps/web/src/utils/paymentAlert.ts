@@ -130,9 +130,9 @@ export const alertBody = (alert: PaymentAlert): string => {
   if (!text) return title;
 
   // A chat app titles the notification with the sender and then repeats the
-  // name at the start of the message: title "Karan", text "Karan paid you
-  // Rs.45". Joined blindly that reads "Karan Karan paid you Rs.45", and the
-  // payer comes out as "Karan Karan" - which is then the description on the
+  // name at the start of the message: title "Arjun", text "Arjun paid you
+  // Rs.45". Joined blindly that reads "Arjun Arjun paid you Rs.45", and the
+  // payer comes out as "Arjun Arjun" - which is then the description on the
   // row and the name the categoriser learns.
   if (text.toLowerCase().startsWith(title.toLowerCase())) return text;
 

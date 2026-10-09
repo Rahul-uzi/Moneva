@@ -52,11 +52,11 @@ class TestRefuses:
 
     def test_the_users_own_name(self):
         assert refused("rahulsecure2026", email="rahul@example.com")
-        assert refused("MyDhimanAccount", display_name="Rahul Dhiman")
+        assert refused("MyVermaAccount", display_name="Asha Verma")
 
     def test_the_email_local_part(self):
         # The exact shape people pick when asked for something longer.
-        assert refused("rahul.dhiman@2026", email="rahul.dhiman@gmail.com")
+        assert refused("asha.verma@2026", email="asha.verma@example.com")
 
     def test_nothing_at_all(self):
         assert refused("")

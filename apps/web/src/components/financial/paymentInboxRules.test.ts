@@ -107,8 +107,8 @@ describe('showing the destination picker', () => {
 describe('naming the row', () => {
   it('names the person and the rail they used', () => {
     // The owner of this app, entering one of these by hand, wrote exactly
-    // "Google pay - Gautam". This is that, derived rather than typed.
-    expect(describeProposal('Karan', ['Google Pay'])).toBe('Google Pay - Karan');
+    // "Google pay - Gopal". This is that, derived rather than typed.
+    expect(describeProposal('Arjun', ['Google Pay'])).toBe('Google Pay - Arjun');
     expect(describeProposal('RAHUL', ['PhonePe'])).toBe('PhonePe - RAHUL');
   });
 
@@ -122,11 +122,11 @@ describe('naming the row', () => {
   it('does not credit the messaging app for a bank SMS', () => {
     // A bank alert merely ARRIVES in Messages; it did not move the money.
     expect(describeProposal('SWIGGY', ['Messages'])).toBe('SWIGGY');
-    expect(describeProposal('Karan', ['Messages'])).toBe('Karan');
+    expect(describeProposal('Arjun', ['Messages'])).toBe('Arjun');
   });
 
   it('ignores a source it cannot name', () => {
-    expect(describeProposal('Karan', ['com.example.unknown'])).toBe('Karan');
+    expect(describeProposal('Arjun', ['com.example.unknown'])).toBe('Arjun');
   });
 
   it('names the rail when nobody is named', () => {
@@ -168,8 +168,8 @@ describe('naming the row', () => {
   });
 
   it('never describes a row as "view"', () => {
-    // The literal production bug, from "Karan paid you Rs.45 / Tap to view".
-    expect(describeProposal('Karan', ['Google Pay'])).not.toBe('view');
+    // The literal production bug, from "Arjun paid you Rs.45 / Tap to view".
+    expect(describeProposal('Arjun', ['Google Pay'])).not.toBe('view');
   });
 });
 
@@ -183,7 +183,7 @@ describe('naming the row', () => {
  *   1. The payee was read as "view", out of the words "Tap to view".
  *   2. Even with the right name, the description was `merchant ?? from`
  *      - an either/or. It could never say the app AND the person, so the
- *      best it could ever have managed was a bare "Karan", with no mark.
+ *      best it could ever have managed was a bare "Arjun", with no mark.
  *
  * So this goes through the real pipeline with the real package name rather
  * than testing the two halves separately and assuming they meet.
@@ -207,19 +207,19 @@ describe('a real Google Pay alert, end to end', () => {
   });
 
   it('reads the friend name, not the words "Tap to view"', () => {
-    const p = proposalFor('Karan paid you Rs.45', 'Tap to view');
+    const p = proposalFor('Arjun paid you Rs.45', 'Tap to view');
     expect(p.kind).toBe('credit');
     expect(p.amountPaise).toBe(4500);
-    expect(p.merchant).toBe('Karan');
+    expect(p.merchant).toBe('Arjun');
   });
 
   it('describes the row the way the owner writes it by hand', () => {
-    const p = proposalFor('Karan paid you Rs.45', 'Tap to view');
-    expect(describeProposal(p.merchant, p.sources)).toBe('Google Pay - Karan');
+    const p = proposalFor('Arjun paid you Rs.45', 'Tap to view');
+    expect(describeProposal(p.merchant, p.sources)).toBe('Google Pay - Arjun');
   });
 
   it('is income, so it is added rather than subtracted', () => {
-    const p = proposalFor('Karan paid you Rs.45', 'Tap to view');
+    const p = proposalFor('Arjun paid you Rs.45', 'Tap to view');
     expect(decideConfirm(p.kind, 'acc-1', '')).toEqual({
       ok: true, transactionType: 'income', toAccountId: null,
     });
