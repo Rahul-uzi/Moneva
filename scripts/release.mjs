@@ -200,10 +200,14 @@ const setVersion = (name) => {
   return code;
 };
 
-const checkAgreement = () => {
+const checkAgreement = ({ allowLiveAhead = false } = {}) => {
   const v = readVersions();
   if (!v.gradleName || !v.envName) die('could not read the version from variables.gradle or .env.production');
-  if (v.gradleName !== v.envName) {
+  // A live update (scripts/live-update.mjs) moves .env.production ahead of the
+  // APK on purpose. Only the other direction - the app calling itself OLDER
+  // than the APK it runs in - is the bug this check exists for.
+  const liveAhead = allowLiveAhead && versionCodeOf(v.envName) > v.gradleCode;
+  if (v.gradleName !== v.envName && !liveAhead) {
     die(`the two version files disagree: variables.gradle says ${v.gradleName}, `
       + `.env.production says ${v.envName}.\nThe app would misreport itself and the `
       + 'update check would compare the wrong number.');
@@ -264,7 +268,7 @@ const wantInstall = process.argv.includes('--install');
 const checkOnly = process.argv.includes('--check');
 
 if (checkOnly) {
-  const v = checkAgreement();
+  const v = checkAgreement({ allowLiveAhead: true });
   say(`\nversions agree: ${v.gradleName} (code ${v.gradleCode})\n`);
   process.exit(0);
 }
@@ -275,6 +279,18 @@ if (!version) {
 
 const current = readVersions();
 const code = versionCodeOf(version);
+
+/* One version sequence for APKs and live updates. A phone already running live
+   update 1.0.10 compares any APK against 1.0.10, so an APK numbered 1.0.9
+   would never be offered to it - it must come after the newest live update. */
+const liveManifest = join(SITE, 'updates', 'manifest.json');
+if (existsSync(liveManifest)) {
+  const env = JSON.parse(readFileSync(liveManifest, 'utf8'));
+  const live = JSON.parse(Buffer.from(env.payload, 'base64').toString('utf8')).version;
+  if (code <= versionCodeOf(live)) {
+    die(`${version} is not newer than live update ${live}. Phones on ${live} would never be offered it.`);
+  }
+}
 if (code <= current.gradleCode && version !== current.gradleName) {
   die(`${version} (code ${code}) is not newer than the current ${current.gradleName} `
     + `(code ${current.gradleCode}). Android refuses a downgrade.`);

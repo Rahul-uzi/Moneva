@@ -8,7 +8,7 @@ import './styles/landscape.css'
 import App from './App.tsx'
 import { initTheme } from './services/themeService'
 import { clearStoredApiUrl, warmUpApi } from './services/apiClient'
-import { markAppReady, startLiveUpdates } from './services/liveUpdate'
+import { applyPendingUpdate, hasPendingUpdate, markAppReady, startLiveUpdates } from './services/liveUpdate'
 
 /**
  * Mark the packaged app, so the stylesheet can behave like an app.
@@ -44,11 +44,22 @@ clearStoredApiUrl()
 // than any request is willing to wait.
 warmUpApi()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+const boot = () => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+  // Quietly fetch any newer screens; they take over on a later start, never mid-use.
+  startLiveUpdates()
+}
 
-// Quietly fetch any newer screens; they take over on a later start, never mid-use.
-startLiveUpdates()
+// A start from closed is the safe moment to switch to a downloaded update:
+// nothing is on screen yet, so nobody can be in the middle of anything.
+// Without a waiting update this is a synchronous no-op and the app renders
+// at once; with one, the page reloads into it before drawing anything.
+if (hasPendingUpdate()) {
+  void applyPendingUpdate().then((switched) => { if (!switched) boot() })
+} else {
+  boot()
+}

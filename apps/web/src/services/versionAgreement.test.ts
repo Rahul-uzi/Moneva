@@ -53,8 +53,14 @@ const gradle = (): { name: string; code: number } => {
 };
 
 describe('the two places the version is written', () => {
-  it('say the same thing', () => {
-    expect(envVersion()).toBe(gradle().name);
+  /*
+   * Since live updates (1.0.8) the two may differ in ONE direction: a live
+   * update moves the web bundle ahead while the APK stays put - screens at
+   * 1.0.10 inside a 1.0.8 shell is normal. The other direction is the bug
+   * described above, so the web version may never be BEHIND the APK.
+   */
+  it('never has the app calling itself older than the APK', () => {
+    expect(versionCodeOf(envVersion())).toBeGreaterThanOrEqual(gradle().code);
   });
 
   it('carry a version code that matches the name', () => {

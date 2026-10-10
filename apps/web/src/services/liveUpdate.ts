@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
-import { currentVersionName } from './updateCheck';
+import { currentVersionName, versionCodeOf } from './updateCheck';
 import { verifyManifest, shouldDownload } from '../utils/liveUpdateManifest';
 
 /**
@@ -14,20 +14,27 @@ import { verifyManifest, shouldDownload } from '../utils/liveUpdateManifest';
  *      signed manifest on the website is read and verified.
  *   2. If it names a newer bundle this shell can run, the zip is downloaded
  *      quietly; the updater checks its SHA-256 before unpacking.
- *   3. It is queued, never applied mid-use: it takes over the next time
- *      MONEVA starts, or after it has sat in the background for 10 minutes.
- *      Someone who switches to their bank app to check an amount comes back
- *      to exactly what they left - not to a restarted app and a lost entry.
+ *   3. It is NOT applied while anyone could be in the middle of something.
+ *      It takes over when MONEVA starts from closed - before anything is on
+ *      screen - or when someone comes back after 10 minutes or more away.
+ *      A quick trip to the bank app never restarts the app mid-entry.
  *   4. If the new bundle fails to start, the updater rolls back by itself.
  *
- * Native changes (permissions, plugins, the icon) still need an APK; the
- * manifest's min_native_code keeps a bundle off shells too old for it.
+ * WHY THE APP DECIDES THE MOMENT, NOT THE PLUGIN. The plugin's own
+ * "apply after N minutes in the background" was tried first (1.0.8). On a
+ * Galaxy A33, swiping the app away destroys the activity but keeps the
+ * process; on the next start the plugin read the background timer as zero,
+ * counted the wait as over, and then reloaded the app the very next time it
+ * was left - two seconds in another app was enough. So the plugin is never
+ * told about a waiting bundle (no next(), no delays); this file applies it
+ * itself, with set(), at the two safe moments above.
  */
 
 const MANIFEST_URL = 'https://moneva.monev.workers.dev/updates/manifest.json';
 const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
-const APPLY_AFTER_BACKGROUND_MS = 10 * 60 * 1000;
+const APPLY_AFTER_AWAY_MS = 10 * 60 * 1000;
 const LAST_CHECK_KEY = 'moneva_live_last_check';
+const PENDING_KEY = 'moneva_live_pending';
 const SEEN_VERSION_KEY = 'moneva_live_seen_version';
 const NOTES_KEY = 'moneva_live_notes';
 
@@ -35,6 +42,18 @@ const isNative = () => Capacitor.isNativePlatform();
 
 const read = (key: string) => { try { return localStorage.getItem(key); } catch { return null; } };
 const write = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
+const forget = (key: string) => { try { localStorage.removeItem(key); } catch { /* private mode */ } };
+
+interface Pending { id: string; version: string }
+
+const readPending = (): Pending | null => {
+  try {
+    const p = JSON.parse(read(PENDING_KEY) || 'null') as Pending | null;
+    return p && typeof p.id === 'string' && typeof p.version === 'string' ? p : null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Tells the updater this bundle started. Must run early on every launch:
@@ -45,9 +64,42 @@ export const markAppReady = (): void => {
   void CapacitorUpdater.notifyAppReady().catch(() => {});
 };
 
+/** Whether a downloaded bundle is waiting - cheap, synchronous, for startup. */
+export const hasPendingUpdate = (): boolean => {
+  if (!isNative()) return false;
+  const p = readPending();
+  return !!p && versionCodeOf(p.version) > versionCodeOf(currentVersionName());
+};
+
+/**
+ * Switches to the waiting bundle now. Resolves false if there is nothing to
+ * switch to; when it works, the page reloads into the new bundle and this
+ * never resolves at all.
+ */
+export const applyPendingUpdate = async (): Promise<boolean> => {
+  if (!hasPendingUpdate()) {
+    forget(PENDING_KEY);
+    return false;
+  }
+  const pending = readPending()!;
+  try {
+    const { bundles } = await CapacitorUpdater.list();
+    const bundle = bundles.find((b) => b.id === pending.id && b.status !== 'error');
+    if (!bundle) {
+      forget(PENDING_KEY);
+      return false;
+    }
+    await CapacitorUpdater.set({ id: bundle.id });
+    return true;
+  } catch {
+    forget(PENDING_KEY);
+    return false;
+  }
+};
+
 let running = false;
 
-/** Looks for a newer bundle and queues it. Never throws, never interrupts. */
+/** Looks for a newer bundle and downloads it. Never throws, never interrupts. */
 export const checkForLiveUpdate = async ({ force = false }: { force?: boolean } = {}): Promise<void> => {
   if (!isNative() || running) return;
   const last = Number(read(LAST_CHECK_KEY) || 0);
@@ -62,17 +114,16 @@ export const checkForLiveUpdate = async ({ force = false }: { force?: boolean } 
 
     const nativeCode = Number((await App.getInfo()).build) || 0;
     if (!shouldDownload(manifest, { bundleVersion: currentVersionName(), nativeCode })) return;
+    const waiting = readPending();
+    if (waiting && versionCodeOf(waiting.version) >= versionCodeOf(manifest.version)) return;
 
-    // Already fetched on an earlier check: queue it again rather than re-download.
+    // Already fetched on an earlier check: reuse it rather than re-download.
     const { bundles } = await CapacitorUpdater.list();
     let bundle = bundles.find((b) => b.version === manifest.version && b.status !== 'error');
     if (!bundle) {
       bundle = await CapacitorUpdater.download({ url: manifest.url, version: manifest.version, checksum: manifest.sha256 });
     }
-    await CapacitorUpdater.next({ id: bundle.id });
-    await CapacitorUpdater.setMultiDelay({
-      delayConditions: [{ kind: 'background', value: String(APPLY_AFTER_BACKGROUND_MS) }],
-    });
+    write(PENDING_KEY, JSON.stringify({ id: bundle.id, version: manifest.version }));
     write(NOTES_KEY, JSON.stringify({ version: manifest.version, notes: manifest.notes }));
   } catch {
     // Offline, a half download, a full disk: try again next time.
@@ -97,11 +148,26 @@ export const takeUpdateNote = (): string | null => {
   return `MONEVA updated to ${now}.`;
 };
 
-/** Checks now, and again whenever the app comes back to the front. */
+/**
+ * Checks now; on every return to the app, either switches to a waiting
+ * bundle (after 10+ minutes away) or checks again.
+ */
 export const startLiveUpdates = (): void => {
   if (!isNative()) return;
   void checkForLiveUpdate();
+
+  let leftAt = 0;
   void App.addListener('appStateChange', ({ isActive }) => {
-    if (isActive) void checkForLiveUpdate();
+    if (!isActive) {
+      leftAt = Date.now();
+      return;
+    }
+    const away = leftAt ? Date.now() - leftAt : 0;
+    leftAt = 0;
+    if (away >= APPLY_AFTER_AWAY_MS && hasPendingUpdate()) {
+      void applyPendingUpdate();
+      return;
+    }
+    void checkForLiveUpdate();
   });
 };
