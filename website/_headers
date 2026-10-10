@@ -50,6 +50,11 @@
   # release would reach people only when some cache happened to expire.
   Cache-Control: no-cache, no-store, must-revalidate
   Content-Type: application/json
+  # The app reads this from its own origin (http://localhost inside the
+  # WebView), so without this header the WebView blocks the read and no phone
+  # ever learns an update exists. Safe to open to everyone: the file is public
+  # and signed, and the app trusts only the signature, not who served it.
+  Access-Control-Allow-Origin: *
 
 /updates/*.zip
   # A versioned file never changes once published; an hour keeps a mistake
