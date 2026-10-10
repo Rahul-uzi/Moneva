@@ -123,3 +123,15 @@ describe('describePayday', () => {
     expect(describePayday(12)).toBe('12 days');
   });
 });
+
+// The old schedule screen saved "bi-weekly", which nothing recognised - so a
+// fortnightly salary was counted down as if it came monthly.
+describe('frequency spellings', () => {
+  it('reads every way of writing a fortnight as fourteen days', () => {
+    for (const f of ['bi-weekly', 'Bi Weekly', 'biweekly', 'bi_weekly', 'fortnightly']) {
+      expect(cycleLengthDays(f)).toBe(14);
+    }
+    expect(cycleLengthDays('Monthly')).toBe(30);
+    expect(cycleLengthDays('something else')).toBe(30);
+  });
+});

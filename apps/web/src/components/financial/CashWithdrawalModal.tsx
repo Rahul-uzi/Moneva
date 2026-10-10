@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { Banknote } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Banknote, CalendarClock, ChevronDown, CreditCard, Landmark, Plus, Wallet } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { AmountInput } from '../ui/AmountInput';
-import { FormField } from '../ui/FormField';
+import { NumberPad, PadAmount } from '../ui/NumberPad';
+import { MoneyFlow } from './MoneyFlow';
 import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import { nowForDateTimeInput } from '../../utils/datetime';
 import { formatMonetaryValue } from '../../utils/money';
+import { describeWhen } from '../../utils/quickAdd';
+import { cashAccountsOf, withdrawalSources } from '../../utils/moneySheets';
+import { padToPaise, paiseToPad } from '../../utils/numberPad';
 import type { Account, Transaction } from '../../types/api';
-import './CashWithdrawalModal.css';
+import './QuickAddModal.css';
+import './MoneySheets.css';
 
 interface Props {
   isOpen: boolean;
@@ -18,6 +22,12 @@ interface Props {
   onSuccess: () => void;
 }
 
+/** The notes an ATM actually hands out, as one-tap amounts - four, so they
+ *  sit in one even row on a phone instead of leaving one alone on a second. */
+const QUICK_AMOUNTS = [50000, 100000, 200000, 500000];
+
+type Panel = 'from' | 'to' | 'when';
+
 /**
  * Taking cash out is not spending it.
  *
@@ -25,66 +35,100 @@ interface Props {
  * expense, because expense was the only thing on offer. It is not one: the
  * money moved from a bank account into a pocket and the person is no poorer
  * for it. Recorded as an expense it drops net worth by the full amount, and
- * then drops it AGAIN when the cash is actually spent and that spend is
- * recorded. One real withdrawal understated a net worth by its full amount
- * and was waiting to do it a second time.
+ * then drops it AGAIN when the cash is actually spent.
  *
- * The general transfer feature was deliberately removed from this app - it
- * confused more people than it served. This is not that coming back. It is
- * the one transfer an ordinary person makes constantly, named after what they
- * did rather than after what the ledger calls it, with both ends chosen for
- * them.
+ * THE DESIGN. Bank -> Cash is drawn, not described, and each circle is the
+ * control for that side. "From" offers only banks and cards: it used to list
+ * every account, so it could read "Cash", and cash into cash is not a
+ * withdrawal. The amount is typed on MONEVA's own pad, so the phone keyboard
+ * never covers the sheet, and the notes an ATM gives are one tap each.
  */
 export const CashWithdrawalModal: React.FC<Props> = ({ isOpen, accounts, onClose, onSuccess }) => {
   const addToast = useUiStore((s) => s.addToast);
 
-  const [amountPaise, setAmountPaise] = useState<number>(0);
+  const [amount, setAmount] = useState<string>('');
   const [fromId, setFromId] = useState<string>('');
   const [toId, setToId] = useState<string>('');
   const [when, setWhen] = useState<string>('');
+  const [whenTouched, setWhenTouched] = useState<boolean>(false);
+  const [panel, setPanel] = useState<Panel | null>(null);
+  const [shownPanel, setShownPanel] = useState<Panel | null>(null);
+  /** A cash account made from this sheet, before the parent has refetched. */
+  const [madeCash, setMadeCash] = useState<Account | null>(null);
+  const [isMakingCash, setIsMakingCash] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
-  /** Anything that holds physical cash, by the name people give it. */
-  const looksLikeCash = (a: Account) => /\b(cash|wallet|pocket|purse)\b/i.test(a.name);
-
-  const active = accounts.filter((a) => a.is_active !== false && a.account_type === 'asset');
-  const cashAccounts = active.filter(looksLikeCash);
-  const bankAccounts = active.filter((a) => !looksLikeCash(a));
 
   useEffect(() => {
     if (!isOpen) return;
     const timer = setTimeout(() => {
       setError(null);
-      setAmountPaise(0);
+      setAmount('');
       setWhen(nowForDateTimeInput());
-      // The bank is almost always where it came from, and the cash account is
-      // almost always where it went. Preselected so the common withdrawal is
-      // an amount and a tap.
-      setFromId(bankAccounts[0]?.id || active[0]?.id || '');
-      setToId(cashAccounts[0]?.id || '');
+      setWhenTouched(false);
+      setPanel(null);
     }, 0);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, accounts]);
+  }, [isOpen]);
 
-  const noCashAccount = cashAccounts.length === 0;
+  const pool = useMemo(() => {
+    const open = accounts.filter((a) => a.is_active !== false);
+    return madeCash && !open.some((a) => a.id === madeCash.id) ? [...open, madeCash] : open;
+  }, [accounts, madeCash]);
 
-  const save = async (ev: React.FormEvent) => {
-    ev.preventDefault();
+  const sources = useMemo(() => withdrawalSources(pool), [pool]);
+  const cashAccounts = useMemo(() => cashAccountsOf(pool), [pool]);
+
+  /* The selection is DERIVED, not copied into state by an effect. The old
+     sheet set its default after the accounts arrived, and until that ran the
+     dropdown showed whichever account came first - which could be Cash. A
+     derived value is right on the very first render. */
+  const from = sources.find((a) => a.id === fromId) ?? sources[0];
+  const into = cashAccounts.find((a) => a.id === toId) ?? cashAccounts[0];
+
+  const amountPaise = padToPaise(amount);
+  const balance = from?.balance_paise;
+  const after = balance != null && from?.account_type === 'asset' ? balance - amountPaise : null;
+
+  const togglePanel = (next: Panel) => {
+    setShownPanel(next);
+    setPanel((cur) => (cur === next ? null : next));
+  };
+
+  const makeCashAccount = async () => {
+    setIsMakingCash(true);
+    setError(null);
+    try {
+      const res = await apiClient.post<Account>('/accounts', {
+        name: 'Cash',
+        account_type: 'asset',
+        opening_balance_minor: 0,
+      });
+      setMadeCash(res.data);
+      setToId(res.data.id);
+      setPanel(null);
+      addToast('Cash account added.', 'success');
+    } catch {
+      setError('Could not add a cash account just now.');
+    } finally {
+      setIsMakingCash(false);
+    }
+  };
+
+  const save = async (ev?: React.FormEvent) => {
+    ev?.preventDefault();
     setError(null);
 
     if (amountPaise <= 0) return setError('Enter how much you took out.');
-    if (!fromId) return setError('Choose the account it came out of.');
-    if (!toId) return setError('Choose where the cash went.');
-    if (fromId === toId) return setError('The money has to move between two different accounts.');
+    if (!from) return setError('Add the bank account it came out of first.');
+    if (!into) return setError('Add a cash account for it to go into.');
 
     setIsSaving(true);
     try {
       await apiClient.post<Transaction>('/transactions', {
         client_mutation_id: crypto.randomUUID(),
-        account_id: fromId,
-        to_account_id: toId,
+        account_id: from.id,
+        to_account_id: into.id,
         // A transfer, which is what it is. No category: a withdrawal is not
         // spending, so filing it under one would put it in a budget it does
         // not belong in.
@@ -95,10 +139,7 @@ export const CashWithdrawalModal: React.FC<Props> = ({ isOpen, accounts, onClose
         transaction_date: when ? new Date(when).toISOString() : new Date().toISOString(),
         device_id: 'web-client',
       });
-      addToast(
-        `${formatMonetaryValue(amountPaise)} moved to cash. Your total is unchanged.`,
-        'success',
-      );
+      addToast(`${formatMonetaryValue(amountPaise)} moved to cash. Your total is unchanged.`, 'success');
       onSuccess();
       onClose();
     } catch (err: unknown) {
@@ -109,66 +150,198 @@ export const CashWithdrawalModal: React.FC<Props> = ({ isOpen, accounts, onClose
     }
   };
 
+  const over = after != null && after < 0 && amountPaise > 0;
+  const note =
+    after != null && amountPaise > 0
+      ? over
+        ? `More than the ${formatMonetaryValue(balance!)} in ${from!.name}`
+        : `${formatMonetaryValue(after)} left in ${from!.name}`
+      : 'Your total stays the same — it just moves';
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Cash withdrawal">
-      <p className="cw-lead">
-        Moving money from a bank account into cash. This does <strong>not</strong> change
-        your total &mdash; you still have it, just not in the bank. Record what you
-        actually spend separately, as you spend it.
-      </p>
-
-      {noCashAccount ? (
-        /* Without somewhere for the cash to land this cannot be a transfer,
-           and quietly making it an expense instead is the bug this screen
-           exists to prevent. So it stops and says what is missing. */
-        <div className="cw-missing">
-          <Banknote size={18} />
-          <p>
-            You have no cash account yet. Add one called <strong>Cash</strong> under
-            your accounts, then come back &mdash; that is where the withdrawal lands.
-          </p>
-        </div>
-      ) : (
-        <form onSubmit={save} className="cw-form">
-          {error && <div className="form-error-banner">{error}</div>}
-
-          <AmountInput valuePaise={amountPaise} onChangePaise={setAmountPaise} label="How much you took out" />
-
-          <div className="select-group">
-            <label className="form-label" htmlFor="cw-from">Out of</label>
-            <select id="cw-from" className="form-select" value={fromId} onChange={(e) => setFromId(e.target.value)}>
-              {active.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
+      <form className="qa ms" data-type="transfer" onSubmit={save} noValidate>
+        {sources.length === 0 ? (
+          <div className="ms-notice">
+            <Landmark size={20} aria-hidden="true" />
+            <span>Add the bank account you took it out of first &mdash; under Accounts.</span>
           </div>
-
-          <div className="select-group">
-            <label className="form-label" htmlFor="cw-to">Into</label>
-            <select id="cw-to" className="form-select" value={toId} onChange={(e) => setToId(e.target.value)}>
-              {cashAccounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <FormField
-            label="When"
-            type="datetime-local"
-            value={when}
-            onChange={(e) => setWhen(e.target.value)}
+        ) : (
+          <MoneyFlow
+            moving={amountPaise > 0}
+            from={{
+              caption: 'From',
+              label: from?.name ?? 'Bank',
+              icon: from?.account_type === 'liability' ? <CreditCard size={22} /> : <Landmark size={22} />,
+              onClick: sources.length > 1 ? () => togglePanel('from') : undefined,
+              expanded: panel === 'from',
+              controls: 'cw-pick',
+            }}
+            to={{
+              caption: 'To',
+              label: into?.name ?? 'Add cash',
+              icon: <Wallet size={22} />,
+              tone: 'accent',
+              onClick: () => togglePanel('to'),
+              expanded: panel === 'to',
+              controls: 'cw-pick',
+            }}
           />
+        )}
 
-          <div className="cw-actions">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" isLoading={isSaving}>
-              Record withdrawal
-            </Button>
+        <div id="cw-pick" className="qa-drawer" data-open={panel !== null} inert={panel === null} aria-hidden={panel === null}>
+          <div className="qa-drawer-inner">
+            {shownPanel === 'from' && (
+              <div className="ms-pick">
+                <p className="ms-pick-title" id="cw-out">Take it out of</p>
+                <div className="qa-chip-wrap" role="radiogroup" aria-labelledby="cw-out">
+                  {sources.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={a.id === from?.id}
+                      className={`qa-chip ${a.id === from?.id ? 'is-selected' : ''}`}
+                      onClick={() => {
+                        setFromId(a.id);
+                        setPanel(null);
+                      }}
+                    >
+                      {a.account_type === 'liability'
+                        ? <CreditCard size={14} aria-hidden="true" />
+                        : <Landmark size={14} aria-hidden="true" />}
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {shownPanel === 'to' && (
+              <div className="ms-pick">
+                <p className="ms-pick-title" id="cw-into">Put it into</p>
+                <div className="qa-chip-wrap" role="radiogroup" aria-labelledby="cw-into">
+                  {cashAccounts.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={a.id === into?.id}
+                      className={`qa-chip ${a.id === into?.id ? 'is-selected' : ''}`}
+                      onClick={() => {
+                        setToId(a.id);
+                        setPanel(null);
+                      }}
+                    >
+                      <Wallet size={14} aria-hidden="true" />
+                      {a.name}
+                    </button>
+                  ))}
+                  {/* Without somewhere for the cash to land this cannot be a
+                      transfer - and quietly making it an expense instead is
+                      the bug this screen exists to prevent. */}
+                  <button
+                    type="button"
+                    className="qa-chip qa-chip-add"
+                    onClick={() => void makeCashAccount()}
+                    disabled={isMakingCash}
+                  >
+                    <Plus size={14} aria-hidden="true" />
+                    {isMakingCash ? 'Adding…' : 'New cash account'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {shownPanel === 'when' && (
+              <div className="qa-when">
+                <div className="qa-chip-wrap">
+                  <button
+                    type="button"
+                    className={`qa-chip ${!whenTouched ? 'is-selected' : ''}`}
+                    onClick={() => {
+                      setWhen(nowForDateTimeInput());
+                      setWhenTouched(false);
+                      setPanel(null);
+                    }}
+                  >
+                    Now
+                  </button>
+                  <button
+                    type="button"
+                    className="qa-chip"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() - 1);
+                      setWhen(nowForDateTimeInput(d));
+                      setWhenTouched(true);
+                    }}
+                  >
+                    Yesterday
+                  </button>
+                </div>
+                <input
+                  className="qa-field"
+                  type="datetime-local"
+                  aria-label="Date and time"
+                  value={when}
+                  onChange={(e) => {
+                    setWhen(e.target.value);
+                    setWhenTouched(true);
+                  }}
+                />
+              </div>
+            )}
           </div>
-        </form>
-      )}
+        </div>
+
+        <PadAmount value={amount} label="Amount taken out" note={note} noteTone={over ? 'warn' : 'normal'} />
+
+        <div className="ms-quick is-even" role="group" aria-label="Quick amounts">
+          {QUICK_AMOUNTS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              className={`qa-chip ${amountPaise === p ? 'is-selected' : ''}`}
+              onClick={() => setAmount(paiseToPad(p))}
+            >
+              {formatMonetaryValue(p).replace(/\.00$/, '')}
+            </button>
+          ))}
+        </div>
+
+        <NumberPad value={amount} onChange={setAmount} listenToKeyboard={isOpen} />
+
+        <div className="ms-footer">
+          <button
+            type="button"
+            className={`qa-pill qa-pill-when ${panel === 'when' ? 'is-open' : ''}`}
+            aria-expanded={panel === 'when'}
+            aria-controls="cw-pick"
+            onClick={() => togglePanel('when')}
+          >
+            <CalendarClock size={14} aria-hidden="true" />
+            <span className="qa-pill-text">{describeWhen(when, whenTouched)}</span>
+            <ChevronDown size={14} className="qa-pill-chevron" aria-hidden="true" />
+          </button>
+        </div>
+
+        {error && (
+          <div className="qa-error" role="alert" key={error}>
+            {error}
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          variant="primary"
+          fullWidth
+          className="qa-save"
+          isLoading={isSaving}
+          disabled={!from || !into}
+        >
+          <Banknote size={16} aria-hidden="true" />
+          {amountPaise > 0 ? `Withdraw ${formatMonetaryValue(amountPaise)}` : 'Withdraw'}
+        </Button>
+      </form>
     </Modal>
   );
 };

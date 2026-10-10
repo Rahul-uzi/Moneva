@@ -1,22 +1,44 @@
-import React, { useEffect, useState } from 'react';
-import { Info, Plus, Trash2, Calendar, Check } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { BriefcaseBusiness, CalendarDays, Check, Plus, Trash2 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
-import { AmountInput } from '../ui/AmountInput';
-import { FormField } from '../ui/FormField';
 import { Button } from '../ui/Button';
+import { NumberPad, PadAmount } from '../ui/NumberPad';
+import { MoneyFlow } from './MoneyFlow';
 import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import { formatMonetaryValue } from '../../utils/money';
+import {
+  FREQUENCIES,
+  describeNext,
+  everyLabel,
+  localDateValue,
+  paydayFromDateValue,
+} from '../../utils/moneySheets';
+import { padToPaise } from '../../utils/numberPad';
 import type { RecurringIncome } from '../../types/api';
-import './RecurringSalaryModal.css';
+import './QuickAddModal.css';
+import './MoneySheets.css';
 
-import { parseApiDate } from '../../utils/datetime';
 interface RecurringSalaryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectForConfirmation: (rule: RecurringIncome) => void;
 }
 
+const dayMonth = (value: string): string => {
+  const p = paydayFromDateValue(value);
+  return p ? p.at.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'Pick a date';
+};
+
+/**
+ * Expected salaries - money the app is waiting for, not money anyone has.
+ *
+ * THE DESIGN. The list is one card per salary - its initial in a circle, how
+ * far away it is, and Received. Adding one turns the whole sheet into the
+ * same flow-and-number-pad layout as the other money sheets, instead of a form
+ * squeezed in under the list. Removing a schedule asks first: it was a single
+ * tap on a bare bin icon, beside the button people actually meant to press.
+ */
 export const RecurringSalaryModal: React.FC<RecurringSalaryModalProps> = ({
   isOpen,
   onClose,
@@ -24,11 +46,12 @@ export const RecurringSalaryModal: React.FC<RecurringSalaryModalProps> = ({
 }) => {
   const [rules, setRules] = useState<RecurringIncome[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [isAdding, setIsAdding] = useState<boolean>(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Form State
   const [source, setSource] = useState<string>('');
-  const [amountPaise, setAmountPaise] = useState<number>(0);
+  const [amount, setAmount] = useState<string>('');
   const [frequency, setFrequency] = useState<string>('monthly');
   const [nextDate, setNextDate] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -36,56 +59,56 @@ export const RecurringSalaryModal: React.FC<RecurringSalaryModalProps> = ({
 
   const { addToast } = useUiStore();
 
-  const fetchRecurringRules = async () => {
+  const fetchRules = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await apiClient.get<RecurringIncome[]>('/income/recurring');
-      setRules(res.data);
+      setRules(res.data || []);
     } catch {
-      // Safe fallback
+      // The sheet still lets a schedule be added without the list.
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  const resetForm = () => {
+    setError(null);
+    setSource('');
+    setAmount('');
+    setFrequency('monthly');
+    // A month from today: closer to a real payday than "the 1st", and
+    // obviously a default rather than a fact about the user.
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    setNextDate(localDateValue(d));
   };
 
   useEffect(() => {
-    let isMounted = true;
+    if (!isOpen) return;
     const timer = setTimeout(() => {
-      if (isOpen && isMounted) {
-        void fetchRecurringRules();
-        const nextMonth = new Date();
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
-        nextMonth.setDate(1);
-        setNextDate(nextMonth.toISOString().split('T')[0]);
-      }
+      setConfirmingId(null);
+      setIsAdding(false);
+      resetForm();
+      void fetchRules();
     }, 0);
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [isOpen]);
+    return () => clearTimeout(timer);
+  }, [isOpen, fetchRules]);
 
   if (!isOpen) return null;
 
-  const handleCreateRule = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const visible = rules.filter((r) => r.active !== false);
+  // With nothing scheduled, adding one IS the sheet - no empty list to read past.
+  const adding = isAdding || (!isLoading && visible.length === 0);
+  const amountPaise = padToPaise(amount);
+
+  const handleCreate = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setError(null);
 
-    if (!source.trim()) {
-      setError('Enter who pays you.');
-      return;
-    }
-
-    if (amountPaise <= 0) {
-      setError('Please enter an amount greater than zero.');
-      return;
-    }
-
-    if (!nextDate) {
-      setError('Please select a next expected payday date.');
-      return;
-    }
+    if (!source.trim()) return setError('Enter who pays you.');
+    if (amountPaise <= 0) return setError('Enter the amount you expect.');
+    const due = paydayFromDateValue(nextDate);
+    if (!due) return setError('Choose when the next one is due.');
 
     setIsSubmitting(true);
     try {
@@ -93,153 +116,198 @@ export const RecurringSalaryModal: React.FC<RecurringSalaryModalProps> = ({
         source: source.trim(),
         amount_minor: amountPaise,
         frequency,
-        next_occurrence: new Date(nextDate).toISOString(),
+        next_occurrence: due.at.toISOString(),
+        anchor_day: due.day,
         active: true,
       });
-
-      addToast('Recurring income rule saved successfully!', 'success');
-      setIsFormOpen(false);
-      setSource('');
-      setAmountPaise(0);
-      void fetchRecurringRules();
+      addToast('Salary schedule saved.', 'success');
+      setIsAdding(false);
+      resetForm();
+      void fetchRules();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to save recurring rule.';
+      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Could not save that schedule.';
       setError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteRule = async (id: string) => {
+  const handleDelete = async (id: string) => {
+    setBusyId(id);
     try {
       await apiClient.delete(`/income/recurring/${id}`);
-      addToast('Recurring income rule removed.', 'info');
-      void fetchRecurringRules();
+      setRules((prev) => prev.filter((r) => r.id !== id));
+      setConfirmingId(null);
+      addToast('Salary schedule removed.', 'info');
     } catch {
-      addToast('Failed to delete recurring rule.', 'error');
+      addToast('Could not remove that schedule.', 'error');
+    } finally {
+      setBusyId(null);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Recurring Salary Rules">
-      <div className="recurring-salary-body">
-        {/* Authoritative Distinction Notice */}
-        <div className="distinction-notice">
-          <Info size={18} className="notice-icon text-blue" />
-          <p className="text-body text-xs">
-            <strong>Expected Income vs Actual Income:</strong> Recurring rules represent expected future salary. They do <strong>NOT</strong> modify your bank balances until explicitly confirmed.
-          </p>
-        </div>
+    <Modal isOpen={isOpen} onClose={onClose} title={adding ? 'Add a salary' : 'Salary schedule'}>
+      {adding ? (
+        <form className="qa ms" data-type="income" onSubmit={handleCreate} noValidate>
+          <MoneyFlow
+            moving={amountPaise > 0}
+            from={{
+              caption: 'From',
+              label: source.trim() || 'Who pays you?',
+              icon: <BriefcaseBusiness size={22} />,
+            }}
+            to={{
+              caption: everyLabel(frequency),
+              label: dayMonth(nextDate),
+              icon: <CalendarDays size={22} />,
+              tone: 'accent',
+            }}
+          />
 
-        {/* Existing Rules List */}
-        <div className="rules-section">
-          <div className="rules-section-header">
-            <h4 className="heading-xs text-main">Configured Salary Streams ({rules.length})</h4>
-            {!isFormOpen && (
-              <Button variant="secondary" size="sm" onClick={() => setIsFormOpen(true)}>
-                <Plus size={14} /> Add Stream
-              </Button>
-            )}
-          </div>
-
-          {isLoading ? (
-            <div className="text-body text-center text-xs text-muted py-2">Loading salary rules...</div>
-          ) : rules.length === 0 && !isFormOpen ? (
-            <div className="empty-rules-box">
-              <span className="text-body text-xs text-muted">No recurring salary rules configured yet.</span>
-            </div>
-          ) : (
-            <div className="rules-list">
-              {rules.map((rule) => (
-                <div key={rule.id} className="rule-card">
-                  <div className="rule-card-main">
-                    <div className="rule-title-row">
-                      <span className="rule-source font-semibold">{rule.source}</span>
-                      <span className="number-sm text-teal font-bold">
-                        {formatMonetaryValue(rule.amount_minor)}
-                      </span>
-                    </div>
-                    <div className="rule-meta-row">
-                      <span className="rule-freq text-muted text-xs capitalize">{rule.frequency}</span>
-                      <span className="rule-date text-muted text-xs">
-                        <Calendar size={12} /> Expected:{' '}
-                        {parseApiDate(rule.next_occurrence).toLocaleDateString('en-IN', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rule-card-actions">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => {
-                        onSelectForConfirmation(rule);
-                        onClose();
-                      }}
-                    >
-                      <Check size={14} /> Received Today
-                    </Button>
-                    <button
-                      type="button"
-                      className="icon-delete-btn"
-                      onClick={() => handleDeleteRule(rule.id)}
-                      title="Delete rule"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Add Rule Form */}
-        {isFormOpen && (
-          <form onSubmit={handleCreateRule} className="add-rule-form">
-            <h4 className="heading-xs text-blue">New Expected Salary Rule</h4>
-            {error && <div className="form-error-banner">{error}</div>}
-
-            <FormField
-              label="Source / Employer Name"
+          <div className="qa-payee">
+            <label className="qa-payee-label" htmlFor="rs-source">From</label>
+            <input
+              id="rs-source"
+              className="qa-payee-input"
               type="text"
+              autoComplete="off"
+              autoCapitalize="words"
+              enterKeyHint="done"
               placeholder="Who pays you"
               value={source}
               onChange={(e) => setSource(e.target.value)}
             />
+          </div>
 
-            <AmountInput valuePaise={amountPaise} onChangePaise={setAmountPaise} label="Expected Net Amount" />
+          <PadAmount value={amount} label="Amount you expect" />
 
-            <div className="select-group">
-              <label className="form-label">Frequency</label>
-              <select className="form-select" value={frequency} onChange={(e) => setFrequency(e.target.value)}>
-                <option value="monthly">Monthly</option>
-                <option value="weekly">Weekly</option>
-                <option value="bi-weekly">Bi-weekly</option>
-              </select>
-            </div>
+          <div className="ms-quick" role="radiogroup" aria-label="How often">
+            {FREQUENCIES.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                role="radio"
+                aria-checked={frequency === f.value}
+                className={`qa-chip ${frequency === f.value ? 'is-selected' : ''}`}
+                onClick={() => setFrequency(f.value)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
 
-            <FormField
-              label="Next Expected Payday"
+          <NumberPad value={amount} onChange={setAmount} />
+
+          <label className="ms-field">
+            <span className="ms-field-label">Next payday</span>
+            <input
+              className="qa-field"
               type="date"
               value={nextDate}
               onChange={(e) => setNextDate(e.target.value)}
             />
+          </label>
 
-            <div className="form-action-btns">
-              <Button type="button" variant="secondary" size="sm" onClick={() => setIsFormOpen(false)}>
+          {error && (
+            <div className="qa-error" role="alert" key={error}>
+              {error}
+            </div>
+          )}
+
+          <div className="ms-two">
+            {visible.length > 0 ? (
+              <Button type="button" variant="secondary" onClick={() => { setIsAdding(false); resetForm(); }}>
                 Cancel
               </Button>
-              <Button type="submit" variant="primary" size="sm" isLoading={isSubmitting}>
-                Save Rule
+            ) : (
+              <Button type="button" variant="secondary" onClick={onClose}>
+                Not now
               </Button>
+            )}
+            <Button type="submit" variant="primary" isLoading={isSubmitting}>
+              Save schedule
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <div className="qa ms" data-type="income">
+          <p className="ms-lead">
+            Pay you&rsquo;re expecting, not money yet. Nothing changes your balance until you mark it received.
+          </p>
+
+          {isLoading ? (
+            <div className="ms-list" aria-busy="true" aria-label="Loading salary schedules">
+              <div className="ms-skeleton" />
             </div>
-          </form>
-        )}
-      </div>
+          ) : (
+            <div className="ms-list">
+              {visible.map((rule, i) => {
+                const next = describeNext(rule.next_occurrence);
+                const confirming = confirmingId === rule.id;
+                return (
+                  <div key={rule.id} className="ms-card" style={{ animationDelay: `${i * 40}ms` }}>
+                    <span className="ms-card-avatar" aria-hidden="true">
+                      {rule.source.trim().charAt(0).toUpperCase() || '₹'}
+                    </span>
+                    <span className="ms-card-main">
+                      <span className="ms-card-name">{rule.source}</span>
+                      <span className={`ms-card-when ${next.due ? 'is-due' : ''}`}>
+                        {everyLabel(rule.frequency)} · {next.text}
+                      </span>
+                    </span>
+                    <span className="ms-card-amount">{formatMonetaryValue(rule.amount_minor)}</span>
+
+                    {confirming ? (
+                      <div className="ms-confirm" role="group" aria-label={`Remove ${rule.source}?`}>
+                        <span className="ms-confirm-text">Remove this schedule?</span>
+                        <Button size="sm" variant="secondary" onClick={() => setConfirmingId(null)}>
+                          Keep
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          isLoading={busyId === rule.id}
+                          onClick={() => void handleDelete(rule.id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="ms-card-actions">
+                        <Button
+                          size="sm"
+                          variant={next.due ? 'primary' : 'secondary'}
+                          onClick={() => {
+                            onSelectForConfirmation(rule);
+                            onClose();
+                          }}
+                        >
+                          <Check size={14} /> Received
+                        </Button>
+                        <button
+                          type="button"
+                          className="ms-icon-btn"
+                          aria-label={`Remove ${rule.source}`}
+                          onClick={() => setConfirmingId(rule.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {!isLoading && (
+            <button type="button" className="ms-add" onClick={() => setIsAdding(true)}>
+              <Plus size={16} aria-hidden="true" /> Add another salary
+            </button>
+          )}
+        </div>
+      )}
     </Modal>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import {
   rupeesToPaise, paiseToRupeesString, groupIndianDigits, ungroupDigits,
 } from '../../utils/money';
@@ -40,6 +40,9 @@ export const AmountInput: React.FC<AmountInputProps> = ({
   accent,
 }) => {
   const isHero = variant === 'hero';
+  /* The visible label was never connected to the input, so a screen reader
+     announced every amount field in the app as an unnamed text box. */
+  const inputId = useId();
   const [displayVal, setDisplayVal] = useState<string>(() => {
     try {
       return valuePaise ? groupIndianDigits(paiseToRupeesString(valuePaise)) : '';
@@ -137,7 +140,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
 
   return (
     <div className={`amount-input-wrapper ${isHero ? 'amount-input-hero' : ''}`}>
-      {label && !isHero && <label className="form-label">{label}</label>}
+      {label && !isHero && <label className="form-label" htmlFor={inputId}>{label}</label>}
       <div className={`amount-input-box ${activeError ? 'input-box-error' : ''}`}>
         <span
           className="currency-symbol"
@@ -146,6 +149,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({
           {currencySymbol}
         </span>
         <input
+          id={inputId}
           aria-label={isHero ? label : undefined}
           /* The hero figure is sized to its own text so the currency sign
              stays beside it. CSS field-sizing would do this, but not every

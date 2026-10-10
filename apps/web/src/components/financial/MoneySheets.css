@@ -1,0 +1,576 @@
+/* ==========================================================================
+   Cash withdrawal, Add salary and Salary schedule.
+
+   Built from three parts: the flow (where the money goes, as two circles),
+   the big figure with MONEVA's own number pad (ui/NumberPad), and one action.
+   The accent, chips, pills and folding drawer come from QuickAddModal.css,
+   which each sheet imports.
+   ========================================================================== */
+
+.ms {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---- the flow: from -> to ---------------------------------------------- */
+
+.mf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
+  padding-top: 2px;
+}
+
+.mf-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 4px 2px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  font-family: var(--font-family);
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mf-node.is-button {
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.mf-node.is-button:active {
+  transform: scale(0.96);
+}
+
+.mf-node.is-button:focus-visible {
+  outline: 2px solid var(--qa-accent);
+  outline-offset: 2px;
+}
+
+.mf-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--moneva-border);
+  background: var(--moneva-overlay);
+  color: var(--moneva-text-main);
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    background-color var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out);
+}
+
+.mf-circle.is-accent {
+  border-color: color-mix(in srgb, var(--qa-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--qa-accent) 14%, transparent);
+  color: var(--qa-accent);
+}
+
+.mf-node.is-open .mf-circle {
+  border-color: var(--qa-accent);
+}
+
+.mf-caption {
+  margin-top: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--moneva-text-muted);
+}
+
+.mf-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+}
+
+.mf-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mf-chevron {
+  flex-shrink: 0;
+  color: var(--moneva-text-muted);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.mf-node.is-open .mf-chevron {
+  transform: rotate(180deg);
+}
+
+/* Three chevrons between the circles. Still until there is an amount; then
+   a wave runs through them, the money visibly on its way. */
+.mf-arrow {
+  display: flex;
+  align-items: center;
+  height: 54px;
+  margin-top: 4px;
+  color: var(--moneva-text-muted);
+}
+
+.mf-arrow svg {
+  margin: 0 -5px;
+  opacity: 0.35;
+}
+
+.mf.is-moving .mf-arrow svg {
+  color: var(--qa-accent);
+  animation: mfWave 1.2s var(--ease-out) infinite;
+}
+
+.mf.is-moving .mf-arrow svg:nth-child(2) { animation-delay: 0.15s; }
+.mf.is-moving .mf-arrow svg:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes mfWave {
+  0%, 100% { opacity: 0.25; transform: translateX(-2px); }
+  40% { opacity: 1; transform: translateX(2px); }
+}
+
+/* ---- what a circle opens ------------------------------------------------ */
+
+.ms-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--moneva-overlay-weak);
+  border: 1px solid var(--moneva-border);
+}
+
+.ms-pick-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--moneva-text-muted);
+}
+
+/* ---- quick amounts ------------------------------------------------------ */
+
+.ms-quick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.ms-quick .qa-chip {
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A fixed set of amounts: one even row, every chip the same width. */
+.ms-quick.is-even {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ms-quick.is-even .qa-chip {
+  justify-content: center;
+  padding: 7px 4px;
+}
+
+.ms-quick-sub {
+  margin-left: 2px;
+  font-weight: 500;
+  color: var(--moneva-text-muted);
+}
+
+/* ---- the action ------------------------------------------------------ */
+
+/* Pinned to the bottom of the sheet. With a couple of saved salaries the pad
+   pushed Save below the fold, and a money sheet whose button has to be
+   scrolled to is one people abandon. The band behind it is the sheet's own
+   colour, so whatever scrolls under it is hidden rather than overlapped;
+   the negative margins carry that band across the body's padding. */
+.ms > .qa-save {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  box-shadow: 0 0 0 12px var(--moneva-surface), 0 -16px 12px 4px var(--moneva-surface);
+}
+
+/* ---- under the pad ------------------------------------------------------ */
+
+.ms-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ms-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--moneva-border);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--moneva-text-secondary);
+}
+
+/* ---- "every month" ------------------------------------------------------ */
+
+.ms-repeat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moneva-border);
+  background: transparent;
+  font-family: var(--font-family);
+  text-align: left;
+  color: var(--moneva-text-main);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.ms-repeat:focus-visible {
+  outline: 2px solid var(--qa-accent);
+  outline-offset: 2px;
+}
+
+.ms-repeat[aria-checked='true'] {
+  border-color: color-mix(in srgb, var(--qa-accent) 50%, var(--moneva-border));
+}
+
+.ms-repeat.is-static {
+  cursor: default;
+}
+
+.ms-repeat-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ms-repeat-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.ms-repeat-sub {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--moneva-text-secondary);
+}
+
+.ms-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 42px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--moneva-overlay-strong);
+  transition: background-color var(--dur-base) var(--ease-out);
+}
+
+.ms-toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--moneva-text-main);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+[aria-checked='true'] > .ms-toggle {
+  background: var(--qa-fill);
+}
+
+[aria-checked='true'] > .ms-toggle::after {
+  transform: translateX(18px);
+  background: var(--moneva-on-brand);
+}
+
+/* The same switch, small enough to sit inside a pill. */
+.ms-repeat-pill {
+  padding-right: 8px;
+}
+
+.ms-toggle.is-small {
+  width: 30px;
+  height: 18px;
+}
+
+.ms-toggle.is-small::after {
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+}
+
+[aria-checked='true'] > .ms-toggle.is-small::after {
+  transform: translateX(12px);
+}
+
+/* ---- saved ---------------------------------------------------------------- */
+
+.ms-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+
+.ms-done-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  color: var(--qa-accent);
+  background: color-mix(in srgb, var(--qa-accent) 14%, transparent);
+  animation: qaPop var(--dur-base) var(--ease-out) both;
+}
+
+.ms-done-amount {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--qa-accent);
+}
+
+.ms-done-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--moneva-text-secondary);
+}
+
+.ms-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* ---- salary schedule ---------------------------------------------------- */
+
+.ms-lead {
+  margin: -4px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--moneva-text-secondary);
+}
+
+.ms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--moneva-border);
+  background: var(--moneva-surface);
+  animation: qaRise var(--dur-base) var(--ease-out) both;
+}
+
+.ms-card-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--qa-accent);
+  background: color-mix(in srgb, var(--qa-accent) 14%, transparent);
+}
+
+.ms-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ms-card-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--moneva-text-main);
+}
+
+.ms-card-when {
+  font-size: 12px;
+  color: var(--moneva-text-secondary);
+}
+
+.ms-card-when.is-due {
+  color: var(--moneva-text-on-warning);
+  font-weight: 600;
+}
+
+.ms-card-amount {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--moneva-text-main);
+}
+
+.ms-card-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ms-card-actions > :first-child {
+  flex: 1 1 auto;
+}
+
+.ms-confirm {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: qaRise var(--dur-fast) var(--ease-out) both;
+}
+
+.ms-confirm-text {
+  flex: 1 1 auto;
+  font-size: 13px;
+  color: var(--moneva-text-main);
+}
+
+.ms-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--moneva-border);
+  background: transparent;
+  color: var(--moneva-text-muted);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.ms-icon-btn:hover,
+.ms-icon-btn:focus-visible {
+  color: var(--moneva-text-on-danger);
+  border-color: color-mix(in srgb, var(--moneva-text-on-danger) 50%, var(--moneva-border));
+}
+
+.ms-icon-btn:focus-visible {
+  outline: 2px solid var(--qa-accent);
+  outline-offset: 2px;
+}
+
+.ms-skeleton {
+  height: 72px;
+  border-radius: var(--radius-md);
+  background: var(--moneva-overlay);
+  animation: qaPulse 1.2s ease-in-out infinite;
+}
+
+.ms-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--moneva-border);
+  background: transparent;
+  font-family: var(--font-family);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.ms-add:hover,
+.ms-add:focus-visible {
+  color: var(--qa-accent);
+  border-color: var(--qa-accent);
+}
+
+.ms-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ms-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--moneva-text-muted);
+}
+
+.ms-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mf-node,
+  .mf-circle,
+  .mf-chevron,
+  .mf.is-moving .mf-arrow svg,
+  .ms-done-ring,
+  .ms-card,
+  .ms-confirm,
+  .ms-toggle,
+  .ms-toggle::after,
+  .ms-skeleton {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}

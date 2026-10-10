@@ -43,6 +43,14 @@
   --qa-fill: var(--moneva-blue);
 }
 
+/* Money that moved without being spent or earned - cash out of a bank, for
+   one. Neither red nor green would be true, so it takes the text colour: the
+   sheet looks like the others and claims nothing about the balance. */
+.qa[data-type='transfer'] {
+  --qa-accent: var(--moneva-text-main);
+  --qa-fill: var(--moneva-blue);
+}
+
 /* ---- the switch -------------------------------------------------------- */
 
 .qa-switch {

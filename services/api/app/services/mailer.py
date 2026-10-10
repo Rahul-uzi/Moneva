@@ -358,6 +358,50 @@ def _verify_body(code: str, minutes: int) -> tuple[str, str]:
     return text, html
 
 
+def _change_body(code: str, minutes: int) -> tuple[str, str]:
+    """For the NEW address. Says plainly that nothing changes until it is used."""
+    text = (
+        f"Your MONEVA code is {code}\n\n"
+        f"Someone asked to move a MONEVA account to this email address. Type the "
+        f"code into the app to finish. It expires in {minutes} minutes.\n\n"
+        "Nothing changes until the code is entered. If you did not ask for "
+        "this, ignore this email."
+    )
+    html = (
+        '<div style="font-family:system-ui,-apple-system,sans-serif;max-width:420px">'
+        '<p style="font-size:15px;color:#333">Your MONEVA code is</p>'
+        f'<p style="font-size:32px;font-weight:800;letter-spacing:.18em;margin:16px 0">{code}</p>'
+        f'<p style="font-size:14px;color:#555">Someone asked to move a MONEVA account to this '
+        f'email address. Type the code into the app to finish. It expires in {minutes} minutes.</p>'
+        '<p style="font-size:13px;color:#888">Nothing changes until the code is entered. '
+        'If you did not ask for this, ignore this email.</p>'
+        '</div>'
+    )
+    return text, html
+
+
+def _changed_notice_body(new_email: str) -> tuple[str, str]:
+    """For the OLD address, after the move. The one email here that is an alarm."""
+    shown = masked(new_email)
+    text = (
+        f"Your MONEVA account now signs in with {shown}.\n\n"
+        "If you made this change, there is nothing to do.\n\n"
+        "If you did not, someone with your password moved your account. Reset "
+        "your password from the MONEVA sign-in screen using the new address, "
+        "or contact MONEVA support from the app's website."
+    )
+    html = (
+        '<div style="font-family:system-ui,-apple-system,sans-serif;max-width:420px">'
+        f'<p style="font-size:15px;color:#333">Your MONEVA account now signs in with <b>{shown}</b>.</p>'
+        '<p style="font-size:14px;color:#555">If you made this change, there is nothing to do.</p>'
+        '<p style="font-size:14px;color:#555">If you did not, someone with your password moved '
+        'your account. Reset your password from the MONEVA sign-in screen using the new '
+        "address, or contact MONEVA support from the app's website.</p>"
+        '</div>'
+    )
+    return text, html
+
+
 def _log_code_if_stranded(to_email: str, code: str) -> None:
     """
     Last resort when a CONFIGURED mail route fails: put the code in the log.
@@ -370,6 +414,8 @@ def _log_code_if_stranded(to_email: str, code: str) -> None:
     code and production logs are frequently shipped somewhere else. Set
     RESET_LOG_CODE_ON_FAILURE=true to force it on for a deliberate diagnosis.
     """
+    if not code:
+        return
     forced = (os.getenv("RESET_LOG_CODE_ON_FAILURE") or "").strip().lower() in {"1", "true", "yes"}
     is_production = (os.getenv("ENVIRONMENT") or "").strip().lower() == "production"
     if not forced and is_production:
@@ -411,6 +457,18 @@ async def send_email_verification(to_email: str, code: str, minutes: int = 30) -
     """
     text, html = _verify_body(code, minutes)
     return await _deliver(to_email, "Confirm your MONEVA email address", text, html, code)
+
+
+async def send_email_change_code(to_email: str, code: str, minutes: int = 30) -> bool:
+    """Sends the code that proves the NEW address of an email change is real."""
+    text, html = _change_body(code, minutes)
+    return await _deliver(to_email, "Your MONEVA code for the new email address", text, html, code)
+
+
+async def send_email_changed_notice(old_email: str, new_email: str) -> bool:
+    """Tells the OLD address that the account has moved. Carries no code."""
+    text, html = _changed_notice_body(new_email)
+    return await _deliver(old_email, "Your MONEVA email address was changed", text, html, "")
 
 
 async def _deliver(to_email: str, subject: str, text: str, html: str, code: str) -> bool:

@@ -1,0 +1,189 @@
+/* Grouped settings rows. */
+
+.pf-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pf-group-label {
+  margin: 0;
+  padding: 0 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--moneva-text-muted);
+}
+
+.pf-list {
+  border: 1px solid var(--moneva-border);
+  border-radius: 20px;
+  background: var(--moneva-card);
+  overflow: hidden;
+}
+
+.pf-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--moneva-text-main);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, opacity 0.2s;
+}
+
+.pf-row.is-static { cursor: default; }
+.pf-row + .pf-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 0;
+  height: 1px;
+  background: var(--moneva-border);
+}
+.pf-row.has-icon + .pf-row::before,
+.pf-row + .pf-row.has-icon::before { left: 58px; }
+
+button.pf-row:active { background: var(--moneva-overlay); }
+@media (hover: hover) { button.pf-row:hover { background: var(--moneva-card-hover); } }
+.pf-row:disabled { cursor: not-allowed; opacity: 0.5; }
+.pf-row:focus-visible { outline: 2px solid var(--moneva-text-on-accent); outline-offset: -2px; }
+
+.pf-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--moneva-overlay);
+  color: var(--moneva-text-main);
+}
+.pf-ico svg { width: 17px; height: 17px; }
+
+.pf-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pf-row-title { font-weight: 600; overflow-wrap: anywhere; }
+.pf-row-sub { font-size: 12.5px; color: var(--moneva-text-muted); overflow-wrap: anywhere; }
+
+.pf-row-val {
+  flex: none;
+  max-width: 45%;
+  font-size: 14px;
+  color: var(--moneva-text-secondary);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-row-val.is-on { color: var(--moneva-text-on-accent); font-weight: 600; }
+.pf-row-val.is-warn { color: var(--moneva-text-on-warning); font-weight: 700; }
+
+.pf-chev { flex: none; color: var(--moneva-text-muted); }
+
+.pf-row-footer { flex-basis: 100%; }
+.pf-row.has-icon .pf-row-footer { padding-left: 44px; }
+
+.pf-row.is-warn { background: color-mix(in srgb, var(--moneva-orange) 12%, transparent); }
+.pf-row.is-warn .pf-ico,
+.pf-row.is-warn .pf-row-title { color: var(--moneva-text-on-warning); }
+.pf-row.is-danger .pf-ico,
+.pf-row.is-danger .pf-row-title { color: var(--moneva-text-on-danger); }
+
+/* the switch */
+.pf-switch {
+  flex: none;
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 99px;
+  background: var(--moneva-overlay-strong);
+  transition: background-color 0.25s;
+}
+.pf-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--moneva-text-secondary);
+  transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1), background-color 0.25s;
+}
+[aria-checked='true'] > .pf-switch { background: #CDFF4A; }
+[aria-checked='true'] > .pf-switch::after { transform: translateX(18px); background: var(--moneva-on-brand); }
+
+/* a small button at the end of a row */
+.pf-mini {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--moneva-border);
+  border-radius: 11px;
+  background: var(--moneva-surface);
+  color: var(--moneva-text-main);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.pf-mini:active { transform: scale(0.95); }
+.pf-mini.is-primary { border-color: transparent; background: #CDFF4A; color: var(--moneva-on-brand); }
+.pf-mini:disabled { opacity: 0.55; cursor: progress; }
+.pf-mini:focus-visible { outline: 2px solid var(--moneva-text-on-accent); outline-offset: 2px; }
+
+.pf-bar {
+  display: block;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--moneva-overlay-strong);
+  overflow: hidden;
+}
+.pf-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #CDFF4A;
+  transition: width 0.2s ease-out;
+}
+
+.pf-spin {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: pfSpin 0.8s linear infinite;
+}
+@keyframes pfSpin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-switch, .pf-switch::after, .pf-row { transition: none; }
+}

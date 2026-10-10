@@ -63,15 +63,27 @@ class User(Base):
     # their password, and by then the ledger is unreachable: reset codes go to
     # a mailbox that is not theirs.
     #
-    # The gate is soft on purpose. An unverified user may use the app; what
-    # they may not do is change the address, because that is the one action
-    # that turns an unverified account into a permanently stolen one.
+    # The gate is soft on purpose. An unverified user may use the app. Changing
+    # the address is the one action that could turn a borrowed session into a
+    # stolen account, so it asks for the password AND proof that the new
+    # mailbox is real (see pending_email below) - which is also what lets
+    # somebody who typed their address wrong at sign-up put it right.
     email_verified = Column(Boolean, default=False, nullable=False)
     verify_code_hash = Column(String, nullable=True)
     verify_code_expires_at = Column(DateTime(timezone=True), nullable=True)
     verify_code_attempts = Column(SmallInteger, default=0, nullable=False)
     # Throttles resends per account, independently of the IP rate limiter.
     verify_code_sent_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Moving the account to a new address. The new address is only HELD here
+    # until it proves it receives mail; `email` itself does not change until a
+    # code sent to `pending_email` comes back. Changing it on the spot would let
+    # one typo point every future reset code at a stranger's inbox.
+    pending_email = Column(String, nullable=True)
+    email_change_code_hash = Column(String, nullable=True)
+    email_change_expires_at = Column(DateTime(timezone=True), nullable=True)
+    email_change_attempts = Column(SmallInteger, default=0, nullable=False)
+    email_change_sent_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)

@@ -12,9 +12,16 @@ const CYCLE_DAYS: Record<string, number> = {
   annually: 365,
 };
 
+/**
+ * One spelling per frequency. "bi-weekly" was saved by the old schedule screen
+ * and recognised by nothing, so a fortnightly salary counted down a month.
+ */
+export const normaliseFrequency = (frequency: string | null | undefined): string =>
+  String(frequency ?? 'monthly').toLowerCase().replace(/[\s_-]/g, '');
+
 /** An unrecognised frequency is treated as monthly - the overwhelming case. */
 export const cycleLengthDays = (frequency: string): number =>
-  CYCLE_DAYS[String(frequency).trim().toLowerCase()] ?? 30;
+  CYCLE_DAYS[normaliseFrequency(frequency)] ?? 30;
 
 export interface Payday {
   id: string;

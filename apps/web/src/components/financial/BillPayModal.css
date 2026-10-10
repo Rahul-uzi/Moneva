@@ -23,3 +23,17 @@
   gap: 14px;
   padding: 8px 0;
 }
+
+/* The success ring. This screen used it without ever defining it, and was
+   styled only because the salary or goal sheet's stylesheet happened to be
+   loaded too - redesigning the salary sheet would have left a bare icon. */
+.confirmed-icon-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: rgba(205, 255, 74, 0.15);
+  color: var(--moneva-teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

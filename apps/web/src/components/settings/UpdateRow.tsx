@@ -1,6 +1,6 @@
 import React from 'react';
-import { Download, RefreshCw } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { RefreshCw } from 'lucide-react';
+import { SettingsRow } from '../profile/ProfileRows';
 import {
   canSelfUpdate,
   downloadUpdate,
@@ -101,63 +101,53 @@ export const UpdateRow: React.FC = () => {
   // has nothing to install. A button offering to update it would be a lie.
   if (!canSelfUpdate()) {
     return (
-      <div className="security-feature-row">
-        <div className="security-feature-copy">
-          <span className="sec-label"><RefreshCw size={14} /> Version</span>
-          <span className="text-body">
-            You are on version {running}. The web app updates itself every time
-            you open it.
-          </span>
-        </div>
-      </div>
+      <SettingsRow
+        icon={<RefreshCw />}
+        title="Version"
+        sub={`You are on version ${running}. The web app updates itself every time you open it.`}
+      />
     );
   }
 
   const hint = updateButtonHint(state, running);
   const downloading = state.stage === 'downloading';
+  const busy = updateButtonBusy(state);
+  const primary = state.stage === 'ready' || state.stage === 'available';
 
   return (
-    <div className="security-feature-row">
-      <div className="security-feature-copy">
-        <span className="sec-label">
-          <Download size={14} /> App updates
+    <SettingsRow
+      icon={<RefreshCw />}
+      title="Version"
+      sub={(
+        <>
+          {hint}
+          {permissionKnown === false && state.stage === 'idle' && (
+            <span className="update-row-note">Android will ask for permission the first time.</span>
+          )}
+        </>
+      )}
+      action={(
+        <button type="button" className={`pf-mini${primary ? ' is-primary' : ''}`} disabled={busy} onClick={press}>
+          {busy && !downloading ? <span className="pf-spin" /> : null}
+          {updateButtonLabel(state)}
+        </button>
+      )}
+      /* A bar as well as the number on the button. On a slow connection the
+         percentage can sit still for several seconds, and a bar that has
+         visibly moved is the difference between "working" and "frozen". */
+      footer={downloading ? (
+        <span
+          className="pf-bar"
+          role="progressbar"
+          aria-valuenow={state.percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Downloading the update"
+        >
+          <i style={{ width: `${state.percent}%` }} />
         </span>
-        <span className="text-body">{hint}</span>
-
-        {/* A bar as well as the number on the button. On a slow connection the
-            percentage can sit still for several seconds, and a bar that has
-            visibly moved since it started is the difference between "working"
-            and "frozen". */}
-        {downloading && (
-          <span
-            className="update-row-bar"
-            role="progressbar"
-            aria-valuenow={state.percent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Downloading the update"
-          >
-            <span className="update-row-bar-fill" style={{ width: `${state.percent}%` }} />
-          </span>
-        )}
-
-        {permissionKnown === false && state.stage === 'idle' && (
-          <span className="update-row-note">
-            Android will ask for permission the first time.
-          </span>
-        )}
-      </div>
-
-      <Button
-        variant={state.stage === 'ready' || state.stage === 'available' ? 'primary' : 'secondary'}
-        size="sm"
-        className="row-action-btn"
-        isLoading={updateButtonBusy(state)}
-        onClick={press}
-      >
-        {updateButtonLabel(state)}
-      </Button>
-    </div>
+      ) : undefined}
+    />
   );
 };
 

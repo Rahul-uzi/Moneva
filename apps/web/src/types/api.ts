@@ -5,6 +5,8 @@ export interface User {
   currency: string;
   timezone: string;
   is_active: boolean;
+  /** Whether a code sent to `email` has come back. False until it has. */
+  email_verified?: boolean;
   avatar_data_url: string | null;
   totp_enabled: boolean;
   created_at: string;

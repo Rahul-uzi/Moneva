@@ -1,0 +1,71 @@
+.pf-otp {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.pf-otp input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  opacity: 0.01;
+  border: 0;
+  font-size: 16px;
+  caret-color: transparent;
+  cursor: text;
+}
+
+.pf-otp-box {
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--moneva-border);
+  border-radius: 14px;
+  background: var(--moneva-bg);
+  color: var(--moneva-text-main);
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color 0.2s,
+    background-color 0.3s,
+    color 0.3s,
+    transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.pf-otp-box.is-filled { transform: scale(1.04); }
+.pf-otp:focus-within .pf-otp-box.is-active {
+  border-color: var(--moneva-text-on-accent);
+  box-shadow: 0 0 0 3px var(--moneva-overlay);
+}
+.pf-otp:focus-within .pf-otp-box.is-active:empty::after {
+  content: '';
+  width: 2px;
+  height: 26px;
+  background: var(--moneva-text-on-accent);
+  animation: pfCaret 1s steps(1) infinite;
+}
+
+.pf-otp.is-busy .pf-otp-box { opacity: 0.6; }
+.pf-otp.is-error { animation: pfShake 0.4s; }
+.pf-otp.is-error .pf-otp-box { border-color: var(--moneva-text-on-danger); }
+.pf-otp.is-done .pf-otp-box { border-color: #CDFF4A; background: #CDFF4A; color: var(--moneva-on-brand); }
+.pf-otp.is-done .pf-otp-box:nth-child(3) { transition-delay: 0.04s; }
+.pf-otp.is-done .pf-otp-box:nth-child(4) { transition-delay: 0.08s; }
+.pf-otp.is-done .pf-otp-box:nth-child(5) { transition-delay: 0.12s; }
+.pf-otp.is-done .pf-otp-box:nth-child(6) { transition-delay: 0.16s; }
+.pf-otp.is-done .pf-otp-box:nth-child(7) { transition-delay: 0.2s; }
+
+@keyframes pfCaret { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+@keyframes pfShake {
+  0%, 100% { transform: none; }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-otp, .pf-otp-box { animation: none !important; transition: none !important; }
+}

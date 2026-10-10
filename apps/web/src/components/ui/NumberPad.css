@@ -1,0 +1,125 @@
+/* MONEVA's own number pad and the figure it types into.
+   Colours come from the sheet's --qa-accent when there is one, so the same
+   pad reads red-free on a withdrawal and lime on a salary. */
+
+.np {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.np-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  border: none;
+  border-radius: 14px;
+  background: var(--moneva-overlay);
+  font-family: var(--font-family);
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--moneva-text-main);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  transition:
+    background-color var(--dur-press) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.np-key:active {
+  transform: scale(0.94);
+  background: var(--moneva-overlay-strong);
+}
+
+.np-key:focus-visible {
+  outline: 2px solid var(--qa-accent, var(--moneva-blue));
+  outline-offset: 2px;
+}
+
+.np-key-back {
+  color: var(--moneva-text-secondary);
+}
+
+/* ---- the figure ----------------------------------------------------- */
+
+.np-amount-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.np-amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 56px;
+}
+
+.np-currency {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--qa-accent, var(--moneva-text-main));
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+.np-figure {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--moneva-text-main);
+  /* Keyed on the length, so each key press gives the figure a small tick. */
+  animation: npTick var(--dur-fast) var(--ease-out);
+}
+
+.np-figure.is-empty {
+  color: var(--moneva-text-muted);
+}
+
+.np-caret {
+  width: 2px;
+  height: 36px;
+  border-radius: 1px;
+  background: var(--qa-accent, var(--moneva-text-main));
+  animation: npBlink 1.1s steps(1) infinite;
+}
+
+.np-note {
+  margin: 0;
+  min-height: 17px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--moneva-text-secondary);
+}
+
+.np-note.is-warn {
+  color: var(--moneva-text-on-warning);
+}
+
+@keyframes npTick {
+  from { transform: scale(0.96); }
+  to { transform: none; }
+}
+
+@keyframes npBlink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-key,
+  .np-figure,
+  .np-caret,
+  .np-currency {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}

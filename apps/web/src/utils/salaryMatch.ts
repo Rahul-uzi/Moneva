@@ -1,5 +1,6 @@
 import type { RecurringIncome } from '../types/api';
 import { parseApiDate } from './datetime';
+import { normaliseFrequency } from './payday';
 
 /**
  * Is this income the salary the app is waiting for?
@@ -95,7 +96,7 @@ export const matchSalaryStream = (
 const advanceOne = (from: Date, frequency: string, anchorDay: number): Date => {
   const next = new Date(from);
   let months: number;
-  switch (String(frequency).trim().toLowerCase()) {
+  switch (normaliseFrequency(frequency)) {
     case 'weekly':
       next.setDate(next.getDate() + 7);
       return next;

@@ -20,6 +20,19 @@ MAX_CATCH_UP = 24
 _WEEKS = {"weekly": 1, "fortnightly": 2, "biweekly": 2}
 
 
+def normalise_frequency(frequency: Optional[str]) -> str:
+    """One spelling per frequency, however it arrived.
+
+    The salary schedule screen offered "Bi-weekly" and saved "bi-weekly" - a
+    spelling nothing here recognised, so every fortnightly salary was quietly
+    advanced a MONTH at a time and its countdown was wrong from the first
+    payday. Spaces, hyphens and underscores are dropped, so "bi-weekly",
+    "Bi Weekly" and "bi_weekly" all mean biweekly, and rows already saved the
+    old way are read correctly without touching them.
+    """
+    return "".join((frequency or "monthly").split()).lower().replace("-", "").replace("_", "")
+
+
 def _as_utc(dt: datetime) -> datetime:
     """Naive timestamps out of SQLite are UTC; comparisons need them aware."""
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
@@ -42,7 +55,7 @@ def add_months(dt: datetime, months: int, anchor_day: Optional[int] = None) -> d
 
 def next_after(dt: datetime, frequency: str, anchor_day: Optional[int] = None) -> datetime:
     """The occurrence following `dt` for a stream of this frequency."""
-    freq = (frequency or "monthly").strip().lower()
+    freq = normalise_frequency(frequency)
     if freq in _WEEKS:
         return dt + timedelta(weeks=_WEEKS[freq])
     if freq == "daily":

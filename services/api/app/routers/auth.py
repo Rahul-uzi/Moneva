@@ -39,6 +39,8 @@ from app.db.database import get_db
 from app.services.mailer import (
     delivery_configured,
     masked,
+    send_email_change_code,
+    send_email_changed_notice,
     send_email_verification,
     send_password_reset,
 )
@@ -60,6 +62,9 @@ from app.schemas.schemas import (
     ResetPasswordRequest,
     VerifyEmailRequest,
     SendVerificationResponse,
+    EmailChangeStartRequest,
+    EmailChangeStartResponse,
+    EmailChangeConfirmRequest,
 )
 
 # How long a reset code is good for. Long enough to fetch it from a phone that
@@ -889,6 +894,143 @@ async def verify_email(
     current_user.verify_code_attempts = 0
     await db.commit()
     await db.refresh(current_user)
+    return current_user
+
+
+def _aware(moment: datetime) -> datetime:
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+async def _address_taken(db: AsyncSession, email: str, me: User) -> bool:
+    row = await db.execute(select(User.id).where(User.email == email, User.id != me.id))
+    return row.first() is not None
+
+
+@router.post("/change-email/start", response_model=EmailChangeStartResponse)
+async def start_email_change(
+    payload: EmailChangeStartRequest,
+    request: Request,
+    background: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Holds a new address and sends it a code. The account does not move yet.
+
+    The password is asked for even though the session already proves who this
+    is: a phone left unlocked on a table is a valid session, and moving the
+    address is the one change that cannot be undone from the old mailbox.
+    """
+    enforce(LOGIN_BY_IP, client_ip(request))
+    enforce(LOGIN_BY_ACCOUNT, current_user.email)
+
+    if not verify_password(payload.password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That password is not right.")
+
+    new_email = payload.new_email.lower().strip()
+    if new_email == current_user.email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That is already your email.")
+    # Saying so is not an enumeration leak worth worrying about here: the
+    # caller has a session and the password, and the sign-up form already
+    # answers the same question for anyone at all.
+    if await _address_taken(db, new_email, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That email already belongs to another MONEVA account.",
+        )
+
+    now = datetime.now(timezone.utc)
+    last = current_user.email_change_sent_at
+    if current_user.pending_email == new_email and last is not None:
+        waited = (now - _aware(last)).total_seconds()
+        if waited < VERIFY_RESEND_SECONDS:
+            return EmailChangeStartResponse(
+                message="A code was just sent. Check that inbox, including spam.",
+                pending_email=new_email,
+                delivery_configured=delivery_configured(),
+                retry_after_seconds=int(VERIFY_RESEND_SECONDS - waited),
+            )
+
+    enforce(FORGOT_BY_IP, client_ip(request))
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    current_user.pending_email = new_email
+    current_user.email_change_code_hash = hash_password(code)
+    current_user.email_change_expires_at = now + timedelta(minutes=VERIFY_CODE_TTL_MINUTES)
+    current_user.email_change_attempts = 0
+    current_user.email_change_sent_at = now
+    await db.commit()
+
+    background.add_task(send_email_change_code, new_email, code, VERIFY_CODE_TTL_MINUTES)
+
+    return EmailChangeStartResponse(
+        message=f"A code is on its way to {masked(new_email)}.",
+        pending_email=new_email,
+        delivery_configured=delivery_configured(),
+        retry_after_seconds=VERIFY_RESEND_SECONDS,
+    )
+
+
+@router.post("/change-email/confirm", response_model=UserResponse)
+async def confirm_email_change(
+    payload: EmailChangeConfirmRequest,
+    background: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Moves the account to the held address, if its code is right and current.
+
+    The new address is confirmed by this very step - the code could only have
+    been read from that mailbox - so it is marked verified at the same time.
+    """
+    if not current_user.pending_email or not current_user.email_change_code_hash \
+            or not current_user.email_change_expires_at:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ask for a new code first.")
+
+    if _aware(current_user.email_change_expires_at) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That code has expired. Ask for a new one.")
+
+    # Counted before the comparison and committed either way, as for the
+    # verification code: an abandoned request still spends its guess.
+    attempts = int(current_user.email_change_attempts or 0) + 1
+    current_user.email_change_attempts = attempts
+    if attempts > VERIFY_MAX_ATTEMPTS:
+        current_user.email_change_code_hash = None
+        current_user.email_change_expires_at = None
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many wrong codes. Ask for a new one.")
+
+    if not verify_password(payload.code.strip(), current_user.email_change_code_hash):
+        await db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That code is not right.")
+
+    new_email = current_user.pending_email
+    # Checked again: somebody may have signed up with it in the half hour
+    # since the code was sent.
+    if await _address_taken(db, new_email, current_user):
+        current_user.pending_email = None
+        current_user.email_change_code_hash = None
+        current_user.email_change_expires_at = None
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="That email already belongs to another MONEVA account.",
+        )
+
+    old_email = current_user.email
+    current_user.email = new_email
+    current_user.email_verified = True
+    current_user.pending_email = None
+    current_user.email_change_code_hash = None
+    current_user.email_change_expires_at = None
+    current_user.email_change_attempts = 0
+    # A verification code for the OLD address must not later "confirm" the new one.
+    current_user.verify_code_hash = None
+    current_user.verify_code_expires_at = None
+    current_user.verify_code_attempts = 0
+    await db.commit()
+    await db.refresh(current_user)
+
+    background.add_task(send_email_changed_notice, old_email, new_email)
     return current_user
 
 

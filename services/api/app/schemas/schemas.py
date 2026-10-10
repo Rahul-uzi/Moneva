@@ -151,6 +151,24 @@ class VerifyEmailRequest(BaseModel):
     code: str = Field(min_length=6, max_length=10)
 
 
+class EmailChangeStartRequest(BaseModel):
+    # Same shape check as sign-up, so an address that could not have been
+    # registered cannot be moved to either.
+    new_email: str = Field(pattern=r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', max_length=254)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class EmailChangeStartResponse(BaseModel):
+    message: str
+    pending_email: str
+    delivery_configured: bool
+    retry_after_seconds: int = 0
+
+
+class EmailChangeConfirmRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=10)
+
+
 class SendVerificationResponse(BaseModel):
     message: str
     # Whether mail is switched on at all on this server - about the SERVER, not
