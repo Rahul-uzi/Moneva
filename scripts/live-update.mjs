@@ -159,7 +159,11 @@ writeFileSync(ENV_PROD, env.replace(/^VITE_APP_VERSION=.*$/m, `VITE_APP_VERSION=
 execSync('npm run build', { cwd: WEB, stdio: ['ignore', 'ignore', 'inherit'] });
 if (!existsSync(join(DIST, 'index.html'))) die('the build produced no dist/index.html');
 const built = listFiles(join(DIST, 'assets')).filter((f) => f.endsWith('.js'))
-  .some((f) => readFileSync(f, 'utf8').includes(`"${version}"`));
+  // The bundler may quote it with ", ' or a backtick; any of them, but whole.
+  .some((f) => {
+    const text = readFileSync(f, 'utf8');
+    return ['"', "'", '`'].some((q) => text.includes(q + version + q));
+  });
 if (!built) die(`the built bundle does not contain "${version}" - the version did not reach it`);
 ok(`dist/ built with version ${version}`);
 
