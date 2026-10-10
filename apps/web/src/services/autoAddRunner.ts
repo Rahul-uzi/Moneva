@@ -25,6 +25,7 @@ import { describeProposal } from '../components/financial/paymentInboxRules';
 import { suggestCategory } from '../utils/categorise';
 import type { Account, Category, Transaction } from '../types/api';
 import type { AlertProposal } from '../utils/paymentAlert';
+import { getDisplayCurrency } from '../utils/money';
 
 export interface AutoAddOutcome {
   /** How many were filed without asking. */
@@ -124,7 +125,7 @@ const fileOne = async (
       category_id: categoryFor(proposal, categories, history),
       transaction_type: proposal.kind === 'debit' ? 'expense' : 'income',
       amount_minor: proposal.amountPaise,
-      currency: 'INR',
+      currency: getDisplayCurrency(),
       description: describeProposal(proposal.merchant, proposal.sources, proposal.accountTail),
       transaction_date: new Date(proposal.postedAt).toISOString(),
       // The marker that makes this row findable and undoable later.

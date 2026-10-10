@@ -5,7 +5,7 @@ import { Logo } from '../components/ui/Logo';
 import { ActionProposalCard, type ProposedAction } from '../components/financial/ActionProposalCard';
 import { QuickAddModal } from '../components/financial/QuickAddModal';
 import { apiClient } from '../services/apiClient';
-import { formatMonetaryValue } from '../utils/money';
+import { formatMonetaryValue, getDisplayCurrency } from '../utils/money';
 import { withProposalCancelled, withProposalDone } from '../utils/proposals';
 import { useUiStore } from '../stores/useUiStore';
 import {
@@ -430,7 +430,7 @@ export const AssistantPage: React.FC = () => {
         savings_goal_id: proposal.savingsGoalId || null,
         transaction_type: txType,
         amount_minor: proposal.amountPaise,
-        currency: 'INR',
+        currency: getDisplayCurrency(),
         description: proposal.description,
         transaction_date: new Date().toISOString(),
         device_id: 'web-client',

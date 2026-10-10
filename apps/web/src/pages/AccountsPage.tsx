@@ -12,7 +12,7 @@ import { ErrorState, EmptyState } from '../components/ui/States';
 import { AccountsSkeleton } from '../components/ui/Skeleton';
 import { apiClient, describeApiError } from '../services/apiClient';
 import { useUiStore } from '../stores/useUiStore';
-import { formatMonetaryValue } from '../utils/money';
+import { formatMonetaryValue, getDisplayCurrency } from '../utils/money';
 import type { Account, Emi, Transaction } from '../types/api';
 import './AccountsPage.css';
 
@@ -242,7 +242,7 @@ export const AccountsPage: React.FC = () => {
         accounts={accounts}
         transactions={transactions}
         emis={emis}
-        currency="INR"
+        currency={getDisplayCurrency()}
         now={now}
         onAddEmi={() => { setEmiToEdit(null); setIsEmiModalOpen(true); }}
         onEditEmi={(emi) => { setEmiToEdit(emi); setIsEmiModalOpen(true); }}

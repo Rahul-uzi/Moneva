@@ -7,7 +7,7 @@ import { MoneyFlow } from './MoneyFlow';
 import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import { nowForDateTimeInput } from '../../utils/datetime';
-import { formatMonetaryValue } from '../../utils/money';
+import { formatMonetaryValue, getDisplayCurrency } from '../../utils/money';
 import { describeWhen } from '../../utils/quickAdd';
 import { cashAccountsOf, withdrawalSources } from '../../utils/moneySheets';
 import { padToPaise, paiseToPad } from '../../utils/numberPad';
@@ -134,7 +134,7 @@ export const CashWithdrawalModal: React.FC<Props> = ({ isOpen, accounts, onClose
         // not belong in.
         transaction_type: 'transfer',
         amount_minor: amountPaise,
-        currency: 'INR',
+        currency: getDisplayCurrency(),
         description: 'Cash withdrawal',
         transaction_date: when ? new Date(when).toISOString() : new Date().toISOString(),
         device_id: 'web-client',

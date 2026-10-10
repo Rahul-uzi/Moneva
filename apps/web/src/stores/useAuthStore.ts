@@ -12,6 +12,7 @@ import {
   refreshSessionShared,
 } from '../services/apiClient';
 import type { AxiosError } from 'axios';
+import { setDisplayCurrency } from '../utils/money';
 
 interface AuthState {
   user: User | null;
@@ -216,3 +217,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 }));
+
+// Every amount on screen that does not name a currency follows the signed-in
+// person's own - from the cached user at start-up, and on every change since
+// (sign-in, restore, a currency switch in Profile, sign-out).
+setDisplayCurrency(useAuthStore.getState().user?.currency);
+useAuthStore.subscribe((state) => setDisplayCurrency(state.user?.currency));

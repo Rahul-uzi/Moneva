@@ -7,6 +7,7 @@ import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import type { Bill, Category } from '../../types/api';
 import './BudgetModal.css';
+import { getDisplayCurrency } from '../../utils/money';
 
 interface BillModalProps {
   isOpen: boolean;
@@ -89,7 +90,7 @@ export const BillModal: React.FC<BillModalProps> = ({
         await apiClient.post<Bill>('/bills', {
           name: name.trim(),
           amount_minor: amountPaise,
-          currency: 'INR',
+          currency: getDisplayCurrency(),
           due_date: new Date(dueDate).toISOString(),
           recurrence,
           category_id: categoryId || null,

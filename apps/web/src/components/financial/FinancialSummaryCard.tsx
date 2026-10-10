@@ -17,7 +17,7 @@ export const FinancialSummaryCard: React.FC<FinancialSummaryCardProps> = ({
   netWorthMinor,
   incomeMinor,
   expenseMinor,
-  currency = 'INR',
+  currency,
   isLoading = false,
 }) => {
   // The headline figure counts up on first paint. Presentation only: it always

@@ -57,6 +57,10 @@ const SectionLink: React.FC<{ shown: number; total: number; onSeeAll: () => void
     <span className="text-label">{total} Total</span>
   );
 
+/** "budgets", "budgets and bills", "budgets, goals and bills". */
+const listOf = (names: string[]): string =>
+  names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { refreshTrigger } = useOutletContext<OutletContextType>() || {};
@@ -80,6 +84,8 @@ export const HomePage: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  // Some parts loaded and some did not: the page stays, with a note and a retry.
+  const [partialError, setPartialError] = useState<string | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isSalaryDialogOpen, setIsSalaryDialogOpen] = useState<boolean>(false);
   /* "Set up salary" opens THIS, not the confirmation dialog.
@@ -102,90 +108,67 @@ export const HomePage: React.FC = () => {
     writeLastSeen(new Date().toISOString());
   }, []);
 
-  const fetchAllData = async (isMounted: boolean) => {
-    try {
-      // Each card paints as its own request lands rather than the whole page
-      // waiting on the slowest one. The summary and accounts are what the user
-      // actually looks at first, so they no longer queue behind bills or goals.
-      const settle = <T,>(p: Promise<{ data: T }>, apply: (d: T) => void) =>
-        p.then((res) => {
-          if (isMounted) {
-            apply(res.data);
-            setIsLoading(false);
-          }
-        });
+  const fetchAllData = async (alive: () => boolean) => {
+    // Each card paints as its own request lands rather than the whole page
+    // waiting on the slowest one. The summary and accounts are what the user
+    // actually looks at first, so they no longer queue behind bills or goals.
+    const settle = <T,>(p: Promise<{ data: T }>, apply: (d: T) => void) =>
+      p.then((res) => {
+        if (alive()) {
+          apply(res.data);
+          setIsLoading(false);
+        }
+      });
 
-      const summaryLoad = settle(
-        apiClient.get<FinancialSummary>('/finance/summary'),
-        (d) => setSummary(d),
-      );
-      const accountsLoad = settle(
-        apiClient.get<Account[]>('/accounts'),
-        (d) => setAccounts(d),
-      );
+    /* Settled one by one, not all-or-nothing. One failed request used to
+       swap the WHOLE dashboard for an error screen - after net worth and the
+       accounts had already appeared. Now the page stays, and only a load that
+       leaves nothing to show (neither the summary nor the accounts) is an
+       error screen; anything else is named in a small notice with a retry. */
+    const required: [string, Promise<void>][] = [
+      ['summary', settle(apiClient.get<FinancialSummary>('/finance/summary'), (d) => setSummary(d))],
+      ['accounts', settle(apiClient.get<Account[]>('/accounts'), (d) => setAccounts(d))],
+      ['budgets', settle(apiClient.get<Budget[]>('/budgets'), (d) => setBudgets(d))],
+      ['goals', settle(apiClient.get<SavingsGoal[]>('/goals'), (d) => setGoals(d))],
+      ['bills', settle(apiClient.get<Bill[]>('/bills'), (d) => setBills(d))],
+      // Only the rows actually shown: this used to fetch the user's entire
+      // transaction history and throw all but five away.
+      ['recent activity', settle(apiClient.get<Transaction[]>('/transactions', { params: { limit: 5 } }), (d) => setTransactions(d))],
+      ['categories', settle(apiClient.get<Category[]>('/categories'), (d) => setCategories(d))],
+    ];
+    const optional = [
+      // Optional: the dashboard still renders if these fail, and says nothing.
+      settle(apiClient.get<SalaryUsage | null>('/income/salary-usage').catch(() => ({ data: null })), (d) => setSalaryUsage(d)),
+      // Salary that came round without being recorded. A saved stream posts
+      // nothing by itself, so without this it stayed silent for months.
+      settle(apiClient.get<DueIncome[]>('/income/recurring/due').catch(() => ({ data: [] as DueIncome[] })), (d) => setDueIncome(d)),
+      // The streams themselves, for the countdown to the next one.
+      settle(apiClient.get<RecurringIncome[]>('/income/recurring').catch(() => ({ data: [] as RecurringIncome[] })), (d) => setSalaryStreams(d)),
+      // Who still has the user's money.
+      settle(apiClient.get<PersonDebt[]>('/debts').catch(() => ({ data: [] as PersonDebt[] })), (d) => setDebts(d)),
+    ];
 
-      await Promise.all([
-        summaryLoad,
-        accountsLoad,
-        settle(apiClient.get<Budget[]>('/budgets'), (d) => setBudgets(d)),
-        settle(apiClient.get<SavingsGoal[]>('/goals'), (d) => setGoals(d)),
-        settle(apiClient.get<Bill[]>('/bills'), (d) => setBills(d)),
-        // Only the rows actually shown: this used to fetch the user's entire
-        // transaction history and throw all but five away.
-        settle(apiClient.get<Transaction[]>('/transactions', { params: { limit: 5 } }), (d) =>
-          setTransactions(d),
-        ),
-        settle(apiClient.get<Category[]>('/categories'), (d) => setCategories(d)),
-        // Optional: the dashboard still renders if this one fails.
-        settle(
-          apiClient
-            .get<SalaryUsage | null>('/income/salary-usage')
-            .catch(() => ({ data: null })),
-          (d) => setSalaryUsage(d),
-        ),
-        // Salary that came round without being recorded. A saved stream posts
-        // nothing by itself, so without this it stayed silent for months.
-        settle(
-          apiClient
-            .get<DueIncome[]>('/income/recurring/due')
-            .catch(() => ({ data: [] as DueIncome[] })),
-          (d) => setDueIncome(d),
-        ),
-        // The streams themselves, for the countdown to the next one. Optional
-        // in the same way: no streams, no card, no error.
-        settle(
-          apiClient
-            .get<RecurringIncome[]>('/income/recurring')
-            .catch(() => ({ data: [] as RecurringIncome[] })),
-          (d) => setSalaryStreams(d),
-        ),
-        // Who still has the user's money. Optional like the rest: no debts,
-        // no card, and a failure here never costs them the dashboard.
-        settle(
-          apiClient
-            .get<PersonDebt[]>('/debts')
-            .catch(() => ({ data: [] as PersonDebt[] })),
-          (d) => setDebts(d),
-        ),
-      ]);
+    const results = await Promise.allSettled(required.map(([, p]) => p));
+    await Promise.allSettled(optional);
+    if (!alive()) return;
 
-      if (isMounted) setError(null);
-    } catch (err: unknown) {
-      if (isMounted) {
-        const msg = describeApiError(err, 'Failed to load financial dashboard.');
-        setError(msg);
-      }
-    } finally {
-      if (isMounted) {
-        setIsLoading(false);
-      }
+    const failed = required.filter((_, i) => results[i].status === 'rejected').map(([name]) => name);
+    const nothingToShow = failed.includes('summary') && failed.includes('accounts');
+    if (nothingToShow) {
+      const first = results[0] as PromiseRejectedResult;
+      setError(describeApiError(first.reason, 'Failed to load financial dashboard.'));
+      setPartialError(null);
+    } else {
+      setError(null);
+      setPartialError(failed.length ? `Couldn't load your ${listOf(failed)}.` : null);
     }
+    setIsLoading(false);
   };
 
   useEffect(() => {
     let isMounted = true;
     const timer = setTimeout(() => {
-      void fetchAllData(isMounted);
+      void fetchAllData(() => isMounted);
     }, 0);
 
     return () => {
@@ -217,7 +200,7 @@ export const HomePage: React.FC = () => {
           : `Bill paid from ${payFrom.name}.`,
         'success',
       );
-      void fetchAllData(true);
+      void fetchAllData(() => true);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to pay bill.';
       addToast(msg, 'error');
@@ -225,7 +208,7 @@ export const HomePage: React.FC = () => {
   };
 
   if (isLoading) return <HomeSkeleton />;
-  if (error) return <ErrorState title="Dashboard Error" message={error} onRetry={() => void fetchAllData(true)} />;
+  if (error) return <ErrorState title="Dashboard Error" message={error} onRetry={() => void fetchAllData(() => true)} />;
 
   return (
     <div className="home-container">
@@ -234,7 +217,13 @@ export const HomePage: React.FC = () => {
              Profile, behind a settings row, which is no use for something
              that wants dealing with today. Renders nothing when the queue is
              empty, so on an ordinary day it costs no space. */}
-      <PendingPayments onAdded={() => void fetchAllData(true)} />
+      {partialError && (
+        <div className="home-partial" role="status">
+          <span>{partialError}</span>
+          <button type="button" onClick={() => void fetchAllData(() => true)}>Retry</button>
+        </div>
+      )}
+      <PendingPayments onAdded={() => void fetchAllData(() => true)} />
 
       {/* 1. Net Worth Financial Summary Card */}
       {summary && (
@@ -254,12 +243,12 @@ export const HomePage: React.FC = () => {
       <DueSalaryCard
         due={dueIncome}
         accounts={accounts}
-        onResolved={() => void fetchAllData(true)}
+        onResolved={() => void fetchAllData(() => true)}
       />
 
       {/* 3b. Money lent to people, which no balance can show. Renders
              nothing at all when there is none outstanding. */}
-      <OwedCard debts={debts} onResolved={() => void fetchAllData(true)} />
+      <OwedCard debts={debts} onResolved={() => void fetchAllData(() => true)} />
 
       {/* 3. This month's income vs spending */}
       {salaryUsage && (
@@ -380,7 +369,7 @@ export const HomePage: React.FC = () => {
           // asked again - otherwise it still reads "Set up salary" directly
           // after one was set up, which is the bug this pair of changes is
           // about.
-          void fetchAllData(true);
+          void fetchAllData(() => true);
         }}
         onSelectForConfirmation={(rule) => {
           setIsSalaryStreamOpen(false);
@@ -399,7 +388,7 @@ export const HomePage: React.FC = () => {
           setIsSalaryDialogOpen(false);
           setRuleToConfirm(null);
         }}
-        onSuccess={() => void fetchAllData(true)}
+        onSuccess={() => void fetchAllData(() => true)}
       />
 
       {/* categoryName was never passed here, so opening a payment from the
@@ -419,7 +408,7 @@ export const HomePage: React.FC = () => {
               : undefined
           }
           onClose={() => setSelectedTransaction(null)}
-          onDeleted={() => void fetchAllData(true)}
+          onDeleted={() => void fetchAllData(() => true)}
         />
       )}
     </div>

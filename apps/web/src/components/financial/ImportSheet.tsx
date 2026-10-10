@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import { useAuthStore } from '../../stores/useAuthStore';
-import { formatMonetaryValue } from '../../utils/money';
+import { formatMonetaryValue, getDisplayCurrency } from '../../utils/money';
 import { parseStatement, assignImportIds, type ParsedStatement, type ParsedRow } from '../../utils/parseStatement';
 import { subscriptionName } from '../../utils/subscriptions';
 import { suggestImportCategory } from '../../utils/categorise';
@@ -65,7 +65,7 @@ export const ImportSheet: React.FC<Props> = ({ isOpen, onClose, onImported, acco
   const [categories, setCategories] = useState<Category[]>([]);
   const [history, setHistory] = useState<Transaction[]>([]);
 
-  const currency = accounts.find((a) => a.id === accountId)?.currency ?? 'INR';
+  const currency = accounts.find((a) => a.id === accountId)?.currency ?? getDisplayCurrency();
 
   useEffect(() => {
     if (!isOpen) return;

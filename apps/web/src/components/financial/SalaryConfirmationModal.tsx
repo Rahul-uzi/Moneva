@@ -8,7 +8,7 @@ import { MoneyFlow } from './MoneyFlow';
 import { apiClient } from '../../services/apiClient';
 import { nowForDateTimeInput } from '../../utils/datetime';
 import { useUiStore } from '../../stores/useUiStore';
-import { formatMonetaryValue } from '../../utils/money';
+import { formatMonetaryValue, getDisplayCurrency } from '../../utils/money';
 import { describeWhen } from '../../utils/quickAdd';
 import { DEFAULT_SALARY_SOURCE, salaryAccountDefault, salaryStreamEffect } from '../../utils/moneySheets';
 import { padToPaise, paiseToPad } from '../../utils/numberPad';
@@ -223,7 +223,7 @@ export const SalaryConfirmationModal: React.FC<SalaryConfirmationModalProps> = (
         category_id: category?.id ?? null,
         transaction_type: 'income',
         amount_minor: amountPaise,
-        currency: 'INR',
+        currency: getDisplayCurrency(),
         description: `Salary Received: ${effectiveSource}`,
         transaction_date: received.toISOString(),
         device_id: 'web-client',

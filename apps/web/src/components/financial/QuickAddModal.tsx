@@ -30,7 +30,7 @@ import {
 } from '../../utils/quickAdd';
 import { apiClient } from '../../services/apiClient';
 import { nowForDateTimeInput } from '../../utils/datetime';
-import { formatMonetaryValue } from '../../utils/money';
+import { formatMonetaryValue, getDisplayCurrency } from '../../utils/money';
 import { useUiStore } from '../../stores/useUiStore';
 import { BANKS, MERCHANTS, WALLETS } from '../../data/transferDestinations';
 import type { Account, Category, Transaction, RecurringIncome } from '../../types/api';
@@ -347,7 +347,7 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
         category_id: categoryId,
         transaction_type: type,
         amount_minor: amountPaise,
-        currency: 'INR',
+        currency: getDisplayCurrency(),
         description,
         transaction_date: txDate ? new Date(txDate).toISOString() : new Date().toISOString(),
         device_id: 'web-client',

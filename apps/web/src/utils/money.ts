@@ -133,16 +133,34 @@ export function ungroupDigits(text: string): string {
 }
 
 /**
- * Formats integer minor units (paise) into a human-readable display string.
- * Uses Indian numbering format (e.g., ₹1,250.50). DISPLAY ONLY.
+ * The currency an amount is shown in when the caller does not say.
+ *
+ * It was 'INR' everywhere, so someone whose account is in dollars saw ₹ on
+ * every figure that did not pass a currency explicitly - around fifty of them.
+ * The auth store keeps this in step with the signed-in person's currency.
  */
-export function formatMonetaryValue(valOrAmount: Paise | MonetaryValue, currency: string = 'INR'): string {
+let displayCurrency = 'INR';
+
+export const setDisplayCurrency = (currency: string | null | undefined): void => {
+  displayCurrency = (currency || 'INR').toUpperCase();
+};
+
+export const getDisplayCurrency = (): string => displayCurrency;
+
+/** Lakh/crore grouping for rupees (12,34,567); thousands for anything else (1,234,567). */
+const groupingFor = (currency: string) => new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US');
+
+/**
+ * Formats integer minor units (paise) into a human-readable display string,
+ * e.g. ₹1,250.50 or USD 1,250.50. DISPLAY ONLY.
+ */
+export function formatMonetaryValue(valOrAmount: Paise | MonetaryValue, currency: string = displayCurrency): string {
   let paise: Paise;
   let curr = currency;
 
   if (typeof valOrAmount === 'object' && valOrAmount !== null) {
     paise = valOrAmount.amount;
-    curr = valOrAmount.currency || 'INR';
+    curr = valOrAmount.currency || displayCurrency;
   } else {
     paise = valOrAmount;
   }
@@ -157,7 +175,7 @@ export function formatMonetaryValue(valOrAmount: Paise | MonetaryValue, currency
   const minor = absPaise % 100;
   const minorStr = minor.toString().padStart(2, '0');
 
-  const formattedMajor = new Intl.NumberFormat('en-IN').format(major);
+  const formattedMajor = groupingFor(curr).format(major);
   const symbol = curr === 'INR' ? '₹' : `${curr} `;
 
   return `${isNegative ? '-' : ''}${symbol}${formattedMajor}.${minorStr}`;
@@ -240,13 +258,13 @@ export function subtractMoney(a: MonetaryValue, b: MonetaryValue): MonetaryValue
  *
  * Rounds rather than truncating, so ₹99.60 reads as ₹100 and not ₹99.
  */
-export function formatMonetaryCompact(valOrAmount: Paise | MonetaryValue, currency: string = 'INR'): string {
+export function formatMonetaryCompact(valOrAmount: Paise | MonetaryValue, currency: string = displayCurrency): string {
   let paise: Paise;
   let curr = currency;
 
   if (typeof valOrAmount === 'object' && valOrAmount !== null) {
     paise = valOrAmount.amount;
-    curr = valOrAmount.currency || 'INR';
+    curr = valOrAmount.currency || displayCurrency;
   } else {
     paise = valOrAmount;
   }
@@ -259,5 +277,5 @@ export function formatMonetaryCompact(valOrAmount: Paise | MonetaryValue, curren
   const major = Math.round(Math.abs(paise) / 100);
   const symbol = curr === 'INR' ? '₹' : `${curr} `;
 
-  return `${isNegative ? '-' : ''}${symbol}${new Intl.NumberFormat('en-IN').format(major)}`;
+  return `${isNegative ? '-' : ''}${symbol}${groupingFor(curr).format(major)}`;
 }

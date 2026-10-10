@@ -365,7 +365,7 @@ export const AnalyticsPage: React.FC = () => {
                   const heightPct = Math.max(8, Math.round((t.amount_minor / maxTrendAmount) * 100));
                   return (
                     <div key={idx} className="trend-bar-column">
-                      <span className="bar-val-label">{formatMonetaryValue(t.amount_minor)}</span>
+                      <span className="bar-val-label">{formatMonetaryValue(t.amount_minor, summary?.currency)}</span>
                       <div className="trend-bar-track">
                         <div className="trend-bar-fill" style={{ height: `${heightPct}%` }} />
                       </div>
@@ -421,7 +421,7 @@ export const AnalyticsPage: React.FC = () => {
             {(categoryQuery || minSpendRupees) && (
               <span className="text-label breakdown-filter-summary">
                 {visibleCategories.length} of {categories.length} categories ·{' '}
-                {formatMonetaryValue(filteredTotalMinor, summary?.currency || 'INR')}
+                {formatMonetaryValue(filteredTotalMinor, summary?.currency)}
                 {(categoryQuery || minSpendRupees) && (
                   <button
                     type="button"
@@ -463,7 +463,7 @@ export const AnalyticsPage: React.FC = () => {
                       </div>
                     </div>
                     <div className="cat-item-right">
-                      <span className="cat-amount">{formatMonetaryValue(c.total_minor)}</span>
+                      <span className="cat-amount">{formatMonetaryValue(c.total_minor, summary?.currency)}</span>
                       <span className="cat-percent-pill">{c.percentage}%</span>
                     </div>
                   </div>

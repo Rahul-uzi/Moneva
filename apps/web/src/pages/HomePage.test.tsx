@@ -188,17 +188,44 @@ describe('when there is nothing yet', () => {
 });
 
 describe('when the server lets it down', () => {
-  it('says the dashboard could not load instead of crashing, and recovers on retry', async () => {
+  // Only a load that leaves nothing to show is an error screen.
+  it('says the dashboard could not load when nothing did, and recovers on retry', async () => {
     failing['/finance/summary'] = new Error('boom');
+    failing['/accounts'] = new Error('boom');
     await show();
     expect(screen.getByText('Dashboard Error')).toBeTruthy();
     expect(screen.getByText('Failed to load financial dashboard.')).toBeTruthy();
 
     delete failing['/finance/summary'];
+    delete failing['/accounts'];
     fireEvent.click(screen.getByRole('button', { name: /Retry/ }));
     await settle();
     expect(screen.queryByText('Dashboard Error')).toBeNull();
     expect(screen.getByText('TOTAL NET WORTH')).toBeTruthy();
+  });
+
+  // The bug: one failed request replaced a dashboard that had already loaded.
+  it('keeps the dashboard when only some parts fail, and names them', async () => {
+    failing['/budgets'] = new Error('boom');
+    failing['/bills'] = new Error('boom');
+    await show();
+    expect(screen.queryByText('Dashboard Error')).toBeNull();
+    expect(screen.getByText('City Bank Savings')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toMatch(/Couldn't load your budgets and bills\./);
+
+    delete failing['/budgets'];
+    delete failing['/bills'];
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await settle();
+    expect(screen.queryByText(/Couldn't load your/)).toBeNull();
+  });
+
+  it('keeps the accounts on screen even when the summary fails', async () => {
+    failing['/finance/summary'] = new Error('boom');
+    await show();
+    expect(screen.queryByText('Dashboard Error')).toBeNull();
+    expect(screen.getByText('City Bank Savings')).toBeTruthy();
+    expect(screen.getByText(/Couldn't load your summary\./)).toBeTruthy();
   });
 
   // The salary figures are optional: losing them must not cost the dashboard.

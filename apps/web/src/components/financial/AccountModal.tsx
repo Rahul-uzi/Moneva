@@ -7,6 +7,7 @@ import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import type { Account } from '../../types/api';
 import './AccountModal.css';
+import { getDisplayCurrency } from '../../utils/money';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -149,7 +150,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           name: name.trim(),
           account_type: accountType,
           opening_balance_minor: openingBalancePaise,
-          currency: 'INR',
+          currency: getDisplayCurrency(),
           ...cardTerms,
         });
         addToast('Account created successfully!', 'success');

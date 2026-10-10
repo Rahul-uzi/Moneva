@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { CashWithdrawalModal } from './CashWithdrawalModal';
 import type { Account } from '../../types/api';
+import { setDisplayCurrency } from '../../utils/money';
 
 /**
  * The reported bug was "Out of" showing Cash. These pin the redesign to what
@@ -101,6 +102,20 @@ describe('Cash withdrawal', () => {
     });
     expect(body).not.toHaveProperty('category_id');
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+  });
+
+  // Records were stamped 'INR' whatever the person's currency was.
+  it('saves the withdrawal in the person\'s own currency', async () => {
+    setDisplayCurrency('USD');
+    try {
+      open(ACCOUNTS);
+      tap('2000');
+      fireEvent.click(screen.getByRole('button', { name: /Withdraw USD 2,000\.00/ }));
+      await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+      expect((post.mock.calls[0] as [string, Record<string, unknown>])[1].currency).toBe('USD');
+    } finally {
+      setDisplayCurrency('INR');
+    }
   });
 
   it('refuses an empty amount and says so', () => {

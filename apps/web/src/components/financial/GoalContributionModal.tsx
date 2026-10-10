@@ -6,7 +6,7 @@ import { AmountInput } from '../ui/AmountInput';
 import { Button } from '../ui/Button';
 import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
-import { formatMonetaryValue } from '../../utils/money';
+import { formatMonetaryValue, getDisplayCurrency } from '../../utils/money';
 import type { SavingsGoal, Account, Transaction } from '../../types/api';
 import './GoalContributionModal.css';
 
@@ -98,7 +98,7 @@ export const GoalContributionModal: React.FC<GoalContributionModalProps> = ({
         savings_goal_id: goal.id,
         transaction_type: 'transfer',
         amount_minor: amountPaise,
-        currency: 'INR',
+        currency: getDisplayCurrency(),
         description: `Goal Contribution: ${goal.name}`,
         transaction_date: new Date().toISOString(),
         device_id: 'web-client',

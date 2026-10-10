@@ -17,7 +17,7 @@ import { ErrorState, EmptyState } from '../components/ui/States';
 import { PlanSkeleton } from '../components/ui/Skeleton';
 import { apiClient, describeApiError } from '../services/apiClient';
 import { useUiStore } from '../stores/useUiStore';
-import { formatMonetaryCompact } from '../utils/money';
+import { formatMonetaryCompact, getDisplayCurrency } from '../utils/money';
 import { parseApiDate } from '../utils/datetime';
 import type { Budget, SavingsGoal, Bill, Category, Account, Transaction } from '../types/api';
 import { SubscriptionsSection } from '../components/financial/SubscriptionsSection';
@@ -168,7 +168,7 @@ export const PlanPage: React.FC = () => {
   );
 
   /** Whatever the accounts are denominated in; they share one currency. */
-  const planCurrency = accounts[0]?.currency ?? 'INR';
+  const planCurrency = accounts[0]?.currency ?? getDisplayCurrency();
 
   /** Nothing planned at all - one invitation reads better than three refusals. */
   const isPlanEmpty = budgets.length === 0 && goals.length === 0 && bills.length === 0;

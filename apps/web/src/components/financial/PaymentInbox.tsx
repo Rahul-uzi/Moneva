@@ -22,6 +22,7 @@ import { recordConfirmation, recordRejection } from '../../utils/autoAdd';
 import { loadTrustLedger, saveTrustLedger } from '../../services/autoAddStore';
 import type { Account, Bill, Category, Transaction } from '../../types/api';
 import './PaymentInbox.css';
+import { getDisplayCurrency } from '../../utils/money';
 
 /** When a person confirmed or waved a payment away - read at the tap, never while drawing. */
 const tappedAt = (): number => Date.now();
@@ -179,7 +180,7 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
         // ternary files a transfer as income.
         transaction_type: decision.transactionType,
         amount_minor: proposal.amountPaise,
-        currency: 'INR',
+        currency: getDisplayCurrency(),
         description: describeProposal(proposal.merchant, proposal.sources, proposal.accountTail),
         transaction_date: new Date(proposal.postedAt).toISOString(),
         device_id: 'android-notification',

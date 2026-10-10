@@ -41,7 +41,7 @@ interface MoneyProps {
  */
 export const Money: React.FC<MoneyProps> = ({
   amount,
-  currency = 'INR',
+  currency,
   animate = false,
   hideMinor = false,
   signed = false,
