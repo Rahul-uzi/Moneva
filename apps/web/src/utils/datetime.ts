@@ -30,3 +30,18 @@ export const parseApiDate = (value: string | Date): Date => {
   const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value.trim());
   return new Date(hasZone ? value : `${value.trim()}Z`);
 };
+
+/**
+ * The same day `months` months earlier, clamped to that month's last day.
+ *
+ * `setMonth` overflows instead: one month before 31 March asks for 31
+ * February, which JavaScript rolls into 3 March - so "the last month" on the
+ * 31st was a 28-day window.
+ */
+export const monthsBefore = (from: Date, months: number): Date => {
+  const target = new Date(from.getFullYear(), from.getMonth() - months, 1,
+    from.getHours(), from.getMinutes(), from.getSeconds(), from.getMilliseconds());
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(from.getDate(), lastDay));
+  return target;
+};

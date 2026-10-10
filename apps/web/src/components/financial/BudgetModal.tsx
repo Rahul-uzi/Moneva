@@ -7,6 +7,7 @@ import { apiClient } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import type { Budget, Category } from '../../types/api';
 import './BudgetModal.css';
+import { dayEndIso, dayStartIso, isoToDateValue, monthBounds } from '../../utils/budgetDates';
 
 interface BudgetModalProps {
   isOpen: boolean;
@@ -40,13 +41,12 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
         setCategoryId(budgetToEdit.category_id);
         setLimitPaise(budgetToEdit.limit_amount_minor);
         setPeriod(budgetToEdit.period || 'monthly');
-        setStartDate(budgetToEdit.start_date ? budgetToEdit.start_date.split('T')[0] : '');
-        setEndDate(budgetToEdit.end_date ? budgetToEdit.end_date.split('T')[0] : '');
+        setStartDate(budgetToEdit.start_date ? isoToDateValue(budgetToEdit.start_date) : '');
+        setEndDate(budgetToEdit.end_date ? isoToDateValue(budgetToEdit.end_date) : '');
       } else {
-        const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-        
+        // Local calendar, not UTC: see utils/budgetDates.
+        const { start: firstDay, end: lastDay } = monthBounds(new Date());
+
         setCategoryId(categories.length > 0 ? categories[0].id : '');
         setLimitPaise(0);
         setPeriod('monthly');
@@ -82,8 +82,8 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
         await apiClient.patch<Budget>(`/budgets/${budgetToEdit.id}`, {
           limit_amount_minor: limitPaise,
           period,
-          start_date: new Date(startDate).toISOString(),
-          end_date: new Date(endDate).toISOString(),
+          start_date: dayStartIso(startDate),
+          end_date: dayEndIso(endDate),
         });
         addToast('Budget limit updated successfully!', 'success');
       } else {
@@ -91,8 +91,8 @@ export const BudgetModal: React.FC<BudgetModalProps> = ({
           category_id: categoryId,
           limit_amount_minor: limitPaise,
           period,
-          start_date: new Date(startDate).toISOString(),
-          end_date: new Date(endDate).toISOString(),
+          start_date: dayStartIso(startDate),
+          end_date: dayEndIso(endDate),
         });
         addToast('Budget created successfully!', 'success');
       }

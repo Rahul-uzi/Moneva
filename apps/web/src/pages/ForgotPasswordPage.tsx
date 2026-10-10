@@ -66,14 +66,16 @@ export const ForgotPasswordPage: React.FC = () => {
 
   React.useEffect(() => {
     if (cooldownUntil === 0) return undefined;
-    setNowMs(Date.now());
-    // Twice a second, so the number never appears to skip one.
-    const ticker = setInterval(() => {
+    // Twice a second, so the number never appears to skip one. The first
+    // reading is a tick away rather than inside the effect itself.
+    const tick = () => {
       const t = Date.now();
       setNowMs(t);
       if (t >= cooldownUntil) clearInterval(ticker);
-    }, 500);
-    return () => clearInterval(ticker);
+    };
+    const first = setTimeout(tick, 0);
+    const ticker = setInterval(tick, 500);
+    return () => { clearTimeout(first); clearInterval(ticker); };
   }, [cooldownUntil]);
 
   /** Start the wait the server just told us about. */

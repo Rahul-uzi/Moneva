@@ -23,6 +23,9 @@ import { loadTrustLedger, saveTrustLedger } from '../../services/autoAddStore';
 import type { Account, Bill, Category, Transaction } from '../../types/api';
 import './PaymentInbox.css';
 
+/** When a person confirmed or waved a payment away - read at the tap, never while drawing. */
+const tappedAt = (): number => Date.now();
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -154,7 +157,7 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
           payment_date: new Date(proposal.postedAt).toISOString(),
           device_id: 'android-notification',
         });
-        saveTrustLedger(recordConfirmation(loadTrustLedger(), proposal, Date.now()));
+        saveTrustLedger(recordConfirmation(loadTrustLedger(), proposal, tappedAt()));
         await acknowledgeProposal(proposal);
         setProposals((rest) => rest.filter((p) => p.clientMutationId !== proposal.clientMutationId));
         setBills((rest) => rest.filter((b) => b.id !== matched.bill.id));
@@ -183,7 +186,7 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
       });
       // Recorded only after the write succeeded. A confirmation the server
       // rejected is not evidence that this reading was right.
-      saveTrustLedger(recordConfirmation(loadTrustLedger(), proposal, Date.now()));
+      saveTrustLedger(recordConfirmation(loadTrustLedger(), proposal, tappedAt()));
 
       await acknowledgeProposal(proposal);
       setProposals((rest) => rest.filter((p) => p.clientMutationId !== proposal.clientMutationId));
@@ -221,7 +224,7 @@ export const PaymentInbox: React.FC<Props> = ({ isOpen, onClose, onSuccess }) =>
     /* Waving a payment away says the reading was wrong, and a pattern that
        produces wrong readings is precisely the one that must not be filing
        anything unasked. So this revokes rather than merely not-counting. */
-    saveTrustLedger(recordRejection(loadTrustLedger(), proposal, Date.now()));
+    saveTrustLedger(recordRejection(loadTrustLedger(), proposal, tappedAt()));
 
     await acknowledgeProposal(proposal);
     setProposals((rest) => rest.filter((p) => p.clientMutationId !== proposal.clientMutationId));

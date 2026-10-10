@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nowForDateTimeInput, parseApiDate } from './datetime';
+import { monthsBefore, nowForDateTimeInput, parseApiDate } from './datetime';
 
 describe('nowForDateTimeInput', () => {
   it('formats a date in local time, not UTC', () => {
@@ -53,5 +53,20 @@ describe('parseApiDate', () => {
     const local = new Date(2026, 8, 2, 23, 52);
     const naiveFromApi = local.toISOString().replace('Z', '');
     expect(nowForDateTimeInput(parseApiDate(naiveFromApi))).toBe('2026-09-02T23:52');
+  });
+});
+
+describe('monthsBefore', () => {
+  // setMonth rolled 31 March back to "31 February" = 3 March.
+  it('clamps to the last day of a shorter month', () => {
+    expect(monthsBefore(new Date(2026, 2, 31), 1).toDateString()).toBe(new Date(2026, 1, 28).toDateString());
+    expect(monthsBefore(new Date(2028, 2, 31), 1).toDateString()).toBe(new Date(2028, 1, 29).toDateString());
+    expect(monthsBefore(new Date(2026, 4, 31), 3).toDateString()).toBe(new Date(2026, 1, 28).toDateString());
+  });
+
+  it('keeps the day when it exists, and crosses the year', () => {
+    expect(monthsBefore(new Date(2026, 9, 15), 1).toDateString()).toBe(new Date(2026, 8, 15).toDateString());
+    expect(monthsBefore(new Date(2026, 0, 10), 1).toDateString()).toBe(new Date(2025, 11, 10).toDateString());
+    expect(monthsBefore(new Date(2028, 1, 29), 12).toDateString()).toBe(new Date(2027, 1, 28).toDateString());
   });
 });

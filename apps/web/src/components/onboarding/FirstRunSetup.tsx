@@ -71,7 +71,9 @@ export const FirstRunSetup: React.FC<Props> = ({ onFinish }) => {
   }, []);
 
   useEffect(() => {
-    void loadAccounts();
+    // Deferred a tick: loading synchronously inside the effect re-rendered on mount.
+    const timer = setTimeout(() => { void loadAccounts(); }, 0);
+    return () => clearTimeout(timer);
   }, [loadAccounts]);
 
   const hasAccount = accounts.length > 0;

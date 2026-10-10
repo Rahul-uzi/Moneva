@@ -17,7 +17,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onClick }) =>
   const balance = account.balance_paise ?? account.opening_balance_minor;
 
   return (
-    <Card variant="surface" interactive onClick={onClick} className="account-card">
+    <Card variant="surface" interactive asButton onClick={onClick} className="account-card">
       <div className="account-header">
         {/* An account whose name contains a bank - "HDFC Savings" as much as
             "HDFC Bank" - gets that bank's mark. Anything else keeps the

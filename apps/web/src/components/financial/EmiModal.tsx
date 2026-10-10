@@ -7,6 +7,7 @@ import { apiClient, describeApiError } from '../../services/apiClient';
 import { useUiStore } from '../../stores/useUiStore';
 import { emiProgress } from '../../utils/cardCycle';
 import { formatMonetaryValue } from '../../utils/money';
+import { asDateInput, fromDateInput } from '../../utils/dateInput';
 import type { Account, Emi } from '../../types/api';
 import './EmiModal.css';
 
@@ -19,37 +20,7 @@ interface Props {
   onSuccess: () => void;
 }
 
-/**
- * An ISO instant as the yyyy-mm-dd a date input wants, on the local calendar.
- *
- * Local rather than UTC, and it has to match the way `emiProgress` counts the
- * months, or the date shown is not the date the plan runs on. Read through
- * toISOString, a plan started on the 1st came back as the last day of the
- * previous month for any reader west of Greenwich - and then, saved again,
- * walked a day earlier each time it was edited.
- */
-export const asDateInput = (iso: string): string => {
-  const at = Date.parse(iso);
-  if (!Number.isFinite(at)) return '';
-  const d = new Date(at);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-};
-
 const todayInput = (): string => asDateInput(new Date().toISOString());
-
-/**
- * The yyyy-mm-dd from the input, as the instant the day began for this reader.
- *
- * Built from the parts rather than parsed from a string, so it cannot depend
- * on whether an engine reads a bare date as local or as UTC.
- */
-export const fromDateInput = (value: string): string | null => {
-  const [y, m, d] = value.split('-').map((part) => Number.parseInt(part, 10));
-  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
-  const at = new Date(y, m - 1, d);
-  return Number.isNaN(at.getTime()) ? null : at.toISOString();
-};
 
 /**
  * Entering a plan the user is already committed to.
@@ -78,22 +49,31 @@ export const EmiModal: React.FC<Props> = ({
 
   const { addToast } = useUiStore();
 
+  // The moment the sheet opened - what "months paid so far" is counted against.
+  const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
     if (!isOpen) return;
-    if (emiToEdit) {
-      setName(emiToEdit.name);
-      setMonthlyPaise(emiToEdit.monthly_minor);
-      setMonths(String(emiToEdit.months));
-      setStartedOn(asDateInput(emiToEdit.started_at));
-      setAccountId(emiToEdit.account_id || '');
-    } else {
-      setName('');
-      setMonthlyPaise(0);
-      setMonths('12');
-      setStartedOn(todayInput());
-      setAccountId('');
-    }
-    setError(null);
+    // Deferred a tick, the pattern used across these sheets: resetting the form
+    // synchronously inside the effect re-rendered it a second time on open.
+    const timer = setTimeout(() => {
+      if (emiToEdit) {
+        setName(emiToEdit.name);
+        setMonthlyPaise(emiToEdit.monthly_minor);
+        setMonths(String(emiToEdit.months));
+        setStartedOn(asDateInput(emiToEdit.started_at));
+        setAccountId(emiToEdit.account_id || '');
+      } else {
+        setName('');
+        setMonthlyPaise(0);
+        setMonths('12');
+        setStartedOn(todayInput());
+        setAccountId('');
+      }
+      setError(null);
+      setNow(Date.now());
+    }, 0);
+    return () => clearTimeout(timer);
   }, [emiToEdit, isOpen]);
 
   const monthCount = Number.parseInt(months, 10);
@@ -102,11 +82,13 @@ export const EmiModal: React.FC<Props> = ({
 
   // Shown live so the plan can be read back before it is saved: a start date
   // typed wrong by a month is invisible in the form and obvious here.
-  const preview = (monthsAreValid && monthlyPaise > 0 && startedOn)
+  // The same local start the plan is saved with (fromDateInput), not UTC
+  // midnight - otherwise the preview and the saved plan could count differently.
+  const previewStart = startedOn ? fromDateInput(startedOn) : null;
+  const preview = (monthsAreValid && monthlyPaise > 0 && previewStart)
     ? emiProgress(
-        { name, monthlyMinor: monthlyPaise, months: monthCount,
-          startedAt: new Date(`${startedOn}T00:00:00.000Z`).toISOString() },
-        Date.now(),
+        { name, monthlyMinor: monthlyPaise, months: monthCount, startedAt: previewStart },
+        now,
       )
     : null;
 

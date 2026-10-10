@@ -157,7 +157,12 @@ export const ActivityPage: React.FC = () => {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toDateString();
 
-    filteredTransactions.forEach((tx) => {
+    // Newest first by the date itself, not by whatever order the API sent:
+    // the day groups are only correct if the list is.
+    const newestFirst = [...filteredTransactions].sort(
+      (a, b) => parseApiDate(b.transaction_date).getTime() - parseApiDate(a.transaction_date).getTime(),
+    );
+    newestFirst.forEach((tx) => {
       const txDate = parseApiDate(tx.transaction_date);
       let label = txDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
       if (txDate.toDateString() === todayStr) label = 'Today';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { withProposalCancelled, CANCELLED_TEXT } from './proposals';
+import { withProposalCancelled, withProposalDone, CANCELLED_TEXT } from './proposals';
 
 describe('withProposalCancelled', () => {
   const messages = [
@@ -34,5 +34,17 @@ describe('withProposalCancelled', () => {
 
   it('is a no-op for an unknown id', () => {
     expect(withProposalCancelled(messages, 'missing')).toEqual(messages);
+  });
+});
+
+describe('withProposalDone', () => {
+  it('drops the card from the carried-out message and keeps its words', () => {
+    const messages = [
+      { id: 'a', text: 'Shall I record this?', proposal: { type: 'add_expense' } },
+      { id: 'b', text: 'Other', proposal: { type: 'add_income' } },
+    ];
+    const out = withProposalDone(messages, 'a');
+    expect(out[0]).toEqual({ id: 'a', text: 'Shall I record this?', proposal: undefined });
+    expect(out[1]).toBe(messages[1]);
   });
 });

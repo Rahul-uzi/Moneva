@@ -53,7 +53,7 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ budget, categoryName = '
   const StatusIcon = status.icon;
 
   return (
-    <Card variant="surface" interactive onClick={onClick} className="budget-card">
+    <Card variant="surface" interactive asButton onClick={onClick} className="budget-card">
       <div className="budget-header">
         <div className="budget-title-box">
           <span className="budget-cat-name">{categoryName}</span>

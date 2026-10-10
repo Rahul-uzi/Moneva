@@ -19,7 +19,7 @@ interface Props {
 }
 
 /** An account is a card when it has both billing days - see the Account type. */
-export const isCard = (account: Account): boolean =>
+const isCard = (account: Account): boolean =>
   account.statement_day != null && account.due_day != null;
 
 const termsOf = (account: Account): CardTerms => ({

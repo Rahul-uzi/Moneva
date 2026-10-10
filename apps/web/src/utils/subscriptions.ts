@@ -1,4 +1,5 @@
 import { isPaymentApp } from './paymentAlert';
+import { parseApiDate } from './datetime';
 
 /**
  * Money that leaves on a rhythm.
@@ -295,7 +296,8 @@ export function findSubscriptions(
     const key = subscriptionKey(description);
     if (!key) continue;
 
-    const at = Date.parse(t.transaction_date);
+    // parseApiDate, like the rest of the app: a zone-less timestamp is UTC.
+    const at = parseApiDate(t.transaction_date).getTime();
     if (!Number.isFinite(at)) continue;
 
     // The cleaned name, not the raw narration: a statement writes

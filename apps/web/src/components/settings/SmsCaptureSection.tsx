@@ -56,7 +56,9 @@ export const SmsCaptureSection: React.FC<Props> = ({ onCaptured, onReadPrivacy }
   }, []);
 
   useEffect(() => {
-    void refresh();
+    // Deferred a tick: loading synchronously inside the effect re-rendered on mount.
+    const timer = setTimeout(() => { void refresh(); }, 0);
+    return () => clearTimeout(timer);
   }, [refresh]);
 
   if (!isSmsCaptureSupported()) return null;

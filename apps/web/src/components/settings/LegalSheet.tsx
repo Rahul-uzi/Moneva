@@ -86,7 +86,10 @@ export const LegalSheet: React.FC<Props> = ({ isOpen, onClose, initial = 'privac
   }, []);
 
   useEffect(() => {
-    if (isOpen) void readState();
+    if (!isOpen) return;
+    // Deferred a tick: loading synchronously inside the effect re-rendered on mount.
+    const timer = setTimeout(() => { void readState(); }, 0);
+    return () => clearTimeout(timer);
   }, [isOpen, readState]);
 
   return (

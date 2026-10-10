@@ -73,7 +73,9 @@ describe('the round trip the field actually performs', () => {
     // The reason this works on strings and never on a Number. 90,071,992,547
     // rupees is past the point where a double keeps every paise, and routing
     // the display through one would silently round the ledger.
-    const paise = 9007199254740993;
+    // 2^53 + 2: past the last safe integer, and - unlike the literal
+    // 9007199254740993 this used to be - a value a double holds exactly.
+    const paise = 2 ** 53 + 2;
     expect(Number.isSafeInteger(paise)).toBe(false);
     // Not asserting a round trip through the parser here - the value is past
     // what it accepts - only that grouping itself invents no digits.

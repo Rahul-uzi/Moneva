@@ -6,7 +6,7 @@ import { ActionProposalCard, type ProposedAction } from '../components/financial
 import { QuickAddModal } from '../components/financial/QuickAddModal';
 import { apiClient } from '../services/apiClient';
 import { formatMonetaryValue } from '../utils/money';
-import { withProposalCancelled } from '../utils/proposals';
+import { withProposalCancelled, withProposalDone } from '../utils/proposals';
 import { useUiStore } from '../stores/useUiStore';
 import {
   hydrateChatHistory,
@@ -349,8 +349,10 @@ export const AssistantPage: React.FC = () => {
     addToast('Proposed action cancelled.', 'info');
   };
 
-  const handleConfirmProposal = async (proposal: ProposedAction) => {
+  const handleConfirmProposal = async (proposal: ProposedAction, messageId: string) => {
     const clientMutationId = crypto.randomUUID();
+    // Carried out: the card goes, so it cannot be confirmed a second time.
+    const retire = () => setMessages((prev) => withProposalDone(prev, messageId));
 
     /* A debt is a note about a person, not a transaction, so it goes nowhere
        near /transactions. Writing it as an expense as well would record the
@@ -362,6 +364,7 @@ export const AssistantPage: React.FC = () => {
         items: lines.map((l) => ({ category_id: l.categoryId, limit_amount_minor: l.amountPaise })),
       });
       addToast(`Plan saved: ${lines.length} budget${lines.length === 1 ? '' : 's'} for this month.`, 'success');
+      retire();
       // Asked and answered, so go and look at it - which is what saying yes
       // to "save to your Plan tab?" means.
       navigate('/plan');
@@ -391,15 +394,14 @@ export const AssistantPage: React.FC = () => {
       });
       addToast('Settled.', 'success');
     } else if (proposal.type === 'bill_payment' && proposal.billId) {
-      if (!proposal.accountId && accounts.length > 0) {
-        proposal.accountId = accounts[0].id;
-      }
-      if (!proposal.accountId) {
+      // A local choice, not a change to the proposal held in state.
+      const billAccountId = proposal.accountId || accounts[0]?.id;
+      if (!billAccountId) {
         addToast('Please select a valid account for bill payment.', 'error');
         return;
       }
       await apiClient.post(`/bills/${proposal.billId}/pay`, {
-        account_id: proposal.accountId,
+        account_id: billAccountId,
         client_mutation_id: clientMutationId,
         device_id: 'web-client',
         payment_date: new Date().toISOString(),
@@ -446,9 +448,10 @@ export const AssistantPage: React.FC = () => {
       text:
         proposal.type === 'remember_debt' || proposal.type === 'settle_debt'
           ? `✓ ${proposal.type === 'remember_debt' ? 'Noted' : 'Settled'}: ${proposal.person} · ${formatMonetaryValue(proposal.amountPaise)}.`
-          : `✓ Action "${proposal.description}" of ₹${(proposal.amountPaise / 100).toFixed(2)} has been recorded into your live ledger.`,
+          : `✓ Action "${proposal.description}" of ${formatMonetaryValue(proposal.amountPaise)} has been recorded into your live ledger.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
+    retire();
     setMessages((prev) => [...prev, confirmMsg]);
   };
 
@@ -576,7 +579,7 @@ export const AssistantPage: React.FC = () => {
                 {msg.proposal && (
                   <ActionProposalCard
                     proposal={msg.proposal}
-                    onConfirm={handleConfirmProposal}
+                    onConfirm={(p) => handleConfirmProposal(p, msg.id)}
                     onCancel={() => handleCancelProposal(msg.id)}
                   />
                 )}

@@ -212,7 +212,7 @@ function findHeader(lines: string[][]): { index: number; cells: string[] } | nul
 
 const DATE_PARTS = /^(\d{1,4})[/\-. ](\d{1,2})[/\-. ](\d{2,4})$/;
 const MONTH_NAMES = 'jan feb mar apr may jun jul aug sep oct nov dec'.split(' ');
-const TEXT_DATE = /^(\d{1,2})[\-/ ]([a-z]{3})[a-z]*[\-/ ](\d{2,4})$/i;
+const TEXT_DATE = /^(\d{1,2})[-/ ]([a-z]{3})[a-z]*[-/ ](\d{2,4})$/i;
 
 export function inferDateOrder(samples: readonly string[]): DateOrder {
   let firstOver12 = 0;

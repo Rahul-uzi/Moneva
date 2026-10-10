@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { asDateInput, fromDateInput } from './EmiModal';
+import { asDateInput, fromDateInput } from '../../utils/dateInput';
 import { emiProgress } from '../../utils/cardCycle';
 
 /**

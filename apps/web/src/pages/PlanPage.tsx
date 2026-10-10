@@ -39,6 +39,9 @@ export const PlanPage: React.FC = () => {
   // the shortest window that can see a yearly renewal twice, which is what
   // it takes to call one a subscription rather than a purchase.
   const [history, setHistory] = useState<Transaction[]>([]);
+  // The instant every subscription date on screen is measured from, read once
+  // per load rather than on each render, so the rows can never disagree.
+  const [now, setNow] = useState(() => Date.now());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +94,7 @@ export const PlanPage: React.FC = () => {
         setCategories(catRes.data);
         setAccounts(accRes.data);
         setHistory(txRes.data);
+        setNow(Date.now());
         setError(null);
       }
     } catch (err: unknown) {
@@ -159,8 +163,8 @@ export const PlanPage: React.FC = () => {
    * row on screen is measured from the same instant.
    */
   const subscriptions = useMemo(
-    () => findSubscriptions(history, Date.now()),
-    [history],
+    () => findSubscriptions(history, now),
+    [history, now],
   );
 
   /** Whatever the accounts are denominated in; they share one currency. */
@@ -466,7 +470,7 @@ export const PlanPage: React.FC = () => {
         <SubscriptionsSection
           subscriptions={subscriptions}
           currency={planCurrency}
-          now={Date.now()}
+          now={now}
         />
       )}
 

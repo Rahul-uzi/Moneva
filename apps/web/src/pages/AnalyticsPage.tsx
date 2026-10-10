@@ -20,6 +20,8 @@ import { useUiStore } from '../stores/useUiStore';
 import { formatMonetaryValue } from '../utils/money';
 import type { FinancialSummary } from '../types/api';
 import './AnalyticsPage.css';
+import { monthsBefore } from '../utils/datetime';
+import { localDateValue } from '../utils/moneySheets';
 
 interface CategoryBreakdownItem {
   category_id: string;
@@ -63,16 +65,18 @@ export const AnalyticsPage: React.FC = () => {
   const dateParams = useMemo(() => {
     if (range === 'all') return {};
     const now = new Date();
-    const startDate = new Date();
+    let startDate = new Date();
 
     if (range === 'week') {
       startDate.setDate(now.getDate() - 7);
     } else if (range === 'month') {
-      startDate.setMonth(now.getMonth() - 1);
+      // Clamped: on the 31st, "a month ago" is the last day of last month,
+      // not the 3rd of this one (see monthsBefore).
+      startDate = monthsBefore(now, 1);
     } else if (range === '3months') {
-      startDate.setMonth(now.getMonth() - 3);
+      startDate = monthsBefore(now, 3);
     } else if (range === 'year') {
-      startDate.setFullYear(now.getFullYear() - 1);
+      startDate = monthsBefore(now, 12);
     }
 
     /**
@@ -164,7 +168,8 @@ export const AnalyticsPage: React.FC = () => {
 
       const res = await apiClient.get(`/finance/reports/export${urlSuffix}`);
       const result = await exportJsonFile(
-        `moneva_analytics_report_${range}_${new Date().toISOString().slice(0, 10)}.json`,
+        // Today's LOCAL date: the UTC one is yesterday until 05:30 in India.
+        `moneva_analytics_report_${range}_${localDateValue(new Date())}.json`,
         res.data,
         'MONEVA analytics report',
       );
