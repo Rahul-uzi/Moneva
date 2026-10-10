@@ -10,7 +10,12 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@capacitor/cli": "^8.5.0",
+    "@capacitor/cli": "8.5.2",
     "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "@capacitor/core": "8.5.2",
+    "@capacitor/android": "8.5.2",
+    "@capacitor/ios": "8.5.2"
   }
 }

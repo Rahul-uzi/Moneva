@@ -27,23 +27,18 @@
  * Every step fails loudly and stops - see release.mjs for why that matters.
  */
 import { execSync } from 'node:child_process';
-import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, relative, sep } from 'node:path';
 import { crc32, deflateRawSync } from 'node:zlib';
+import { ROOT, SITE_UPDATES, loadSigningKey, readManifest, writeManifest } from './lib/manifest.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const WEB = join(ROOT, 'apps', 'web');
 const DIST = join(WEB, 'dist');
 const UPDATES = join(ROOT, 'website', 'updates');
-const MANIFEST = join(UPDATES, 'manifest.json');
 const ENV_PROD = join(WEB, '.env.production');
 const GRADLE_VARS = join(WEB, 'android', 'variables.gradle');
-const KEY_SOURCE = join(WEB, 'src', 'utils', 'liveUpdateManifest.ts');
-const SITE_URL = 'https://moneva.monev.workers.dev/updates/';
-const KEY_PATH = process.env.MONEVA_UPDATE_KEY || join(homedir(), '.moneva', 'live-update-ed25519.pem');
+const SITE_URL = SITE_UPDATES;
 const KEEP_BUNDLES = 2;
 
 let step = 0;
@@ -56,21 +51,6 @@ const arg = (name) => {
 };
 const VERSION_RE = /^(\d{1,3})\.(\d{1,2})\.(\d{1,2})$/;
 const codeOf = (v) => { const m = VERSION_RE.exec(v); return m ? +m[1] * 10000 + +m[2] * 100 + +m[3] : -1; };
-
-/** The public key the APP trusts, read from its source - not from the private key. */
-const appPublicKey = () => {
-  const m = /LIVE_UPDATE_PUBLIC_KEY = '([A-Za-z0-9_-]+)'/.exec(readFileSync(KEY_SOURCE, 'utf8'));
-  if (!m) die(`no LIVE_UPDATE_PUBLIC_KEY in ${relative(ROOT, KEY_SOURCE)}`);
-  return createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: m[1] }, format: 'jwk' });
-};
-
-const readManifest = () => {
-  if (!existsSync(MANIFEST)) return null;
-  const env = JSON.parse(readFileSync(MANIFEST, 'utf8'));
-  const payload = Buffer.from(env.payload, 'base64');
-  const good = verify(null, payload, appPublicKey(), Buffer.from(env.signature, 'base64'));
-  return { good, manifest: JSON.parse(payload.toString('utf8')) };
-};
 
 /* ---- a small, dependency-free zip writer (stored + deflate, no zip64) ---- */
 const listFiles = (dir) => readdirSync(dir).flatMap((name) => {
@@ -145,12 +125,8 @@ if (codeOf(version) <= nativeNow) die(`${version} is not newer than the APK (${n
 ok(`${current ? current.manifest.version : 'nothing'} -> ${version}, for APKs from ${minNative}`);
 
 heading('Loading the signing key');
-if (!existsSync(KEY_PATH)) die(`no signing key at ${KEY_PATH}`);
-const privateKey = createPrivateKey(readFileSync(KEY_PATH));
-const derivedX = createPublicKey(privateKey).export({ format: 'jwk' }).x;
-if (derivedX !== appPublicKey().export({ format: 'jwk' }).x) {
-  die('this private key does not match the public key built into the app - phones would refuse the update');
-}
+let privateKey;
+try { privateKey = loadSigningKey(); } catch (e) { die(e.message); }
 ok('matches the key the app trusts');
 
 heading('Building the web bundle');
@@ -173,13 +149,14 @@ const zipName = `moneva-web-${version}.zip`;
 const zip = zipDir(DIST);
 writeFileSync(join(UPDATES, zipName), zip);
 const sha256 = createHash('sha256').update(zip).digest('hex');
-const payload = Buffer.from(JSON.stringify({
-  version, url: SITE_URL + zipName, sha256, min_native_code: minNative, notes,
-  released_at: new Date().toISOString(),
-}), 'utf8');
-const signature = sign(null, payload, privateKey);
-writeFileSync(MANIFEST, JSON.stringify({ payload: payload.toString('base64'), signature: signature.toString('base64') }, null, 2) + '\n');
-if (!readManifest().good) die('the manifest just written does not verify');
+try {
+  writeManifest({
+    version, url: SITE_URL + zipName, sha256, min_native_code: minNative, notes,
+    released_at: new Date().toISOString(),
+    // The APK section belongs to release.mjs; carried over untouched.
+    ...(current?.manifest.apk ? { apk: current.manifest.apk } : {}),
+  }, privateKey);
+} catch (e) { die(e.message); }
 ok(`${zipName}  ${(zip.length / 1024).toFixed(0)} KB  sha256 ${sha256.slice(0, 16)}...`);
 ok('manifest signed and verified against the app key');
 

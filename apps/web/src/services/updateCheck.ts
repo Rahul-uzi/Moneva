@@ -19,6 +19,8 @@
 
 import { Capacitor } from '@capacitor/core';
 import { apiClient } from './apiClient';
+import { versionCodeOf } from '../utils/version';
+import { fetchManifest } from '../utils/liveUpdateManifest';
 
 export interface LatestVersion {
   version_code: number;
@@ -43,11 +45,7 @@ export interface UpdateNews {
  * the same one build.gradle uses - MAJOR*10000 + MINOR*100 + PATCH - so 1.2.3
  * is 10203 on both sides.
  */
-export const versionCodeOf = (name: string): number => {
-  const parts = String(name).trim().split('.').map((n) => parseInt(n, 10));
-  const [major, minor, patch] = [parts[0] || 0, parts[1] || 0, parts[2] || 0];
-  return major * 10000 + minor * 100 + patch;
-};
+export { versionCodeOf };
 
 export const currentVersionName = (): string =>
   (import.meta.env?.VITE_APP_VERSION as string | undefined) ?? '0.0.0';
@@ -109,8 +107,13 @@ export const checkForUpdate = async (): Promise<UpdateNews | null> => {
   if (!Capacitor.isNativePlatform()) return null;
 
   try {
-    const res = await apiClient.get<LatestVersion>('/app/version');
-    const latest = res.data;
+    /* The signed manifest on the website first (since 1.0.12): publishing an
+       APK is then a push, with nothing to set by hand on Render. Render's
+       /app/version stays as the fallback for when the site cannot be read. */
+    const apk = (await fetchManifest())?.apk;
+    const latest: LatestVersion | null = apk
+      ? { version_code: apk.version_code, version_name: apk.version_name, download_url: apk.url, notes: apk.notes, mandatory: apk.mandatory }
+      : (await apiClient.get<LatestVersion>('/app/version')).data;
     if (!latest || !latest.version_code) return null;
 
     const current = versionCodeOf(currentVersionName());

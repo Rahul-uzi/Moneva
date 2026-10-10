@@ -34,6 +34,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SITE_DOWNLOADS, loadSigningKey, readManifest, writeManifest } from './lib/manifest.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const WEB = join(ROOT, 'apps', 'web');
@@ -280,17 +281,25 @@ if (!version) {
 const current = readVersions();
 const code = versionCodeOf(version);
 
+/* The Update button reads the APK from the signed manifest (since 1.0.12), and
+   shows these notes - so they are required, and checked before anything builds. */
+const notesAt = process.argv.indexOf('--notes');
+const notes = notesAt > 0 ? (process.argv[notesAt + 1] || '').trim() : '';
+if (!notes) die('say in one line what changed: --notes "..." (shown on the Update button)');
+if (notes.length > 200) die('keep --notes under 200 characters');
+
 /* One version sequence for APKs and live updates. A phone already running live
    update 1.0.10 compares any APK against 1.0.10, so an APK numbered 1.0.9
    would never be offered to it - it must come after the newest live update. */
-const liveManifest = join(SITE, 'updates', 'manifest.json');
-if (existsSync(liveManifest)) {
-  const env = JSON.parse(readFileSync(liveManifest, 'utf8'));
-  const live = JSON.parse(Buffer.from(env.payload, 'base64').toString('utf8')).version;
-  if (code <= versionCodeOf(live)) {
-    die(`${version} is not newer than live update ${live}. Phones on ${live} would never be offered it.`);
-  }
+const staged0 = readManifest();
+if (!staged0) die('no website/updates/manifest.json - publish a live update first (scripts/live-update.mjs)');
+if (!staged0.good) die('website/updates/manifest.json does not verify against the key in the app');
+if (code <= versionCodeOf(staged0.manifest.version)) {
+  const live = staged0.manifest.version;
+  die(`${version} is not newer than live update ${live}. Phones on ${live} would never be offered it.`);
 }
+let signingKey;
+try { signingKey = loadSigningKey(); } catch (e) { die(e.message); }
 if (code <= current.gradleCode && version !== current.gradleName) {
   die(`${version} (code ${code}) is not newer than the current ${current.gradleName} `
     + `(code ${current.gradleCode}). Android refuses a downgrade.`);
@@ -391,6 +400,23 @@ ok(specChanged ? `spec line now reads v${version} · ${sizeMb} MB` : 'spec line 
 
 const digest = sha256(apk);
 
+heading('Signing the update manifest');
+/* What the Update button reads. The live-update fields are carried over as
+   they were; only the APK section is this script's to write. */
+try {
+  writeManifest({
+    ...readManifest().manifest,
+    apk: {
+      version_code: code,
+      version_name: version,
+      url: `${SITE_DOWNLOADS}moneva-${version}.apk`,
+      notes,
+      mandatory: false,
+    },
+  }, signingKey);
+} catch (e) { die(e.message); }
+ok(`website/updates/manifest.json now offers APK ${version}, signed and verified`);
+
 if (wantInstall) {
   heading('Installing on the connected device');
   const devices = run(`"${ADB}" devices`, ROOT);
@@ -410,13 +436,15 @@ say(`  APK  ${(apkSize / 1048576).toFixed(2)} MB   website/downloads/moneva-${ve
 say(`  AAB  ${(aabSize / 1048576).toFixed(2)} MB   ${aab}`);
 say(`       (an .aab cannot be installed - it is for Play upload only)\n`);
 say(`  SHA-256  ${digest}\n`);
-say('Still to do by hand, because neither lives in this repository:\n');
-say('  1. Commit and push. Cloudflare redeploys the site within a minute.');
-say('  2. Set these on Render, or NO EXISTING USER IS TOLD about this release:\n');
+say('Still to do:\n');
+say('  1. Commit and push. Cloudflare redeploys the site within a minute, and the');
+say('     Update button on every phone with 1.0.12+ screens offers this APK.');
+say('  2. Only for phones whose screens are OLDER than 1.0.12 (they still ask');
+say('     Render): set these on Render.\n');
 say(`       LATEST_VERSION_CODE=${code}`);
 say(`       LATEST_VERSION_NAME=${version}`);
-say(`       APK_DOWNLOAD_URL=https://moneva.monev.workers.dev/downloads/moneva-${version}.apk`);
-say('       LATEST_RELEASE_NOTES=<one line on what changed>\n');
-say('  3. Delete the previous APK from website/downloads/ - git keeps every');
-say('     version of a binary for ever.\n');
+say(`       APK_DOWNLOAD_URL=${SITE_DOWNLOADS}moneva-${version}.apk`);
+say(`       LATEST_RELEASE_NOTES=${notes}\n`);
+say('  3. Once (2) is done, delete the previous APK from website/downloads/ -');
+say('     git keeps every version of a binary for ever.\n');
 say(`${'-'.repeat(68)}\n`);

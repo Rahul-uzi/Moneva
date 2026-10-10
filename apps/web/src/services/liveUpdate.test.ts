@@ -25,15 +25,10 @@ vi.mock('@capacitor/app', () => ({
     addListener: (_: string, fn: (s: { isActive: boolean }) => void) => { stateListener = fn; return Promise.resolve({ remove: () => {} }); },
   },
 }));
-vi.mock('./updateCheck', () => ({
-  currentVersionName: () => '1.0.9',
-  versionCodeOf: (v: string) => { const [a, b, c] = v.split('.').map(Number); return a * 10000 + b * 100 + c; },
-}));
+vi.mock('./updateCheck', () => ({ currentVersionName: () => '1.0.9' }));
+const fetchManifest = vi.fn();
 vi.mock('../utils/liveUpdateManifest', () => ({
-  verifyManifest: () => Promise.resolve({
-    version: '1.0.10', url: 'https://moneva.monev.workers.dev/updates/moneva-web-1.0.10.zip',
-    sha256: 'a'.repeat(64), min_native_code: 10008, notes: 'Safer timing',
-  }),
+  fetchManifest: () => fetchManifest(),
   shouldDownload: () => true,
 }));
 
@@ -44,7 +39,10 @@ beforeEach(() => {
   stateListener = null;
   updater.list.mockResolvedValue({ bundles: [] });
   updater.download.mockResolvedValue({ id: 'b10', version: '1.0.10', status: 'pending' });
-  globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) })) as unknown as typeof fetch;
+  fetchManifest.mockResolvedValue({
+    version: '1.0.10', url: 'https://moneva.monev.workers.dev/updates/moneva-web-1.0.10.zip',
+    sha256: 'a'.repeat(64), min_native_code: 10008, notes: 'Safer timing',
+  });
 });
 afterEach(() => { vi.clearAllMocks(); vi.useRealTimers(); });
 
@@ -70,15 +68,15 @@ describe('downloading', () => {
 describe('how often it looks', () => {
   it('always looks when the app starts from closed', async () => {
     await live.checkForLiveUpdate({ force: true });
-    (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockClear();
+    fetchManifest.mockClear();
     live.startLiveUpdates();
-    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(fetchManifest).toHaveBeenCalledTimes(1));
   });
 
   it('looks again on a return only after 30 minutes', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     await live.checkForLiveUpdate({ force: true });
-    const f = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const f = fetchManifest;
     f.mockClear();
     await live.checkForLiveUpdate();
     expect(f).not.toHaveBeenCalled();

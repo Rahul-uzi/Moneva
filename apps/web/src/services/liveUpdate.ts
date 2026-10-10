@@ -1,8 +1,9 @@
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
-import { currentVersionName, versionCodeOf } from './updateCheck';
-import { verifyManifest, shouldDownload } from '../utils/liveUpdateManifest';
+import { currentVersionName } from './updateCheck';
+import { versionCodeOf } from '../utils/version';
+import { fetchManifest, shouldDownload } from '../utils/liveUpdateManifest';
 
 /**
  * Live updates: new screens and fixes without an APK.
@@ -31,7 +32,6 @@ import { verifyManifest, shouldDownload } from '../utils/liveUpdateManifest';
  * itself, with set(), at the two safe moments above.
  */
 
-const MANIFEST_URL = 'https://moneva.monev.workers.dev/updates/manifest.json';
 /* The manifest is a few hundred bytes from Cloudflare's edge, so checking is
    nearly free: every start from closed, and on returns at most every 30 min. */
 const CHECK_EVERY_MS = 30 * 60 * 1000;
@@ -109,11 +109,9 @@ export const checkForLiveUpdate = async ({ force = false }: { force?: boolean } 
   if (!force && Date.now() - last < CHECK_EVERY_MS) return;
   running = true;
   try {
-    const res = await fetch(`${MANIFEST_URL}?t=${Date.now()}`, { cache: 'no-store' });
-    if (!res.ok) return;
-    const manifest = await verifyManifest(await res.json());
-    write(LAST_CHECK_KEY, String(Date.now()));
+    const manifest = await fetchManifest();
     if (!manifest) return;
+    write(LAST_CHECK_KEY, String(Date.now()));
 
     const nativeCode = Number((await App.getInfo()).build) || 0;
     if (!shouldDownload(manifest, { bundleVersion: currentVersionName(), nativeCode })) return;

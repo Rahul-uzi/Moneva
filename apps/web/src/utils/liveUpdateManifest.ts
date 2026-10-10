@@ -1,4 +1,4 @@
-import { versionCodeOf } from '../services/updateCheck';
+import { versionCodeOf } from './version';
 
 /**
  * Reading and trusting the live-update manifest.
@@ -15,6 +15,18 @@ export const LIVE_UPDATE_PUBLIC_KEY = 'xKnErog9UrpBwFsYoOtBH17j1fxWbx1kD0kATaYHs
 
 /** Bundles are only ever fetched from here. */
 export const BUNDLE_URL_PREFIX = 'https://moneva.monev.workers.dev/updates/';
+/** ...and APKs only from here. */
+export const APK_URL_PREFIX = 'https://moneva.monev.workers.dev/downloads/';
+export const MANIFEST_URL = `${BUNDLE_URL_PREFIX}manifest.json`;
+
+/** The newest APK, for the Update button. Signed with the rest of the manifest. */
+export interface ApkInfo {
+  version_code: number;
+  version_name: string;
+  url: string;
+  notes: string;
+  mandatory: boolean;
+}
 
 export interface LiveManifest {
   /** The web bundle's version, on the same sequence as the APK's. */
@@ -25,7 +37,24 @@ export interface LiveManifest {
   /** Oldest native shell (versionCode) this bundle runs on. */
   min_native_code: number;
   notes: string;
+  apk?: ApkInfo;
 }
+
+const readApk = (raw: unknown): ApkInfo | undefined => {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const a = raw as Partial<ApkInfo>;
+  if (typeof a.version_name !== 'string' || !VERSION.test(a.version_name)) return undefined;
+  // The code is derived from the name everywhere else; a mismatch is a mistake.
+  if (a.version_code !== versionCodeOf(a.version_name)) return undefined;
+  if (typeof a.url !== 'string' || !a.url.startsWith(APK_URL_PREFIX) || !a.url.endsWith('.apk')) return undefined;
+  return {
+    version_code: a.version_code,
+    version_name: a.version_name,
+    url: a.url,
+    notes: typeof a.notes === 'string' ? a.notes.slice(0, 200) : '',
+    mandatory: a.mandatory === true,
+  };
+};
 
 const VERSION = /^\d{1,3}\.\d{1,2}\.\d{1,2}$/;
 
@@ -69,6 +98,7 @@ export const verifyManifest = async (
       sha256: m.sha256,
       min_native_code: m.min_native_code,
       notes: typeof m.notes === 'string' ? m.notes.slice(0, 200) : '',
+      apk: readApk((m as { apk?: unknown }).apk),
     };
   } catch {
     // Old WebViews without Ed25519 land here too: no verification, no update.
@@ -88,3 +118,14 @@ export const shouldDownload = (
   { bundleVersion, nativeCode }: { bundleVersion: string; nativeCode: number },
 ): boolean =>
   versionCodeOf(manifest.version) > versionCodeOf(bundleVersion) && manifest.min_native_code <= nativeCode;
+
+/** Reads and verifies the manifest on the website; null on any failure. */
+export const fetchManifest = async (): Promise<LiveManifest | null> => {
+  try {
+    const res = await fetch(`${MANIFEST_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return await verifyManifest(await res.json());
+  } catch {
+    return null;
+  }
+};

@@ -78,6 +78,30 @@ describe('verifyManifest', () => {
   });
 });
 
+describe('the APK section', () => {
+  const APK = {
+    version_code: 10012, version_name: '1.0.12',
+    url: 'https://moneva.monev.workers.dev/downloads/moneva-1.0.12.apk', notes: 'Security fix', mandatory: false,
+  };
+
+  it('is read when it is signed with the rest', async () => {
+    const m = await verifyManifest(await envelope(enc({ ...GOOD, apk: APK })), publicKey);
+    expect(m?.apk).toEqual(APK);
+  });
+
+  it('is dropped when it points anywhere but the downloads page', async () => {
+    const elsewhere = { ...APK, url: 'https://example.com/moneva-1.0.12.apk' };
+    const m = await verifyManifest(await envelope(enc({ ...GOOD, apk: elsewhere })), publicKey);
+    expect(m).not.toBeNull();
+    expect(m?.apk).toBeUndefined();
+  });
+
+  it('is dropped when its code does not match its name', async () => {
+    const m = await verifyManifest(await envelope(enc({ ...GOOD, apk: { ...APK, version_code: 20000 } })), publicKey);
+    expect(m?.apk).toBeUndefined();
+  });
+});
+
 describe('shouldDownload', () => {
   const m = GOOD as LiveManifest;
 
