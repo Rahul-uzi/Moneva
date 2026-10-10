@@ -527,7 +527,7 @@ export const ProfilePage: React.FC = () => {
 
           <section {...enter()} className="pf-enter pf-group" aria-label="Appearance">
             <h2 className="pf-group-label">Appearance</h2>
-            <div className="pf-theme">
+            <div className="pf-theme" data-pill-card>
               <ThemePill
                 mode={themeMode}
                 onChange={(m) => { setThemeModeState(m); persistThemeMode(m); }}

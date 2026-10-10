@@ -44,3 +44,15 @@
   # The page changes with every release; the APK it points at does not. A
   # cached index would offer an old download long after a new one shipped.
   Cache-Control: public, max-age=0, must-revalidate
+
+/updates/manifest.json
+  # Read by every phone to learn whether new screens exist. Never cached, or a
+  # release would reach people only when some cache happened to expire.
+  Cache-Control: no-cache, no-store, must-revalidate
+  Content-Type: application/json
+
+/updates/*.zip
+  # A versioned file never changes once published; an hour keeps a mistake
+  # from being cached for long (see the APK rule above for why not a year).
+  Content-Type: application/zip
+  Cache-Control: public, max-age=3600

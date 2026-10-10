@@ -20,6 +20,7 @@
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/share": "^8.0.1",
     "@capacitor/status-bar": "^8.0.3",
+    "@capgo/capacitor-updater": "8.51.25",
     "@hookform/resolvers": "^5.9.1",
     "axios": "^1.20.0",
     "lucide-react": "^1.37.0",

@@ -52,7 +52,7 @@
 .pf-otp.is-busy .pf-otp-box { opacity: 0.6; }
 .pf-otp.is-error { animation: pfShake 0.4s; }
 .pf-otp.is-error .pf-otp-box { border-color: var(--moneva-text-on-danger); }
-.pf-otp.is-done .pf-otp-box { border-color: #CDFF4A; background: #CDFF4A; color: var(--moneva-on-brand); }
+.pf-otp.is-done .pf-otp-box { border-color: var(--moneva-blue); background: var(--moneva-blue); color: var(--moneva-on-brand); }
 .pf-otp.is-done .pf-otp-box:nth-child(3) { transition-delay: 0.04s; }
 .pf-otp.is-done .pf-otp-box:nth-child(4) { transition-delay: 0.08s; }
 .pf-otp.is-done .pf-otp-box:nth-child(5) { transition-delay: 0.12s; }

@@ -61,7 +61,7 @@
   height: 58px;
   overflow: hidden;
   border-radius: 50%;
-  background: #CDFF4A;
+  background: var(--moneva-blue);
   color: var(--moneva-on-brand);
   font-size: 23px;
   font-weight: 800;
@@ -296,7 +296,7 @@
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: #CDFF4A;
+  background: var(--moneva-blue);
   color: var(--moneva-on-brand);
 }
 .pf-status-mark.is-quiet { background: var(--moneva-overlay-strong); color: var(--moneva-text-on-accent); }
@@ -316,7 +316,7 @@
   height: 76px;
   margin-top: 8px;
   border-radius: 50%;
-  background: #CDFF4A;
+  background: var(--moneva-blue);
   color: var(--moneva-on-brand);
   animation: pfPopIn 0.55s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
@@ -357,7 +357,7 @@
   height: 112px;
   overflow: hidden;
   border-radius: 50%;
-  background: #CDFF4A;
+  background: var(--moneva-blue);
   color: var(--moneva-on-brand);
   font-size: 44px;
   font-weight: 800;
@@ -420,7 +420,7 @@
   transition: background-color 0.2s, border-color 0.2s;
 }
 .pf-tick svg { opacity: 0; }
-.pf-choice[aria-checked='true'] .pf-tick { background: #CDFF4A; border-color: #CDFF4A; }
+.pf-choice[aria-checked='true'] .pf-tick { background: var(--moneva-blue); border-color: var(--moneva-blue); }
 .pf-choice[aria-checked='true'] .pf-tick svg { opacity: 1; }
 .pf-tick .pf-spin { width: 12px; height: 12px; border-width: 2px; }
 
@@ -575,7 +575,7 @@
 .form-input:focus,
 .form-select:focus {
   border-color: var(--moneva-blue);
-  box-shadow: 0 0 0 3px rgba(205, 255, 74, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--moneva-blue) 18%, transparent);
   outline: none;
 }
 

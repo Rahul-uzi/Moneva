@@ -130,7 +130,7 @@ button.pf-row:active { background: var(--moneva-overlay); }
   background: var(--moneva-text-secondary);
   transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1), background-color 0.25s;
 }
-[aria-checked='true'] > .pf-switch { background: #CDFF4A; }
+[aria-checked='true'] > .pf-switch { background: var(--moneva-blue); }
 [aria-checked='true'] > .pf-switch::after { transform: translateX(18px); background: var(--moneva-on-brand); }
 
 /* a small button at the end of a row */
@@ -154,7 +154,7 @@ button.pf-row:active { background: var(--moneva-overlay); }
   transition: transform var(--dur-press) var(--ease-out);
 }
 .pf-mini:active { transform: scale(0.95); }
-.pf-mini.is-primary { border-color: transparent; background: #CDFF4A; color: var(--moneva-on-brand); }
+.pf-mini.is-primary { border-color: transparent; background: var(--moneva-blue); color: var(--moneva-on-brand); }
 .pf-mini:disabled { opacity: 0.55; cursor: progress; }
 .pf-mini:focus-visible { outline: 2px solid var(--moneva-text-on-accent); outline-offset: 2px; }
 
@@ -169,7 +169,7 @@ button.pf-row:active { background: var(--moneva-overlay); }
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #CDFF4A;
+  background: var(--moneva-blue);
   transition: width 0.2s ease-out;
 }
 

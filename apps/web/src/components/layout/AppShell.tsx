@@ -19,6 +19,7 @@ import { Capacitor } from '@capacitor/core';
 import { isOnboardingPending, completeOnboarding, ONBOARDING_REQUESTED } from '../../services/onboardingService';
 import { isTourPending, completeTour, markTourPending, TOUR_REQUESTED } from '../../services/tourService';
 import { isSetupPending, completeSetup, markSetupPending, SETUP_REQUESTED } from '../../services/setupService';
+import { takeUpdateNote } from '../../services/liveUpdate';
 import './AppShell.css';
 
 // Only ever fetched for a brand-new account, so it stays out of every other launch.
@@ -35,7 +36,14 @@ interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({ title }) => {
   const navigate = useNavigate();
-  const { isOnline } = useUiStore();
+  const { isOnline, addToast } = useUiStore();
+
+  // One line about what changed, the first time a live update runs. Said once,
+  // after the fact - the update itself never asked anyone for anything.
+  useEffect(() => {
+    const note = takeUpdateNote();
+    if (note) addToast(note, 'info');
+  }, [addToast]);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState<boolean>(false);
   const [isNotifOpen, setIsNotifOpen] = useState<boolean>(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);

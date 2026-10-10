@@ -8,6 +8,7 @@ import './styles/landscape.css'
 import App from './App.tsx'
 import { initTheme } from './services/themeService'
 import { clearStoredApiUrl, warmUpApi } from './services/apiClient'
+import { markAppReady, startLiveUpdates } from './services/liveUpdate'
 
 /**
  * Mark the packaged app, so the stylesheet can behave like an app.
@@ -27,6 +28,10 @@ if (Capacitor.isNativePlatform()) {
   document.documentElement.classList.add('is-native-app')
 }
 
+// First thing, before any network: a live-update bundle that does not report
+// in within 10 seconds is rolled back to the last one that did.
+markAppReady()
+
 // Apply the saved appearance preference before first paint.
 initTheme()
 
@@ -44,3 +49,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// Quietly fetch any newer screens; they take over on a later start, never mid-use.
+startLiveUpdates()
