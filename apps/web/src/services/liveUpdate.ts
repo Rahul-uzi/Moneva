@@ -10,8 +10,9 @@ import { verifyManifest, shouldDownload } from '../utils/liveUpdateManifest';
  * The APK is a native shell around a web bundle - every screen, colour and
  * line of logic. A new bundle can therefore be shipped on its own:
  *
- *   1. On launch and on return to the app (at most every few hours), the
- *      signed manifest on the website is read and verified.
+ *   1. Every time the app starts from closed, and on returns to it at most
+ *      every 30 minutes, the signed manifest on the website is read and
+ *      verified.
  *   2. If it names a newer bundle this shell can run, the zip is downloaded
  *      quietly; the updater checks its SHA-256 before unpacking.
  *   3. It is NOT applied while anyone could be in the middle of something.
@@ -31,7 +32,9 @@ import { verifyManifest, shouldDownload } from '../utils/liveUpdateManifest';
  */
 
 const MANIFEST_URL = 'https://moneva.monev.workers.dev/updates/manifest.json';
-const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+/* The manifest is a few hundred bytes from Cloudflare's edge, so checking is
+   nearly free: every start from closed, and on returns at most every 30 min. */
+const CHECK_EVERY_MS = 30 * 60 * 1000;
 const APPLY_AFTER_AWAY_MS = 10 * 60 * 1000;
 const LAST_CHECK_KEY = 'moneva_live_last_check';
 const PENDING_KEY = 'moneva_live_pending';
@@ -154,7 +157,8 @@ export const takeUpdateNote = (): string | null => {
  */
 export const startLiveUpdates = (): void => {
   if (!isNative()) return;
-  void checkForLiveUpdate();
+  // A start from closed always checks, whatever the last check was.
+  void checkForLiveUpdate({ force: true });
 
   let leftAt = 0;
   void App.addListener('appStateChange', ({ isActive }) => {

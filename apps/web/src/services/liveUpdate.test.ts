@@ -67,6 +67,27 @@ describe('downloading', () => {
   });
 });
 
+describe('how often it looks', () => {
+  it('always looks when the app starts from closed', async () => {
+    await live.checkForLiveUpdate({ force: true });
+    (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockClear();
+    live.startLiveUpdates();
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+  });
+
+  it('looks again on a return only after 30 minutes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    await live.checkForLiveUpdate({ force: true });
+    const f = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    f.mockClear();
+    await live.checkForLiveUpdate();
+    expect(f).not.toHaveBeenCalled();
+    vi.setSystemTime(Date.now() + 30 * 60 * 1000 + 1);
+    await live.checkForLiveUpdate();
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('switching over', () => {
   const waiting = async () => {
     await live.checkForLiveUpdate({ force: true });
