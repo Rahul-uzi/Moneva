@@ -22,13 +22,15 @@ describe('the theme pill', () => {
     expect(onChange).toHaveBeenCalledWith('dark');
   });
 
-  it('changes once per tap, even though finger-down and the click both arrive', () => {
+  // Seen on the phone: a swipe down the page that began on the pill switched
+  // the theme, because the pill acted the moment the finger landed.
+  it('ignores a finger that lands on it and then scrolls away', () => {
     const onChange = vi.fn();
     render(<ThemePill mode="light" onChange={onChange} />);
     const dark = screen.getByRole('radio', { name: 'Dark' });
     fireEvent.pointerDown(dark, { button: 0 });
-    fireEvent.click(dark);
-    expect(onChange).toHaveBeenCalledTimes(1);
+    fireEvent.pointerCancel(dark);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('does nothing when the chosen mode is tapped again', () => {
@@ -133,6 +135,47 @@ describe('the theme pill', () => {
       act(() => { on('theme-wash')[0].onfinish?.(); });
       const props = animations.flatMap((a) => a.keyframes.flatMap((k) => Object.keys(k)));
       expect(new Set(props)).toEqual(new Set(['transform', 'opacity']));
+    });
+
+    // Seen on the phone: Light then Dark in quick succession ended on Light,
+    // because the first switch's recolour landed after the second tap.
+    it('ends on the last choice when tapped again mid-switch', async () => {
+      const onChange = vi.fn();
+      const { rerender } = render(<ThemePill mode="dark" onChange={(m) => { onChange(m); rerender(<ThemePill mode={m} onChange={onChange} />); }} />);
+      fireEvent.click(screen.getByRole('radio', { name: 'Light' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 1250)); });
+      expect(onChange).toHaveBeenLastCalledWith('dark');
+      expect(screen.getByRole('radio', { name: 'Dark' }).getAttribute('aria-checked')).toBe('true');
+      // The first circle went when the second tap came; never two at once.
+      expect(document.querySelectorAll('.theme-wash')).toHaveLength(0);
+      expect(document.querySelectorAll('.theme-ghost')).toHaveLength(0);
+    });
+
+    it('never leaves two circles on screen', () => {
+      render(<ThemePill mode="dark" onChange={() => {}} />);
+      fireEvent.click(screen.getByRole('radio', { name: 'Light' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Light' }));
+      expect(document.querySelectorAll('.theme-wash')).toHaveLength(1);
+      expect(document.querySelectorAll('.theme-ghost')).toHaveLength(1);
+    });
+
+    // The copy of the pill is pinned to the screen; once the page moves it
+    // would float over whatever scrolled under it.
+    it('finishes at once when the page scrolls', () => {
+      const onChange = vi.fn();
+      render(
+        <div data-pill-card>
+          <ThemePill mode="light" onChange={onChange} />
+        </div>,
+      );
+      fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
+      expect(document.querySelector('.theme-ghost')).toBeTruthy();
+      fireEvent.scroll(document.body);
+      expect(onChange).toHaveBeenCalledWith('dark');
+      expect(document.querySelector('.theme-wash')).toBeNull();
+      expect(document.querySelector('.theme-ghost')).toBeNull();
     });
 
     // Seen in a background pane: an animation that never ends left the theme unchanged.

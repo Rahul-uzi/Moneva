@@ -17,8 +17,12 @@
   background: var(--moneva-blue);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
   transform: translateX(calc(var(--i, 2) * 100%));
+  /* No will-change: kept on its own layer for good, the thumb forced the
+     labels above it onto a second layer, and on the A33 that layer was
+     sometimes not redrawn after a theme switch - Light, Dark and System
+     vanished until something else repainted the page. The transition still
+     moves it on the graphics chip while it slides. */
   transition: transform 0.3s cubic-bezier(0.3, 1.3, 0.5, 1);
-  will-change: transform;
 }
 
 .pf-seg button {

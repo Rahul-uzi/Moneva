@@ -85,13 +85,22 @@ const pillGhost = (from: HTMLElement, next: ThemeMode): HTMLElement | null => {
  */
 export const ThemePill: React.FC<ThemePillProps> = ({ mode, onChange }) => {
   const wanted = useRef(mode);
-  // The thumb moves the moment the finger lands; the page follows under the circle.
+  /* Ends the switch still in progress at once - its theme applied, its circle
+     and copy gone. Seen on the phone: a second tap while the first circle was
+     still growing was undone when the first one's recolour landed late, and
+     the pill and the page no longer agreed. */
+  const finishRunning = useRef<(() => void) | null>(null);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The thumb moves the moment the finger lifts; the page follows under the circle.
   const [pending, setPending] = useState<ThemeMode | null>(null);
   const shown = pending ?? mode;
   const index = MODES.findIndex((m) => m.mode === shown);
 
   const choose = (next: ThemeMode, from: HTMLElement | null) => {
     if (next === wanted.current) return;
+    // What the page is showing once any earlier switch has been finished.
+    const current = finishRunning.current ? wanted.current : mode;
+    finishRunning.current?.();
     wanted.current = next;
 
     const root = document.documentElement;
@@ -99,13 +108,17 @@ export const ThemePill: React.FC<ThemePillProps> = ({ mode, onChange }) => {
     const apply = () => {
       if (applied) return;
       applied = true;
+      clearTimeout(settleTimer.current);
       root.classList.add('theme-switching');
       flushSync(() => { setPending(null); onChange(next); });
     };
-    const settle = () => setTimeout(() => root.classList.remove('theme-switching'), 50);
+    const settle = () => {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = setTimeout(() => root.classList.remove('theme-switching'), 50);
+    };
 
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (resolveTheme(mode) === resolveTheme(next) || !from || reduce || document.hidden || !document.body.animate) {
+    if (resolveTheme(current) === resolveTheme(next) || !from || reduce || document.hidden || !document.body.animate) {
       apply();
       settle();
       return;
@@ -137,15 +150,25 @@ export const ThemePill: React.FC<ThemePillProps> = ({ mode, onChange }) => {
     let painted = false;
     let fading = false;
     let cleaned = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     const cleanup = () => {
       if (cleaned) return;
       cleaned = true;
+      timers.forEach(clearTimeout);
+      window.removeEventListener('scroll', finish, true);
+      if (finishRunning.current === finish) finishRunning.current = null;
       wash.remove();
       ghost?.remove();
       settle();
     };
+    const finish = () => { apply(); cleanup(); };
+    finishRunning.current = finish;
+    /* The copy of the pill is pinned to the screen, so once the page scrolls
+       it no longer sits over the real one. A scroll ends the switch at once. */
+    window.addEventListener('scroll', finish, { capture: true, passive: true });
+
     const fadeOut = () => {
-      if (!grown || !painted || fading) return;
+      if (!grown || !painted || fading || cleaned) return;
       fading = true;
       const fade = wash.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, easing: 'ease-out', fill: 'forwards' });
       // The real pill underneath already looks exactly like the copy, so the
@@ -158,14 +181,14 @@ export const ThemePill: React.FC<ThemePillProps> = ({ mode, onChange }) => {
       { duration: 380, easing: 'cubic-bezier(.3,.7,.2,1)', fill: 'forwards' },
     );
     grow.onfinish = () => { grown = true; fadeOut(); };
-    setTimeout(() => {
+    timers.push(setTimeout(() => {
       apply();
       // Two frames: the first is the long one that paints the new colours.
       requestAnimationFrame(() => requestAnimationFrame(() => { painted = true; fadeOut(); }));
-    }, RECOLOUR_AT);
+    }, RECOLOUR_AT));
     // Never a pill stuck half-way or a circle left on screen, even if no
     // frame ever comes (the app sent to the background mid-switch).
-    setTimeout(() => { apply(); cleanup(); }, 1200);
+    timers.push(setTimeout(finish, 1200));
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -195,7 +218,8 @@ export const ThemePill: React.FC<ThemePillProps> = ({ mode, onChange }) => {
           data-mode={m}
           aria-checked={shown === m}
           tabIndex={shown === m ? 0 : -1}
-          onPointerDown={(e) => { if (e.button === 0) choose(m, e.currentTarget); }}
+          /* On the click, not finger-down: a scroll that happens to start on
+             the pill is not a choice. */
           onClick={(e) => choose(m, e.currentTarget)}
         >
           <Icon size={16} aria-hidden="true" />
