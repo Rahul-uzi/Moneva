@@ -10,9 +10,13 @@
   z-index: 100;
   margin: 0 14px calc(10px + env(safe-area-inset-bottom, 0px));
 
-  display: flex;
+  /* Equal halves either side of the button, so it stays centred whichever
+     tab is open. Each half is never narrower than its tabs need, though: on
+     a very narrow phone the button gives a little ground rather than a
+     label being cut off. */
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 3px;
   padding: 8px;
   box-sizing: border-box;
@@ -27,14 +31,26 @@
   box-shadow: 0 8px 24px rgba(10, 11, 13, 0.12);
 }
 
+/* Within a half, the tab next to the button sits midway between the edge tab
+   and the button, so all four gaps match as they did before the split. */
+.dock-side {
+  display: flex;
+  align-items: center;
+}
+.dock-side--start .dock-tab:last-child,
+.dock-side--end .dock-tab:first-child {
+  margin-inline: auto;
+}
+
 .dock-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-height: 46px;
-  /* Tight enough that four tabs, the open one's label and the button all fit
-     inside the pill on a 360px screen without anything having to shrink. */
-  padding: 0 9px;
+  /* 8 + 20 + 8 + 8 = 44px for a tab showing only its icon: Android's touch
+     target. And tight enough that the widest half - Activity open, with Home
+     beside it - fits in half of a 384px screen (Galaxy A33), so the button
+     can stay dead centre. */
+  padding: 0 8px;
   /* If it ever does overflow, the label gives way - it already clips - rather
      than the icon squashing. */
   min-width: 0;
@@ -58,19 +74,32 @@
 /* The label is present for assistive tech on every tab; only the open one
    takes up any width. */
 .dock-label {
-  max-width: 0;
+  /* The space between icon and label, which an icon-only tab keeps too - it
+     makes up the 44px. */
+  margin-left: 8px;
+  /* Unrolls from 0fr to 1fr: in proportion to the label's own width, so the
+     label closing and the one opening always add up to no more than they do
+     at rest. A max-width slide did not: both reached full width part-way
+     through, the left half outgrew its share for a moment, and Home ->
+     Activity nudged the button 5px right and back. */
+  display: grid;
+  grid-template-columns: 0fr;
   opacity: 0;
-  overflow: hidden;
   white-space: nowrap;
   transition:
-    max-width var(--dur-base) var(--ease-soft),
+    grid-template-columns var(--dur-base) var(--ease-soft),
     opacity var(--dur-fast) ease;
+}
+
+.dock-label > span {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .dock-tab.is-active {
   background-color: var(--moneva-blue);
   color: var(--moneva-on-brand);
-  padding-right: 13px;
+  padding-right: 10px;
 }
 
 .dock-tab svg {
@@ -78,7 +107,7 @@
 }
 
 .dock-tab.is-active .dock-label {
-  max-width: 90px;
+  grid-template-columns: 1fr;
   opacity: 1;
 }
 
