@@ -1,0 +1,38 @@
+.ib-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ib-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ib-section-total {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--moneva-text-main);
+}
+
+.ib-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ib-empty {
+  margin: 0;
+}
+
+/* The sum of both sections - the card's "Received", so the two can be seen
+   to agree. */
+.ib-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--moneva-border);
+}

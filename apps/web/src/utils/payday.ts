@@ -23,6 +23,13 @@ export const normaliseFrequency = (frequency: string | null | undefined): string
 export const cycleLengthDays = (frequency: string): number =>
   CYCLE_DAYS[normaliseFrequency(frequency)] ?? 30;
 
+/**
+ * How close a payday has to be before Home counts down to it. The user's
+ * call: a month-long countdown that appears the day after payday says
+ * nothing; the last fortnight is when "how long until I'm paid" matters.
+ */
+export const PAYDAY_COUNTDOWN_DAYS = 15;
+
 export interface Payday {
   id: string;
   source: string;
@@ -30,7 +37,8 @@ export interface Payday {
   /** Whole days from today. 0 means it lands today. */
   daysAway: number;
   cycleDays: number;
-  /** How far through the cycle we are, 0 to 1. */
+  /** How far through the countdown we are, 0 to 1: empty when the card
+   *  first appears, full on the day. */
   progress: number;
 }
 
@@ -64,9 +72,12 @@ export function nextPayday(streams: RecurringIncome[], today: Date = new Date())
     if (daysAway < 0) continue;
 
     const cycleDays = cycleLengthDays(stream.frequency);
-    // A payday further out than its own cycle means the stream is anchored
-    // oddly; clamp rather than report a negative share of the cycle elapsed.
-    const progress = Math.min(1, Math.max(0, (cycleDays - daysAway) / cycleDays));
+    // The arc spans the countdown, not the whole cycle - otherwise a monthly
+    // salary's card would first appear already half full. A weekly one counts
+    // down its own seven days. Clamped: a payday further out than the window
+    // draws an empty arc rather than a negative one.
+    const window = Math.min(cycleDays, PAYDAY_COUNTDOWN_DAYS);
+    const progress = Math.min(1, Math.max(0, (window - daysAway) / window));
 
     if (best === null || daysAway < best.daysAway) {
       best = {

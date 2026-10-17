@@ -66,8 +66,34 @@
 }
 
 .salary-breakdown {
-  text-transform: none;
-  letter-spacing: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 18px;
+  row-gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--moneva-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Label and amount stay together; it is the whole part that moves down. */
+.salary-part {
+  white-space: nowrap;
+}
+
+/* The same line, as the way into the payments behind it. The whole line is
+   the target. */
+.salary-breakdown.is-button {
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .salary-setup-link {

@@ -8,13 +8,21 @@ import './SalaryUsageCard.css';
 interface Props {
   usage: SalaryUsage;
   onSetUpSalary?: () => void;
+  /** Opens the list of the payments behind the salary / extra income split. */
+  onShowIncome?: () => void;
 }
+
+/** An amount without ".00" when there are no paise - "₹40,000", "₹1,200". */
+const short = (minor: number, currency: string): string => {
+  const text = formatMonetaryValue(minor, currency);
+  return minor % 100 === 0 ? text.replace(/\.00$/, '') : text;
+};
 
 /**
  * This month's income against this month's spending.
  * "Left" is total income received minus every expense recorded this month.
  */
-export const SalaryUsageCard: React.FC<Props> = ({ usage, onSetUpSalary }) => {
+export const SalaryUsageCard: React.FC<Props> = ({ usage, onSetUpSalary, onShowIncome }) => {
   const {
     salary_received_minor: salary,
     other_income_minor: other,
@@ -87,11 +95,26 @@ export const SalaryUsageCard: React.FC<Props> = ({ usage, onSetUpSalary }) => {
         </strong>
       </div>
 
-      {salary > 0 && other > 0 && (
-        <span className="text-label salary-breakdown">
-          Salary {formatMonetaryValue(salary, currency)} · Other {formatMonetaryValue(other, currency)}
-        </span>
-      )}
+      {/* "Extra income", not "Other": it is income all the same - money from
+          people, refunds, rewards - just not the salary. Tapping the line
+          lists the payments, so the split can be checked. Each part keeps
+          its label and amount together; when both no longer fit on one line
+          the second moves down whole rather than breaking in the middle. */}
+      {income > 0 && (() => {
+        const parts = (
+          <>
+            {salary > 0 && <span className="salary-part">Salary {short(salary, currency)}</span>}
+            {other > 0 && <span className="salary-part">Extra income {short(other, currency)}</span>}
+          </>
+        );
+        return onShowIncome ? (
+          <button type="button" className="salary-breakdown is-button" onClick={onShowIncome}>
+            {parts}
+          </button>
+        ) : (
+          <div className="salary-breakdown">{parts}</div>
+        );
+      })()}
     </Card>
   );
 };

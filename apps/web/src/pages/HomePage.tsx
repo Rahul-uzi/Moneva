@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { FinancialSummaryCard } from '../components/financial/FinancialSummaryCard';
 import { SalaryUsageCard } from '../components/financial/SalaryUsageCard';
+import { IncomeBreakdownSheet } from '../components/financial/IncomeBreakdownSheet';
 import { AccountCard } from '../components/financial/AccountCard';
 import { BudgetCard } from '../components/financial/BudgetCard';
 import { GoalCard } from '../components/financial/GoalCard';
@@ -20,7 +21,7 @@ import { ChevronRight } from 'lucide-react';
 import { apiClient, describeApiError } from '../services/apiClient';
 import { formatMonetaryValue } from '../utils/money';
 import { useUiStore } from '../stores/useUiStore';
-import { nextPayday } from '../utils/payday';
+import { nextPayday, PAYDAY_COUNTDOWN_DAYS } from '../utils/payday';
 import { isNewSince } from '../utils/activity';
 import { readLastSeen, writeLastSeen } from '../services/lastSeen';
 import type {
@@ -97,6 +98,8 @@ export const HomePage: React.FC = () => {
      no money; `onSelectForConfirmation` is the way through to recording one. */
   const [isSalaryStreamOpen, setIsSalaryStreamOpen] = useState<boolean>(false);
   const [ruleToConfirm, setRuleToConfirm] = useState<RecurringIncome | null>(null);
+  // The month's income, opened from the salary / extra income line.
+  const [isIncomeOpen, setIsIncomeOpen] = useState<boolean>(false);
 
   const { addToast } = useUiStore();
 
@@ -235,9 +238,10 @@ export const HomePage: React.FC = () => {
         />
       )}
 
-      {/* 2. When the next one lands. Only shown while nothing is overdue - two
-             answers to "where is my salary" would contradict each other. */}
-      {dueIncome.length === 0 && payday && <PaydayCard payday={payday} />}
+      {/* 2. When the next one lands, in its last 15 days. Only shown while
+             nothing is overdue - two answers to "where is my salary" would
+             contradict each other. */}
+      {dueIncome.length === 0 && payday && payday.daysAway <= PAYDAY_COUNTDOWN_DAYS && <PaydayCard payday={payday} />}
 
       {/* 3. Salary that is due but unrecorded - asked, never assumed. */}
       <DueSalaryCard
@@ -252,7 +256,20 @@ export const HomePage: React.FC = () => {
 
       {/* 3. This month's income vs spending */}
       {salaryUsage && (
-        <SalaryUsageCard usage={salaryUsage} onSetUpSalary={() => setIsSalaryStreamOpen(true)} />
+        <SalaryUsageCard
+          usage={salaryUsage}
+          onSetUpSalary={() => setIsSalaryStreamOpen(true)}
+          onShowIncome={() => setIsIncomeOpen(true)}
+        />
+      )}
+      {salaryUsage && (
+        <IncomeBreakdownSheet
+          isOpen={isIncomeOpen}
+          onClose={() => setIsIncomeOpen(false)}
+          usage={salaryUsage}
+          salarySources={salaryStreams.map((s) => s.source)}
+          onSelect={(tx) => { setIsIncomeOpen(false); setSelectedTransaction(tx); }}
+        />
       )}
 
       {/* 4. Accounts Overview */}

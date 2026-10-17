@@ -150,6 +150,18 @@ describe('the dashboard figures', () => {
     expect(screen.getByRole('img', { name: /Monthly Salary arrives in 5 days/ })).toBeTruthy();
   });
 
+  // Asked for by the user: no month-long countdown, only the last 15 days.
+  it('counts down only in the last 15 days before payday', async () => {
+    data.streams = [{ ...data.streams[0], next_occurrence: daysFromToday(24) }];
+    await show();
+    expect(screen.queryByText('Next payday')).toBeNull();
+    cleanup();
+
+    data.streams = [{ ...data.streams[0], next_occurrence: daysFromToday(15) }];
+    await show();
+    expect(besideLabel('Next payday')).toContain('15 days');
+  });
+
   // Two answers to "where is my salary" would contradict each other.
   it('does not count down while a salary is overdue and unrecorded', async () => {
     data.due = [{

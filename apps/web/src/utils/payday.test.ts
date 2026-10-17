@@ -93,12 +93,18 @@ describe('nextPayday', () => {
     expect(nextPayday([], on('2026-09-05'))).toBeNull();
   });
 
-  it('fills the arc as the cycle runs down', () => {
-    const justPaid = nextPayday([stream({ next_occurrence: '2026-10-05' })], on('2026-09-05'));
-    const almostThere = nextPayday([stream({ next_occurrence: '2026-09-08' })], on('2026-09-05'));
-    expect(justPaid!.progress).toBeLessThan(0.1);
-    expect(almostThere!.progress).toBeGreaterThan(0.85);
-    expect(almostThere!.progress).toBeLessThanOrEqual(1);
+  // The card appears 15 days out; its arc starts empty there, not half full.
+  it('fills the arc over the last 15 days', () => {
+    const at = (date: string) => nextPayday([stream({ next_occurrence: date })], on('2026-09-05'))!.progress;
+    expect(at('2026-09-20')).toBe(0); // 15 days: the card's first day
+    expect(at('2026-10-05')).toBe(0); // further out still: empty, never negative
+    expect(at('2026-09-08')).toBeCloseTo(12 / 15);
+    expect(at('2026-09-05')).toBe(1);
+  });
+
+  it('counts a weekly stream down over its own seven days', () => {
+    const found = nextPayday([stream({ frequency: 'weekly', next_occurrence: '2026-09-09' })], on('2026-09-05'));
+    expect(found?.progress).toBeCloseTo(3 / 7);
   });
 
   /* A stream anchored oddly can sit further out than its own cycle. The arc
