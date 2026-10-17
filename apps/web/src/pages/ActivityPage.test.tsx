@@ -96,9 +96,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 10)); });
-const show = async () => {
+/** Opens the page. Most tests here are about the whole history, so they
+ *  widen the period to all time; the page itself opens on this month. */
+const show = async (period: 'month' | 'all' = 'all') => {
   render(<MemoryRouter><ActivityPage /></MemoryRouter>);
   await settle();
+  // Absent on the error screen, which has no list to scope.
+  const select = screen.queryByLabelText('Time period');
+  if (select && period !== 'month') fireEvent.change(select, { target: { value: period } });
 };
 
 /** Entry titles in the order they appear on screen. */
@@ -174,6 +179,24 @@ describe('the activity list', () => {
     expect(titles()).toContain('Corner Book Store');
   });
 
+  // Asked for by the user: the log should mostly show the current month.
+  // 40 days back is always before the 1st, whatever today's date.
+  it('opens on this month', async () => {
+    await show('month');
+    expect((screen.getByLabelText('Time period') as HTMLSelectElement).value).toBe('month');
+    expect(titles()).toContain('Fresh Mart');
+    expect(titles()).not.toContain('Corner Book Store');
+  });
+
+  it('says so, and offers the rest, when this month has nothing yet', async () => {
+    transactions = [TRANSACTIONS.find((t) => t.description === 'Corner Book Store')!];
+    await show('month');
+    expect(screen.getByText('Nothing this month yet')).toBeTruthy();
+    expect(screen.queryByText('You have not created any transaction activity yet.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all time' }));
+    expect(titles()).toEqual(['Corner Book Store']);
+  });
+
   it('invites a first entry when there is no activity at all', async () => {
     transactions = [];
     await show();
@@ -193,7 +216,8 @@ describe('the activity list', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /Retry/ }));
     await settle();
-    expect(titles()).toHaveLength(4);
+    // Back on the page's own opening view, this month - so today's entry.
+    expect(titles()).toContain('Fresh Mart');
   });
 });
 

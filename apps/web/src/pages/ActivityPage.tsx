@@ -31,7 +31,9 @@ export const ActivityPage: React.FC = () => {
   // Filters & State
   const [activeTab, setActiveTab] = useState<'all' | 'expense' | 'income'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [period, setPeriod] = useState<'month' | '30d' | '90d' | '3m' | 'all'>('all');
+  // Opens on this month - the period people check most. A different choice
+  // lasts for the visit; the next visit starts on this month again.
+  const [period, setPeriod] = useState<'month' | '30d' | '90d' | '3m' | 'all'>('month');
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   // Long-press target: the sheet offers edit or delete for any entry here.
   const [actionTx, setActionTx] = useState<Transaction | null>(null);
@@ -231,11 +233,11 @@ export const ActivityPage: React.FC = () => {
           onChange={(e) => setPeriod(e.target.value as typeof period)}
           aria-label="Time period"
         >
-          <option value="all">All time</option>
           <option value="month">This month</option>
           <option value="30d">Last 30 days</option>
           <option value="90d">Last 90 days</option>
           <option value="3m">Last 3 months</option>
+          <option value="all">All time</option>
         </select>
           <ChevronDown size={14} />
         </div>
@@ -298,15 +300,28 @@ export const ActivityPage: React.FC = () => {
 
       {/* Grouped Transactions List */}
       {filteredTransactions.length === 0 ? (
-        <EmptyState
-          art="ledger"
-          title="No Transactions Found"
-          description={
-            searchQuery || activeTab !== 'all'
-              ? 'No transactions match your selected search or filter.'
-              : 'You have not created any transaction activity yet.'
-          }
-        />
+        searchQuery || activeTab !== 'all' || transactions.length === 0 ? (
+          <EmptyState
+            art="ledger"
+            title="No Transactions Found"
+            description={
+              searchQuery || activeTab !== 'all'
+                ? 'No transactions match your selected search or filter.'
+                : 'You have not created any transaction activity yet.'
+            }
+          />
+        ) : (
+          /* There is history, just none in the chosen period - the 1st of the
+             month, on the new default. Saying "no activity yet" would be
+             wrong, so it says what is true and offers the rest. */
+          <EmptyState
+            art="ledger"
+            title={period === 'month' ? 'Nothing this month yet' : 'Nothing in this period'}
+            description="Your earlier transactions are still here."
+            actionLabel="Show all time"
+            onAction={() => setPeriod('all')}
+          />
+        )
       ) : (
         <div className="grouped-transactions" key={`${activeTab}:${searchQuery}:${period}`}>
           {groupedTransactions.map((group) => (
