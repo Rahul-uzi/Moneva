@@ -2,6 +2,8 @@ import { LocalNotifications, type Channel } from '@capacitor/local-notifications
 import { Capacitor } from '@capacitor/core';
 import type { NotificationRecord } from '../types/api';
 import { stableId } from './reminderScheduler';
+import { markReadFromTray } from './notificationRead';
+import { UPDATE_ROUTE } from './appUpdate';
 
 export type PermissionStatus = 'granted' | 'denied' | 'prompt';
 
@@ -15,6 +17,8 @@ export interface UserNotifPreferences {
 const DELIVERED_KEY = 'moneva_delivered_notifs';
 const ASKED_KEY = 'moneva_notif_permission_asked';
 const DELIVERED_CAP = 500;
+/** The newest version a "new version" notification has been posted for. */
+const UPDATE_NOTICED_KEY = 'moneva_update_noticed_code';
 
 /**
  * Delivers server-generated notifications to the system tray.
@@ -38,7 +42,8 @@ class NativeNotificationService {
     }
   }
 
-  public setDeepLinkHandler(handler: (route: string) => void) {
+  /** Opens a tapped notification's page inside the app; null falls back to a full load. */
+  public setDeepLinkHandler(handler: ((route: string) => void) | null) {
     this.onDeepLinkCallback = handler;
   }
 
@@ -110,7 +115,12 @@ class NativeNotificationService {
     if (!this.isNative) return;
     try {
       void LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
-        const extra = action.notification.extra as { route?: string } | undefined;
+        const extra = action.notification.extra as { route?: string; notifId?: string; source?: string } | undefined;
+        // Opened from the tray, so it has been read. Only server notifications
+        // have a row to mark; reminders planned on the phone do not.
+        if (extra?.source === 'moneva-server' && typeof extra.notifId === 'string' && extra.notifId) {
+          void markReadFromTray(extra.notifId);
+        }
         const route = extra?.route || '/plan';
         if (this.onDeepLinkCallback) this.onDeepLinkCallback(route);
         else window.location.href = route;
@@ -218,6 +228,41 @@ class NativeNotificationService {
       });
       this.deliveredIds.add(notifId);
       this.saveDelivered();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * "MONEVA 1.0.16 is out" in the phone's notification shade, once per version.
+   *
+   * The update banner is only seen inside the app; this one is there when the
+   * person next looks at their phone. Tapping it opens the in-app updater
+   * (UPDATE_ROUTE), the same place the banner's "Get it" leads. Posted once
+   * per version - a notification repeated on every launch is one people turn
+   * off, along with every bill reminder on the same switch.
+   */
+  public async postUpdateNotice(latest: { version_code: number; version_name: string; notes?: string | null }): Promise<boolean> {
+    if (!this.isNative || !latest.version_code) return false;
+    try {
+      const noticed = Number(localStorage.getItem(UPDATE_NOTICED_KEY) || 0);
+      if (noticed >= latest.version_code) return false;
+      if ((await this.checkPermission()) !== 'granted') return false;
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: stableId(`update:${latest.version_code}`),
+            title: `MONEVA ${latest.version_name} is out`,
+            body: latest.notes?.trim() || 'Tap to update.',
+            channelId: 'system',
+            extra: { route: UPDATE_ROUTE, source: 'moneva-update' },
+            smallIcon: 'ic_stat_moneva',
+            iconColor: '#CDFF4A',
+          },
+        ],
+      });
+      localStorage.setItem(UPDATE_NOTICED_KEY, String(latest.version_code));
       return true;
     } catch {
       return false;

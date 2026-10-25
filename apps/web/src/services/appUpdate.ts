@@ -88,6 +88,13 @@ const readMessage = (err: unknown, fallback: string): string => {
 /** Whether this build can update itself at all. The web app is never stale. */
 export const canSelfUpdate = (): boolean => Capacitor.isNativePlatform();
 
+/**
+ * Where "update now" leads: Profile's Version row, told to start by itself.
+ * The update banner and the "new version" notification both open it, so
+ * there is one download-and-install flow in the app, not three.
+ */
+export const UPDATE_ROUTE = '/profile?update=1';
+
 export const updaterStatus = async (): Promise<UpdaterStatus | null> => {
   if (!canSelfUpdate()) return null;
   try {

@@ -11,6 +11,7 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { apiClient } from './apiClient';
+import { flushPendingReads } from './notificationRead';
 import { nativeNotificationService, type UserNotifPreferences } from './notificationService';
 import { shouldSync, syncDeviceReminders, type ReminderCard } from './reminderScheduler';
 import { cardCycle, cardLedger, cycleTotals } from '../utils/cardCycle';
@@ -48,6 +49,10 @@ export const runNotificationSync = async (opts: { force?: boolean } = {}): Promi
     skipped: true, permission: 'n/a', deliveredNow: 0, scheduled: 0, autoAdded: 0,
   };
   if (!Capacitor.isNativePlatform()) return result;
+
+  // Reads from tray taps that have not reached the server yet go first, so a
+  // notification already opened is not listed as unread again below.
+  await flushPendingReads();
 
   const now = new Date();
   if (!shouldSync(now, opts.force)) return result;

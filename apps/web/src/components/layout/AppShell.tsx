@@ -14,6 +14,8 @@ import { apiClient, STALE_DATA_EVENT, FRESH_DATA_EVENT } from '../../services/ap
 import { checkForUpdate, dismissUpdate, wasRecentlyDismissed, type UpdateNews } from '../../services/updateCheck';
 import { flushCrashes } from '../../services/crashReporter';
 import { runNotificationSync } from '../../services/notificationSync';
+import { nativeNotificationService } from '../../services/notificationService';
+import { flushPendingReads, NOTIFICATIONS_CHANGED } from '../../services/notificationRead';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { isOnboardingPending, completeOnboarding, ONBOARDING_REQUESTED } from '../../services/onboardingService';
@@ -125,6 +127,22 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
     };
   }, [fetchUnreadCount, refreshTrigger]);
 
+  /* A notification opened from the phone's tray is marked read (see
+     notificationRead.ts). Its page opens inside the app rather than by a full
+     reload - which also used to cut the mark-read request off - and the bell
+     recounts as soon as the server has it. Reads a cold start or a lost
+     signal interrupted are sent again here. */
+  useEffect(() => {
+    nativeNotificationService.setDeepLinkHandler((route) => navigate(route));
+    const recount = () => { void fetchUnreadCount(true); };
+    window.addEventListener(NOTIFICATIONS_CHANGED, recount);
+    void flushPendingReads();
+    return () => {
+      nativeNotificationService.setDeepLinkHandler(null);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, recount);
+    };
+  }, [navigate, fetchUnreadCount]);
+
   /**
    * Two things that belong on launch and nowhere else.
    *
@@ -136,6 +154,32 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
    * uninteresting case, including a failure, so an unreachable version
    * endpoint never produces a message.
    */
+  /* A newer APK: the banner in the app, and - once per version - a
+     notification in the shade (nativeNotificationService.postUpdateNotice). */
+  const lookForNewVersion = useCallback(async () => {
+    const news = await checkForUpdate();
+    if (!news) return;
+    void nativeNotificationService.postUpdateNotice(news.latest);
+    // A version waved away stays away for a few days - unless it is the
+    // one the release marked as required.
+    if (!news.latest.mandatory && wasRecentlyDismissed(news.latest.version_code)) return;
+    setUpdate(news);
+  }, []);
+
+  /* Checked again on coming back to the app, at most every 30 minutes - MONEVA
+     can sit in the background for days, and a release published meanwhile
+     would otherwise wait for a cold start to be mentioned at all. */
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let lastCheck = Date.now();
+    const sub = App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive || Date.now() - lastCheck < 30 * 60 * 1000) return;
+      lastCheck = Date.now();
+      void lookForNewVersion();
+    });
+    return () => { void sub.then((h) => h.remove()); };
+  }, [lookForNewVersion]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       void flushCrashes((record) => apiClient.post('/app/crashes', {
@@ -146,17 +190,11 @@ export const AppShell: React.FC<AppShellProps> = ({ title }) => {
         at: Date.parse(record.at) || undefined,
       }));
 
-      void checkForUpdate().then((news) => {
-        if (!news) return;
-        // A version waved away stays away for a few days - unless it is the
-        // one the release marked as required.
-        if (!news.latest.mandatory && wasRecentlyDismissed(news.latest.version_code)) return;
-        setUpdate(news);
-      });
+      void lookForNewVersion();
       // After the first paint, so neither delays the screen appearing.
     }, 2500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [lookForNewVersion]);
 
   useEffect(() => {
     const onStale = (e: Event) => {

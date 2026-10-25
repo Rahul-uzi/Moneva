@@ -7,14 +7,19 @@
  * The exception is a release marked mandatory, which is the one case where
  * carrying on with the old build is the worse outcome.
  *
- * It cannot install anything. Android does not let a web view install an APK,
- * and should not: the link opens the download, and the person installs it
- * themselves, deliberately.
+ * "Get it" starts the app's own updater (Profile's Version row): download
+ * with progress, then Android's install prompt. It used to be a link, which
+ * left the app for Chrome, landed the file in Downloads and left the person
+ * to find and install it themselves. Android still asks before installing -
+ * that confirmation is the person's, and stays. (The web app has no updater,
+ * so there it is still a link.)
  */
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowUpCircle, X } from 'lucide-react';
 import type { UpdateNews } from '../../services/updateCheck';
+import { canSelfUpdate, UPDATE_ROUTE } from '../../services/appUpdate';
 import './UpdateBanner.css';
 
 interface Props {
@@ -24,6 +29,7 @@ interface Props {
 
 export const UpdateBanner: React.FC<Props> = ({ news, onDismiss }) => {
   const { latest } = news;
+  const navigate = useNavigate();
 
   return (
     <div
@@ -44,7 +50,11 @@ export const UpdateBanner: React.FC<Props> = ({ news, onDismiss }) => {
       {/* No link when the server has no URL for the file. Offering a button
           that goes nowhere is worse than not mentioning the update: it makes
           the app look broken rather than merely out of date. */}
-      {latest.download_url && (
+      {latest.download_url && (canSelfUpdate() ? (
+        <button type="button" className="update-banner-action" onClick={() => navigate(UPDATE_ROUTE)}>
+          Get it
+        </button>
+      ) : (
         <a
           className="update-banner-action"
           href={latest.download_url}
@@ -53,7 +63,7 @@ export const UpdateBanner: React.FC<Props> = ({ news, onDismiss }) => {
         >
           Get it
         </a>
-      )}
+      ))}
 
       {/* A required update has no dismiss. Everything else does - somebody on
           a train has not decided never to update, and it asks again in a few

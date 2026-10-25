@@ -56,6 +56,10 @@
   font-size: 12px;
   font-weight: 600;
   text-decoration: none;
+  /* Also a <button> on the phone (see UpdateBanner.tsx): no browser border. */
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
 }
 
 .update-banner-close {

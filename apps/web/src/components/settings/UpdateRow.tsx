@@ -1,5 +1,7 @@
 import React from 'react';
 import { RefreshCw } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { App } from '@capacitor/app';
 import { SettingsRow } from '../profile/ProfileRows';
 import {
   canSelfUpdate,
@@ -13,7 +15,7 @@ import {
   updaterStatus,
   type UpdateState,
 } from '../../services/appUpdate';
-import { currentVersionName } from '../../services/updateCheck';
+import { currentVersionName, type LatestVersion } from '../../services/updateCheck';
 import './UpdateRow.css';
 
 /**
@@ -45,6 +47,23 @@ export const UpdateRow: React.FC = () => {
     return () => { alive = false; };
   }, []);
 
+  const download = async (latest: LatestVersion) => {
+    setState({ stage: 'downloading', latest, percent: 0 });
+    const done = await downloadUpdate(latest, (percent) => {
+      // Functional update: progress events arrive faster than React
+      // re-renders, and reading `state` here would read a stale one.
+      setState((s) => (s.stage === 'downloading' ? { ...s, percent } : s));
+    });
+    setState(done);
+  };
+
+  const check = async (): Promise<UpdateState> => {
+    setState({ stage: 'checking' });
+    const found = await lookForUpdate(running);
+    setState(found);
+    return found;
+  };
+
   /*
    * The whole flow, as one handler.
    *
@@ -57,27 +76,18 @@ export const UpdateRow: React.FC = () => {
 
     switch (state.stage) {
       case 'blocked': {
+        // Android's switch opens over the app; whether it was turned on is
+        // read when the person comes back (see the effect below). Reading it
+        // here, the moment the screen opened, always said "not yet" - and the
+        // button stayed on "Allow updates" after they had allowed it.
+        awaitingPermission.current = state.latest;
         await openInstallPermission();
-        // Re-read rather than assume. They may have come straight back
-        // without granting anything, and claiming otherwise would send them
-        // into a download that cannot be installed.
-        const status = await updaterStatus();
-        const granted = !!status && !status.needsPermission;
-        setPermissionKnown(granted);
-        setState(granted ? { stage: 'available', latest: state.latest } : state);
         return;
       }
 
-      case 'available': {
-        setState({ stage: 'downloading', latest: state.latest, percent: 0 });
-        const done = await downloadUpdate(state.latest, (percent) => {
-          // Functional update: progress events arrive faster than React
-          // re-renders, and reading `state` here would read a stale one.
-          setState((s) => (s.stage === 'downloading' ? { ...s, percent } : s));
-        });
-        setState(done);
+      case 'available':
+        await download(state.latest);
         return;
-      }
 
       case 'ready': {
         const failure = await installUpdate(state.path);
@@ -90,12 +100,56 @@ export const UpdateRow: React.FC = () => {
       case 'idle':
       case 'current':
       case 'failed':
-      default: {
-        setState({ stage: 'checking' });
-        setState(await lookForUpdate(running));
-      }
+      default:
+        await check();
     }
   };
+
+  /* Back from Android's "Install unknown apps" switch: if it was turned on,
+     carry straight on with the download they asked for. */
+  const awaitingPermission = React.useRef<LatestVersion | null>(null);
+  React.useEffect(() => {
+    if (!canSelfUpdate()) return;
+    const sub = App.addListener('appStateChange', ({ isActive }) => {
+      const latest = awaitingPermission.current;
+      if (!isActive || !latest) return;
+      void updaterStatus().then((status) => {
+        const granted = !!status && !status.needsPermission;
+        setPermissionKnown(granted);
+        if (!granted) return;
+        awaitingPermission.current = null;
+        void download(latest);
+      });
+    });
+    return () => { void sub.then((h) => h.remove()); };
+  }, []);
+
+  /* Sent here by the update banner or the "new version" notification
+     (UPDATE_ROUTE): bring the row into view and start without another tap -
+     check, and download if nothing stands in the way. The flag is cleared at
+     once, so going back and forward does not start it again. */
+  const rowRef = React.useRef<HTMLButtonElement>(null);
+  const [params, setParams] = useSearchParams();
+  const startNow = params.get('update') === '1';
+  const started = React.useRef(false);
+  React.useEffect(() => {
+    // Re-armed once the flag is gone, so a later "Get it" starts it again.
+    if (!startNow) { started.current = false; return; }
+    if (started.current || !canSelfUpdate()) return;
+    started.current = true;
+    // Next tick: the row has laid out, and the effect itself sets no state.
+    // Deliberately not cancelled when the flag is cleared just below - that
+    // re-runs this effect, and cancelling here meant nothing ever started.
+    setTimeout(() => {
+      rowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      void check().then((found) => {
+        if (found.stage === 'available') void download(found.latest);
+      });
+    }, 0);
+    setParams((p) => { p.delete('update'); return p; }, { replace: true });
+    // Runs when the flag appears; `check`/`download` only close over setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startNow]);
 
   // The web app is served fresh on every load, so it is never out of date and
   // has nothing to install. A button offering to update it would be a lie.
@@ -127,7 +181,7 @@ export const UpdateRow: React.FC = () => {
         </>
       )}
       action={(
-        <button type="button" className={`pf-mini${primary ? ' is-primary' : ''}`} disabled={busy} onClick={press}>
+        <button ref={rowRef} type="button" className={`pf-mini${primary ? ' is-primary' : ''}`} disabled={busy} onClick={press}>
           {busy && !downloading ? <span className="pf-spin" /> : null}
           {updateButtonLabel(state)}
         </button>
