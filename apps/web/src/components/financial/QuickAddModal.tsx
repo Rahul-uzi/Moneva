@@ -386,7 +386,15 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose, o
 
       setSavedTransaction(res.data);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Could not save that. Try again in a moment.';
+      const failure = err as { response?: { data?: { detail?: string } } };
+      /* No response at all means the server was never reached - no signal,
+         or the server still waking up. Said plainly, because the balance
+         staying where it was looked like a bug when the message did not say
+         that nothing had been saved. */
+      const msg = failure.response?.data?.detail
+        || (!failure.response
+          ? "Couldn't reach MONEVA, so nothing was saved and your balances haven't changed. Check your connection and tap Save again."
+          : 'Could not save that. Try again in a moment.');
       setFormError(msg);
     } finally {
       setIsSubmitting(false);

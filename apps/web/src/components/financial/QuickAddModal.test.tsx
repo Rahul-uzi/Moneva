@@ -169,6 +169,32 @@ describe('the add sheet', () => {
     });
   });
 
+  // Seen on the vivo with no route to the server: the balance stayed put and
+  // the old message did not say that nothing had been saved.
+  it('says nothing was saved when the server cannot be reached', async () => {
+    post.mockRejectedValueOnce(new Error('Network Error'));
+    await openSheet();
+    typeAmount('450');
+    typePayee('Swiggy');
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: /Food & Dining/ }).getAttribute('aria-checked')).toBe('true'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Save expense/ }));
+    expect(await screen.findByText(/nothing was saved and your balances haven't changed/)).toBeTruthy();
+  });
+
+  it("passes on the server's own reason when it gives one", async () => {
+    post.mockRejectedValueOnce({ response: { status: 400, data: { detail: 'Amount is too large.' } } });
+    await openSheet();
+    typeAmount('450');
+    typePayee('Swiggy');
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: /Food & Dining/ }).getAttribute('aria-checked')).toBe('true'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Save expense/ }));
+    expect(await screen.findByText('Amount is too large.')).toBeTruthy();
+  });
+
   it('shows the amount on the save button once there is one', async () => {
     await openSheet();
     expect(screen.getByRole('button', { name: 'Save expense' })).toBeTruthy();
