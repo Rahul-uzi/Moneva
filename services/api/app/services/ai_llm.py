@@ -17,6 +17,7 @@ Design constraints carried over from the rule engine:
 import asyncio
 import json
 import logging
+import math
 import os
 import re
 from typing import Any, Dict, List, Optional
@@ -35,6 +36,18 @@ MAX_HISTORY_TURNS = 10
 #: your network connection" - with Groq sitting there never asked. A provider
 #: that cannot answer quickly has not answered.
 PROVIDER_TIMEOUT_SECONDS = float(os.getenv("AI_PROVIDER_TIMEOUT", "9"))
+
+#: The most a request may weigh, prompt and snapshot together, in tokens.
+#:
+#: Groq's free plan allows 8,000 tokens a minute per model - gpt-oss-120b,
+#: gpt-oss-20b and qwen alike - and refuses any single request over that with
+#: HTTP 413 rather than shortening it. One with sixty full transactions and ten
+#: turns of history came to 8,742. This leaves room for the reply as well.
+REQUEST_TOKEN_BUDGET = int(os.getenv("AI_REQUEST_TOKEN_BUDGET", "5600"))
+
+#: The longest reply asked for. The answer is one small JSON object; the cap
+#: keeps request plus reply inside the per-minute ceiling.
+MAX_COMPLETION_TOKENS = int(os.getenv("AI_MAX_COMPLETION_TOKENS", "2000"))
 
 #: Default model.
 #:
@@ -333,6 +346,51 @@ def _history_block(history: Optional[List[Dict[str, str]]]) -> str:
     return header + "\n".join(lines)
 
 
+def _estimate_tokens(text: str) -> int:
+    """A cautious count: JSON full of numbers and names runs short of the
+    usual four characters a token, so this divides by a little over three."""
+    return math.ceil(len(text) / 3.2)
+
+
+def _render_payload(prompt: str, snapshot: Dict[str, Any], history: Optional[List[Dict[str, str]]]) -> str:
+    # The snapshot is trusted context; the prompt is explicitly fenced off.
+    # Compact separators: the spaces after every comma and colon were ~6%.
+    return (
+        "FINANCIAL SNAPSHOT (trusted):\n"
+        + json.dumps(snapshot, ensure_ascii=False, separators=(",", ":"))
+        + _history_block(history)
+        + "\n\nUSER MESSAGE:\n<untrusted_input>"
+        + prompt.strip()
+        + "</untrusted_input>"
+    )
+
+
+def _fit_payload(prompt: str, snapshot: Dict[str, Any], history: Optional[List[Dict[str, str]]]) -> str:
+    """The request, cut down until it fits REQUEST_TOKEN_BUDGET.
+
+    What goes first is what the answer needs least: the oldest turns of the
+    conversation (the last two stay), then the oldest transactions (the
+    newest ten stay), then the rest of the history. The question and the
+    balances are never cut.
+    """
+    snap = dict(snapshot)
+    turns = list(history or [])[-MAX_HISTORY_TURNS:]
+    fixed = _estimate_tokens(SYSTEM_PROMPT)
+    while True:
+        payload = _render_payload(prompt, snap, turns)
+        if fixed + _estimate_tokens(payload) <= REQUEST_TOKEN_BUDGET:
+            return payload
+        txs = snap.get("recent_transactions")
+        if len(turns) > 2:
+            turns = turns[1:]
+        elif isinstance(txs, list) and len(txs) > 10:
+            snap["recent_transactions"] = txs[:max(10, len(txs) - 5)]  # newest first
+        elif turns:
+            turns = turns[1:]
+        else:
+            return payload  # as small as it goes; let the provider decide
+
+
 async def _call_gemini(payload: str) -> Optional[str]:
     """The backup, tried when Groq cannot answer.
 
@@ -352,6 +410,11 @@ async def _call_gemini(payload: str) -> Optional[str]:
         result = await model.generate_content_async(
             payload,
             generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
+            # No silent retrying. The SDK retried an exhausted quota (429) until
+            # our cut-off, so the health page only ever said "timed out" and
+            # never which: quota, bad key or retired model. One try, and its
+            # real error is what gets remembered.
+            request_options={"retry": None, "timeout": PROVIDER_TIMEOUT_SECONDS},
         )
         return getattr(result, "text", "") or None
     except Exception as exc:
@@ -386,6 +449,7 @@ async def _call_groq(payload: str) -> Optional[str]:
                 json={
                     "model": GROQ_MODEL,
                     "temperature": 0.2,
+                    "max_completion_tokens": MAX_COMPLETION_TOKENS,
                     # Groq's JSON mode. The system prompt already specifies the
                     # exact object, and the same validation runs on the result
                     # either way - this just stops it wrapping the JSON in prose.
@@ -422,15 +486,7 @@ async def query_llm(
     is unavailable, errored, or produced something that did not validate - in
     which case the caller falls back to the rule engine.
     """
-    # The snapshot is trusted context; the prompt is explicitly fenced off.
-    payload = (
-        "FINANCIAL SNAPSHOT (trusted):\n"
-        + json.dumps(snapshot, ensure_ascii=False)
-        + _history_block(history)
-        + "\n\nUSER MESSAGE:\n<untrusted_input>"
-        + prompt.strip()
-        + "</untrusted_input>"
-    )
+    payload = _fit_payload(prompt, snapshot, history)
 
     # GROQ FIRST, Gemini behind it - the order follows which one actually
     # answers, not which one is nominally better.

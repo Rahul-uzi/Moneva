@@ -94,6 +94,26 @@ def parse_amount_to_minor(text: str) -> Optional[int]:
     except ValueError:
         return None
 
+def _compact_transactions(rows: list) -> list:
+    """The snapshot's transactions without what the model never uses.
+
+    Each carried its UUID - about 25 tokens apiece, never referred to by the
+    assistant - and a microsecond timestamp. Sixty of them made the request
+    8,742 tokens, over the 8,000-a-minute ceiling of Groq's free plan, which
+    refuses such a request outright (HTTP 413) before reading a word of it.
+    """
+    out = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        tx = {k: v for k, v in row.items() if k != "id"}
+        when = tx.get("transaction_date")
+        if isinstance(when, str) and len(when) >= 16:
+            tx["transaction_date"] = when[:16].replace("T", " ")
+        out.append(tx)
+    return out
+
+
 async def _build_snapshot(user_id: uuid.UUID, db: AsyncSession) -> dict:
     """Read-only picture of the user's finances handed to the model as context."""
     summary = await get_financial_summary_tool(user_id, db)
@@ -114,7 +134,8 @@ async def _build_snapshot(user_id: uuid.UUID, db: AsyncSession) -> dict:
         # who uses the app as intended, so "what did I spend on groceries"
         # could only ever see a sliver and answer confidently from it. Sixty
         # covers a couple of months and still costs a fraction of the window.
-        "recent_transactions": await get_recent_transactions_tool(user_id, db, limit=60),
+        "recent_transactions": _compact_transactions(
+            await get_recent_transactions_tool(user_id, db, limit=60)),
         "budgets": await get_budgets_tool(user_id, db),
         "goals": await get_goals_tool(user_id, db),
         "bills": await get_bills_tool(user_id, db),
