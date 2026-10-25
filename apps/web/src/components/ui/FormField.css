@@ -57,10 +57,16 @@
 }
 
 .form-reveal {
+  /* Centred by auto margins, not translateY(-50%): the app-wide press rule
+     (index.css) sets transform: scale(0.97) on any tapped button, which
+     REPLACED the translate - so the eye jumped down half its height under
+     the finger and slid back. With no transform of its own, the press only
+     dips it in place, like every other button. */
   position: absolute;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   right: 6px;
-  transform: translateY(-50%);
+  margin: auto 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,7 +84,11 @@
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.form-reveal:hover { color: var(--moneva-text); background: var(--moneva-overlay-weak); }
+/* Only where there is a real pointer: on a phone :hover sticks after a tap,
+   leaving a grey square behind the eye until something else is touched. */
+@media (hover: hover) {
+  .form-reveal:hover { color: var(--moneva-text); background: var(--moneva-overlay-weak); }
+}
 .form-reveal:active { color: var(--moneva-text); }
 .form-reveal:focus-visible {
   outline: 2px solid var(--moneva-blue);
