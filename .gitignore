@@ -81,3 +81,7 @@ Thumbs.db
 /apps/web/android/keystore.properties
 *.jks
 *.keystore
+
+# Local demo API for the test phone (services/api/scripts/demo_server_local.py):
+# its database and JWT secret never leave this computer.
+services/api/demo-data/

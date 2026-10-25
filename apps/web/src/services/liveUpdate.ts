@@ -41,7 +41,28 @@ const PENDING_KEY = 'moneva_live_pending';
 const SEEN_VERSION_KEY = 'moneva_live_seen_version';
 const NOTES_KEY = 'moneva_live_notes';
 
-const isNative = () => Capacitor.isNativePlatform();
+/**
+ * Whether this build takes live updates at all.
+ *
+ * Not one pointed at a server on this computer or the home network - the test
+ * phone's demo setup (`adb reverse` to a local API). Every published bundle
+ * talks to the live server, so taking one swapped the test build for the
+ * public app at its next start and signed it out of the demo account.
+ */
+export const takesLiveUpdates = (
+  apiBase: string = (import.meta.env?.VITE_API_BASE_URL as string | undefined) ?? '',
+): boolean => {
+  try {
+    const host = new URL(apiBase).hostname;
+    return !(host === 'localhost' || host === '127.0.0.1' || host === '10.0.2.2'
+      || host.endsWith('.local') || /^(10|192\.168)\./.test(host) || /^172\.(1[6-9]|2\d|3[01])\./.test(host));
+  } catch {
+    // No usable address: behave like the public app.
+    return true;
+  }
+};
+
+const isNative = () => Capacitor.isNativePlatform() && takesLiveUpdates();
 
 const read = (key: string) => { try { return localStorage.getItem(key); } catch { return null; } };
 const write = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };

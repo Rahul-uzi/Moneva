@@ -133,3 +133,22 @@ describe('switching over', () => {
     expect(live.hasPendingUpdate()).toBe(false);
   });
 });
+
+// The test phone's build talks to a server on this computer; a published
+// bundle would swap it for the public app and sign it out of the demo.
+describe('which builds take live updates', () => {
+  it('the public app does', () => {
+    expect(live.takesLiveUpdates('https://moneva.onrender.com/api')).toBe(true);
+  });
+
+  it('a build pointed at this computer or the home network does not', () => {
+    for (const url of [
+      'http://localhost:8000/api', 'http://127.0.0.1:8000/api', 'http://10.0.2.2:8000/api',
+      'http://192.168.1.20:8000/api', 'http://10.0.0.5:8000/api', 'http://172.20.1.2:8000/api', 'http://devbox.local:8000/api',
+    ]) expect(live.takesLiveUpdates(url)).toBe(false);
+  });
+
+  it('behaves like the public app when the address is missing', () => {
+    expect(live.takesLiveUpdates('')).toBe(true);
+  });
+});
