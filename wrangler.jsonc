@@ -18,6 +18,7 @@
 
   "assets": {
     "directory": "./website",
+    "binding": "ASSETS",
 
     // The Worker script above handles 404 fallback for /web/* (SPA routing).
     // Everything else keeps the default 404 behaviour.

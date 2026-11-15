@@ -6,18 +6,29 @@
 // back to /web/index.html so the React router can take over.
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
+    try {
+      const url = new URL(request.url);
 
-    if (url.pathname.startsWith('/web/')) {
-      // Try the real asset (index.html, assets/*, favicon.svg, …).
-      const asset = await env.ASSETS.fetch(request);
-      if (asset.status !== 404) return asset;
+      if (url.pathname.startsWith('/web/')) {
+        let asset;
+        try {
+          asset = await env.ASSETS.fetch(request);
+        } catch (e1) {
+          asset = null;
+        }
+        if (asset && asset.status !== 404) return asset;
 
-      // No file found — hand off to the React app shell.
-      const shell = new URL('/web/index.html', url.origin);
-      return env.ASSETS.fetch(new Request(shell.href, { method: 'GET' }));
+        const shellUrl = new URL('/web/index.html', url.origin).href;
+        try {
+          return await env.ASSETS.fetch(new Request(shellUrl));
+        } catch (e2) {
+          return new Response(`Shell fetch failed: ${e2.message} | shellUrl=${shellUrl}`, { status: 200 });
+        }
+      }
+
+      return env.ASSETS.fetch(request);
+    } catch (e) {
+      return new Response(`Worker error: ${e.message}`, { status: 200 });
     }
-
-    return env.ASSETS.fetch(request);
   },
 };
