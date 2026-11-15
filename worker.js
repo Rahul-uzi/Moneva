@@ -15,7 +15,7 @@ export default {
 
       // No file found — hand off to the React app shell.
       const shell = new URL('/web/index.html', url.origin);
-      return env.ASSETS.fetch(new Request(shell.href, request));
+      return env.ASSETS.fetch(new Request(shell.href, { method: 'GET' }));
     }
 
     return env.ASSETS.fetch(request);
