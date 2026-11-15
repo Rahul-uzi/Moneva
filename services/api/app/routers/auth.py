@@ -244,14 +244,6 @@ DEMO_NAME = "Demo User"
 @router.post("/demo", response_model=TokenResponse)
 async def demo_login(request: Request, db: AsyncSession = Depends(get_db)):
     """Returns tokens for the shared demo account, creating and seeding it on first call."""
-    import traceback as _tb
-    try:
-        return await _demo_login_inner(request, db)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"demo error: {_tb.format_exc()}") from exc
-
-
-async def _demo_login_inner(request: Request, db: AsyncSession):
     stmt = select(User).where(User.email == DEMO_EMAIL)
     res = await db.execute(stmt)
     user = res.scalar_one_or_none()
@@ -304,6 +296,8 @@ async def _demo_login_inner(request: Request, db: AsyncSession):
                 transaction_type=tx_type, amount_minor=amount * 100,
                 currency="INR", description=desc,
                 transaction_date=dt(days_ago),
+                client_mutation_id=uuid.uuid4(),
+                device_id="demo",
             )
 
         seed = [
