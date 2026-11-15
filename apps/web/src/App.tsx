@@ -57,7 +57,7 @@ export const App: React.FC = () => {
     // Outside the router, so a fault in routing itself still lands somewhere
     // that can offer a restart rather than a white screen.
     <AppErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}>
         <BiometricGate>
           <Routes>
             {/* Public Unauthenticated Auth Routes */}
