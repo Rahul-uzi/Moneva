@@ -14,15 +14,13 @@
   // same answer, written down in the repository where it can be reviewed.)
   "name": "moneva",
   "compatibility_date": "2025-01-01",
+  "main": "./worker.js",
 
   "assets": {
     "directory": "./website",
 
-    // Serve /index.html at /, and return a real 404 for anything else rather
-    // than the index page. The site is one page with in-page anchors, so a
-    // catch-all would answer every mistyped URL with a 200 and hide broken
-    // links - including a wrong APK path, which is the one link here that
-    // matters most.
+    // The Worker script above handles 404 fallback for /web/* (SPA routing).
+    // Everything else keeps the default 404 behaviour.
     "not_found_handling": "404-page"
   },
 

@@ -1,3 +1,0 @@
-# SPA routing for the web app at /web/.
-# Every path under /web/ that is not a real file falls through to the app shell.
-/web/*  /web/index.html  200
