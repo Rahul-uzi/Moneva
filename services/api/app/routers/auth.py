@@ -237,6 +237,103 @@ async def login_user(request: Request, payload: UserLogin, db: AsyncSession = De
     return _issue_token_pair(user, jti)
 
 
+DEMO_EMAIL = "demo@moneva.app"
+DEMO_NAME = "Demo User"
+
+
+@router.post("/demo", response_model=TokenResponse)
+async def demo_login(request: Request, db: AsyncSession = Depends(get_db)):
+    """Returns tokens for the shared demo account, creating and seeding it on first call."""
+    stmt = select(User).where(User.email == DEMO_EMAIL)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+
+    if user is None:
+        from app.core.security import hash_password as _hp
+        from app.models.models import Account, Transaction
+        from datetime import date, timedelta
+
+        user = User(
+            email=DEMO_EMAIL,
+            password_hash=_hp(secrets.token_hex(32)),  # random, no one knows it
+            display_name=DEMO_NAME,
+            currency="INR",
+            timezone="Asia/Kolkata",
+        )
+        db.add(user)
+        await db.flush()
+
+        for name, kind, icon, colour in DEFAULT_CATEGORIES:
+            db.add(Category(user_id=user.id, name=name, type=kind, icon=icon, color=colour))
+        await db.flush()
+
+        # Fetch categories for seeding transactions
+        cats = {r.name: r for r in (await db.execute(
+            select(Category).where(Category.user_id == user.id)
+        )).scalars()}
+
+        savings = Account(
+            user_id=user.id, name="HDFC Savings", account_type="asset",
+            currency="INR", opening_balance_minor=0,
+        )
+        card = Account(
+            user_id=user.id, name="HDFC Credit Card", account_type="liability",
+            currency="INR", opening_balance_minor=0, statement_day=25, due_day=5,
+            credit_limit_minor=10000000,
+        )
+        db.add(savings); db.add(card)
+        await db.flush()
+
+        today = datetime.now(timezone.utc).date()
+
+        def dt(days_ago: int):
+            return datetime.combine(today - timedelta(days=days_ago), datetime.min.time()).replace(tzinfo=timezone.utc)
+
+        def tx(acc, cat_name, amount, desc, days_ago, tx_type="expense"):
+            return Transaction(
+                user_id=user.id, account_id=acc.id,
+                category_id=cats.get(cat_name, cats.get("Other")).id,
+                transaction_type=tx_type, amount_minor=amount * 100,
+                currency="INR", description=desc,
+                transaction_date=dt(days_ago),
+            )
+
+        seed = [
+            # Income
+            tx(savings, "Salary", 55000, "Google Pay - HDFC Bank - Salary Nov", 2, "income"),
+            tx(savings, "Salary", 55000, "Google Pay - HDFC Bank - Salary Oct", 32, "income"),
+            tx(savings, "Other Income", 3000, "Google Pay - Freelance Project", 15, "income"),
+            # Expenses
+            tx(card, "Food & Dining", 450, "Google Pay - Swiggy", 1),
+            tx(card, "Food & Dining", 320, "Google Pay - Zomato", 4),
+            tx(card, "Food & Dining", 180, "Google Pay - Chai Point", 7),
+            tx(card, "Groceries", 2340, "Google Pay - DMart", 5),
+            tx(card, "Groceries", 890, "Google Pay - BigBasket", 12),
+            tx(card, "Transport", 240, "Google Pay - Ola", 2),
+            tx(card, "Transport", 180, "Google Pay - Rapido", 9),
+            tx(savings, "Rent & Housing", 18000, "Google Pay - Landlord - Rent Nov", 3),
+            tx(savings, "Utilities", 1240, "Google Pay - BESCOM - Electricity", 10),
+            tx(card, "Shopping", 2199, "Google Pay - Amazon", 8),
+            tx(card, "Health", 650, "Google Pay - Apollo Pharmacy", 6),
+            tx(card, "Entertainment", 199, "Google Pay - Netflix", 14),
+            tx(card, "Entertainment", 149, "Google Pay - Spotify", 14),
+            tx(card, "Food & Dining", 560, "Google Pay - Cafe Coffee Day", 20),
+            tx(card, "Transport", 850, "Google Pay - Uber - Airport", 22),
+            tx(savings, "Rent & Housing", 18000, "Google Pay - Landlord - Rent Oct", 33),
+            tx(card, "Groceries", 1760, "Google Pay - Reliance Fresh", 28),
+        ]
+        for t in seed:
+            db.add(t)
+        await db.commit()
+        await db.refresh(user)
+
+    jti = await session_store.start_session(
+        db, user, device_label="Demo", ip=client_ip(request)
+    )
+    await db.commit()
+    return _issue_token_pair(user, jti)
+
+
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_tokens(
     request: Request,

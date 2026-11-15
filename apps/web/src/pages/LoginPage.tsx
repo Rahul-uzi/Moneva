@@ -20,10 +20,11 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, completeTwoFactorLogin } = useAuthStore();
+  const { login, completeTwoFactorLogin, loginDemo } = useAuthStore();
   const { addToast } = useUiStore();
 
   const [loginError, setLoginError] = React.useState<string | null>(null);
+  const [isDemoLoading, setIsDemoLoading] = React.useState(false);
 
   // Set once the password is accepted but the account still needs a second factor.
   const [challengeToken, setChallengeToken] = React.useState<string | null>(null);
@@ -37,6 +38,20 @@ export const LoginPage: React.FC = () => {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
+
+  const onDemoLogin = async () => {
+    setLoginError(null);
+    setIsDemoLoading(true);
+    try {
+      await loginDemo();
+      navigate('/');
+    } catch (err: unknown) {
+      const msg = (err as Error).message || 'Could not load demo. Please try again.';
+      setLoginError(msg);
+    } finally {
+      setIsDemoLoading(false);
+    }
+  };
 
   const onSubmit = async (data: LoginFormData) => {
     setLoginError(null);
@@ -145,18 +160,26 @@ export const LoginPage: React.FC = () => {
         )}
 
         {!challengeToken && (
-          <div className="auth-footer">
-            {/* There was no way back in at all before this: no reset endpoint
-                and no link, so a forgotten password meant a lost account. */}
-            <Link to="/forgot-password" className="auth-link">
-              Forgot password?
-            </Link>
-            <div className="auth-footer-divider" />
-            <span className="text-body">Don't have an account?</span>{' '}
-            <Link to="/register" className="auth-link">
-              Create Account
-            </Link>
-          </div>
+          <>
+            <div className="auth-demo-divider">
+              <span>or</span>
+            </div>
+            <Button type="button" variant="ghost" fullWidth isLoading={isDemoLoading} onClick={onDemoLogin}>
+              Try Demo — no sign-up needed
+            </Button>
+            <div className="auth-footer">
+              {/* There was no way back in at all before this: no reset endpoint
+                  and no link, so a forgotten password meant a lost account. */}
+              <Link to="/forgot-password" className="auth-link">
+                Forgot password?
+              </Link>
+              <div className="auth-footer-divider" />
+              <span className="text-body">Don't have an account?</span>{' '}
+              <Link to="/register" className="auth-link">
+                Create Account
+              </Link>
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -26,6 +26,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<string | null>;
   /** Completes a 2FA login by exchanging the challenge for real tokens. */
   completeTwoFactorLogin: (tokens: AuthTokens) => Promise<void>;
+  loginDemo: () => Promise<void>;
   register: (email: string, password: string, displayName: string, currency?: string, timezone?: string) => Promise<void>;
   logout: () => Promise<void>;
   restoreSession: () => Promise<void>;
@@ -70,6 +71,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Do NOT write transient UI error into global store — page handles display via local state
       set({ isLoading: false, error: null, isAuthenticated: false, isInitialized: true });
       throw new Error(msg, { cause: err });
+    }
+  },
+
+  loginDemo: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await apiClient.post<AuthTokens>('/auth/demo');
+      const tokens = response.data;
+      setStoredTokens(tokens);
+      const userRes = await apiClient.get<User>('/auth/me');
+      setCachedUser(userRes.data);
+      set({ tokens, user: userRes.data, isAuthenticated: true, isInitialized: true, isLoading: false, error: null });
+    } catch (err: unknown) {
+      const msg = (err as Error).message || 'Demo login failed';
+      set({ isLoading: false, error: msg });
+      throw err;
     }
   },
 
